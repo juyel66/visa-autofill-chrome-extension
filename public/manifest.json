@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Visa Autofill",
+  "version": "0.1.0",
+  "description": "Smart Visa Application Autofill",
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "Visa Autofill"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ],
+  "permissions": [
+    "activeTab"
+  ]
+}
