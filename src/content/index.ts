@@ -9,6 +9,7 @@ import type {
   UndoResponsePayload,
   VisaPageResponsePayload,
   WorkflowStatePayload,
+  AttachmentsStatusPayload,
 } from '../core/messaging'
 import { normalizeApplicant } from '../core/normalization'
 import type { AutofillOperation } from '../core/safety'
@@ -79,6 +80,7 @@ chrome.runtime.onMessage.addListener(
         | WorkflowStatePayload
         | DocumentAttachmentPayload
         | UndoResponsePayload
+        | AttachmentsStatusPayload
       >
     ) => void
   ) => {
@@ -148,10 +150,53 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === 'EXECUTE_AUTOFILL') {
       const detection = detectIndiaVisaPage()
-      if (!detection.matched) {
+      if (!detection.matched || detection.page === 'unknown' || !detection.page) {
+        activeState = updateWorkflowState(activeState, {
+          status: 'manual-required',
+          currentPage: 'unknown',
+        })
         sendResponse({
           status: 'error',
-          error: 'Current page is not a supported visa application page.',
+          error: 'Visa Autofill could not identify this page.',
+        })
+        return true
+      }
+
+      // Check manual boundaries
+      if (
+        detection.page === 'login' ||
+        detection.page === 'otp' ||
+        detection.page === 'captcha' ||
+        detection.page === 'payment'
+      ) {
+        activeState = updateWorkflowState(activeState, {
+          status: 'manual-required',
+          currentPage: detection.page,
+        })
+        sendResponse({
+          status: 'error',
+          error: `${detection.page.toUpperCase()} verification is required. Please solve manually.`,
+        })
+        return true
+      }
+
+      if (detection.page === 'review') {
+        activeState = updateWorkflowState(activeState, {
+          status: 'waiting-for-user',
+          currentPage: 'review',
+        })
+        sendResponse({
+          status: 'error',
+          error: 'Review the application before submitting.',
+        })
+        return true
+      }
+
+      // Applicant Consistency Check
+      if (activeState.status !== 'idle' && activeState.applicantId && message.applicant.applicantId !== activeState.applicantId) {
+        sendResponse({
+          status: 'error',
+          error: 'Applicant consistency violation. Workflow stopped.',
         })
         return true
       }
@@ -167,12 +212,21 @@ chrome.runtime.onMessage.addListener(
         return true
       }
 
-      const mappings = getIndiaVisaMappings(detection.flow, detection.page)
+      let mappings = getIndiaVisaMappings(detection.flow, detection.page)
+      if (message.failedMappingIds && message.failedMappingIds.length > 0) {
+        mappings = mappings.filter((m) => message.failedMappingIds!.includes(m.id))
+      }
 
       executeAutofill({
         mappings,
         applicant: normalizedApplicant,
-        options: { policy: 'fill-empty' },
+        options: {
+          policy: 'fill-empty',
+          validatePageConsistency: () => {
+            const currentDet = detectIndiaVisaPage()
+            return currentDet.matched && currentDet.page === detection.page
+          },
+        },
       })
         .then((result) => {
           if (detection.page && !activeState.completedPages.includes(detection.page)) {
@@ -264,7 +318,8 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === 'EXECUTE_UNDO') {
-      if (!latestOperation || latestOperation.changes.length === 0) {
+      const opToUndo = message.operation || latestOperation
+      if (!opToUndo || opToUndo.changes.length === 0) {
         sendResponse({
           status: 'error',
           error: 'No recent autofill operation available to undo on this page.',
@@ -272,9 +327,11 @@ chrome.runtime.onMessage.addListener(
         return true
       }
 
-      executeUndo(latestOperation)
+      executeUndo(opToUndo)
         .then((undoRes) => {
-          latestOperation = null
+          if (opToUndo === latestOperation) {
+            latestOperation = null
+          }
           sendResponse({
             status: 'success',
             data: {
@@ -290,6 +347,41 @@ chrome.runtime.onMessage.addListener(
           })
         })
 
+      return true
+    }
+
+    if (message.type === 'CHECK_ATTACHMENTS') {
+      const statuses: Record<string, { attached: boolean; fileName?: string; fileSize?: number }> = {}
+
+      for (const req of message.requirements) {
+        if (!req.targetSelector) {
+          statuses[req.id] = { attached: false }
+          continue
+        }
+
+        const element = resolveElement(req.targetSelector)
+        if (element instanceof HTMLInputElement && element.type.toLowerCase() === 'file') {
+          if (element.files && element.files.length > 0) {
+            statuses[req.id] = {
+              attached: true,
+              fileName: element.files[0].name,
+              fileSize: element.files[0].size,
+            }
+          } else {
+            statuses[req.id] = { attached: false }
+          }
+        } else {
+          statuses[req.id] = { attached: false }
+        }
+      }
+
+      sendResponse({
+        status: 'success',
+        data: {
+          type: 'ATTACHMENTS_STATUS',
+          statuses,
+        },
+      })
       return true
     }
 
