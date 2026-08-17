@@ -1,3 +1,5 @@
+import type { AutofillOperation } from '../safety/types'
+
 export type WorkflowStatus =
   | 'idle'
   | 'detected'
@@ -8,6 +10,8 @@ export type WorkflowStatus =
   | 'completed'
   | 'blocked'
   | 'error'
+  | 'manual-required'
+  | 'cancelled'
 
 export interface PageIdentity {
   countryCode: string
@@ -23,6 +27,7 @@ export interface PageDetectionResult {
 }
 
 export interface WorkflowState {
+  sessionId: string | null
   status: WorkflowStatus
   countryCode: string | null
   flow: string | null
@@ -32,6 +37,9 @@ export interface WorkflowState {
   completedPages: string[]
   formReady: boolean
   blockedReason?: string
+  tabId?: number | null
+  operations?: Record<string, AutofillOperation>
+  errors?: string[]
 }
 
 export interface WorkflowSession {
