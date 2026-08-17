@@ -1,61 +1,86 @@
 import type { FieldSelector } from './types'
 
 /**
- * Resolves a target DOM HTMLElement using developer-defined selector strategies (id, name, label, css, xpath).
+ * Queries all matching target HTMLElements using developer-defined selector strategies.
  */
-export function resolveElement(selector?: FieldSelector): HTMLElement | null {
+export function resolveElements(selector?: FieldSelector): HTMLElement[] {
   if (!selector || !selector.value || typeof document === 'undefined') {
-    return null
+    return []
   }
 
   const { strategy, value } = selector
+  const elements: HTMLElement[] = []
 
   try {
     switch (strategy) {
       case 'id': {
-        return document.getElementById(value)
+        const els = Array.from(document.querySelectorAll(`[id="${CSS.escape(value)}"]`))
+        return els.filter((el): el is HTMLElement => el instanceof HTMLElement)
       }
       case 'name': {
-        const el = document.querySelector(`[name="${CSS.escape(value)}"]`)
-        return el instanceof HTMLElement ? el : null
+        const els = Array.from(document.querySelectorAll(`[name="${CSS.escape(value)}"]`))
+        return els.filter((el): el is HTMLElement => el instanceof HTMLElement)
       }
       case 'css': {
-        const el = document.querySelector(value)
-        return el instanceof HTMLElement ? el : null
+        const els = Array.from(document.querySelectorAll(value))
+        return els.filter((el): el is HTMLElement => el instanceof HTMLElement)
       }
       case 'label': {
         // Strategy 1: Find <label for="value">
-        const labelFor = document.querySelector(`label[for="${CSS.escape(value)}"]`)
-        if (labelFor && labelFor.getAttribute('for')) {
-          const target = document.getElementById(labelFor.getAttribute('for')!)
-          if (target instanceof HTMLElement) return target
+        const labelsFor = Array.from(document.querySelectorAll(`label[for="${CSS.escape(value)}"]`))
+        for (const labelFor of labelsFor) {
+          const forId = labelFor.getAttribute('for')
+          if (forId) {
+            const target = document.getElementById(forId)
+            if (target instanceof HTMLElement) {
+              elements.push(target)
+            }
+          }
         }
         // Strategy 2: Find <label> matching text -> containing <input>
         const labels = Array.from(document.querySelectorAll('label'))
         for (const l of labels) {
           if (l.textContent && l.textContent.toLowerCase().includes(value.toLowerCase())) {
             const input = l.querySelector('input, select, textarea')
-            if (input instanceof HTMLElement) return input
+            if (input instanceof HTMLElement) {
+              elements.push(input)
+            }
           }
         }
-        return null
+        // Remove duplicates
+        return Array.from(new Set(elements))
       }
       case 'xpath': {
-        const result = document.evaluate(
+        const iterator = document.evaluate(
           value,
           document,
           null,
-          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          XPathResult.ORDERED_NODE_ITERATOR_TYPE,
           null
         )
-        const node = result.singleNodeValue
-        return node instanceof HTMLElement ? node : null
+        let node = iterator.iterateNext()
+        while (node) {
+          if (node instanceof HTMLElement) {
+            elements.push(node)
+          }
+          node = iterator.iterateNext()
+        }
+        return elements
       }
       default:
-        return null
+        return []
     }
   } catch (err) {
     console.error(`Failed to resolve selector (${strategy}: ${value}):`, err)
-    return null
+    return []
   }
+}
+
+/**
+ * Resolves a single target DOM HTMLElement.
+ * Returns null if no elements are matched, or if multiple elements match (ambiguous target).
+ */
+export function resolveElement(selector?: FieldSelector): HTMLElement | null {
+  const els = resolveElements(selector)
+  return els.length === 1 ? els[0] : null
 }
