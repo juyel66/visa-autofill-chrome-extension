@@ -39,4 +39,62 @@ export const REGULAR_VISA_SELECTORS: Record<string, IndiaFieldSelector> = {
   presentCountry: { strategy: 'name', value: 'pres_country' },
   presentPostalCode: { strategy: 'name', value: 'pres_postal_code' },
   mobile: { strategy: 'name', value: 'mobile_no' },
+  phone: { strategy: 'name', value: 'phone_no' },
+
+  // Permanent Address
+  permanentAddressLine1: { strategy: 'name', value: 'perm_addr1' },
+  permanentAddressLine2: { strategy: 'name', value: 'perm_addr2' },
+  permanentCity: { strategy: 'name', value: 'perm_city' },
+  permanentState: { strategy: 'name', value: 'perm_state' },
+  permanentCountry: { strategy: 'name', value: 'perm_country' },
+  permanentPostalCode: { strategy: 'name', value: 'perm_postal_code' },
+  sameAsPresentAddress: { strategy: 'name', value: 'same_address' },
+
+  // Family Information
+  fatherName: { strategy: 'name', value: 'father_name' },
+  fatherNationality: { strategy: 'name', value: 'father_nationality' },
+  fatherPreviousNationality: { strategy: 'name', value: 'father_prev_nationality' },
+  fatherPlaceOfBirth: { strategy: 'name', value: 'father_place_birth' },
+  fatherCountryOfBirth: { strategy: 'name', value: 'father_country_birth' },
+
+  motherName: { strategy: 'name', value: 'mother_name' },
+  motherNationality: { strategy: 'name', value: 'mother_nationality' },
+  motherPreviousNationality: { strategy: 'name', value: 'mother_prev_nationality' },
+  motherPlaceOfBirth: { strategy: 'name', value: 'mother_place_birth' },
+  motherCountryOfBirth: { strategy: 'name', value: 'mother_country_birth' },
+
+  spouseName: { strategy: 'name', value: 'spouse_name' },
+  spouseNationality: { strategy: 'name', value: 'spouse_nationality' },
+  spousePreviousNationality: { strategy: 'name', value: 'spouse_prev_nationality' },
+  spousePlaceOfBirth: { strategy: 'name', value: 'spouse_place_birth' },
+  spouseCountryOfBirth: { strategy: 'name', value: 'spouse_country_birth' },
+
+  // Employment / Occupation
+  presentOccupation: { strategy: 'name', value: 'present_occupation' },
+  designationRank: { strategy: 'name', value: 'designation' },
+  employerName: { strategy: 'name', value: 'employer_name' },
+  employerAddress: { strategy: 'name', value: 'employer_address' },
+  employerPhone: { strategy: 'name', value: 'employer_phone' },
+
+  // Travel Details
+  purposeOfVisit: { strategy: 'name', value: 'purpose' },
+  intendedArrivalDate: { strategy: 'name', value: 'arrival_date' },
+  intendedDepartureDate: { strategy: 'name', value: 'departure_date' },
+  countriesToVisit: { strategy: 'name', value: 'countries_to_visit' },
+  previousVisitToCountry: { strategy: 'name', value: 'prev_visit' },
+
+  // Accommodation
+  hotelName: { strategy: 'name', value: 'hotel_name' },
+  hotelAddress: { strategy: 'name', value: 'hotel_address' },
+  hotelState: { strategy: 'name', value: 'hotel_state' },
+  hotelPhone: { strategy: 'name', value: 'hotel_phone' },
+  bookingReference: { strategy: 'name', value: 'booking_ref' },
+
+  // Reference / Contact
+  referenceIndiaName: { strategy: 'name', value: 'ref_india_name' },
+  referenceIndiaAddress: { strategy: 'name', value: 'ref_india_address' },
+  referenceIndiaPhone: { strategy: 'name', value: 'ref_india_phone' },
+  referenceHomeName: { strategy: 'name', value: 'ref_home_name' },
+  referenceHomeAddress: { strategy: 'name', value: 'ref_home_address' },
+  referenceHomePhone: { strategy: 'name', value: 'ref_home_phone' },
 }
