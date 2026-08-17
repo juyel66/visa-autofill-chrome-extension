@@ -90,8 +90,8 @@ export const SYNTHETIC_APPLICANT_PROFILE: ApplicantProfile = {
 }
 
 export const SYNTHETIC_TD3_MRZ_LINES = [
-  'P<BDTEST<<JOHN<TEST<APPLICANT<<<<<<<<<<<<<<',
-  'TEST0000000BGD9501150M3501147<<<<<<<<<<<<<<04',
+  'P<BGDAPPLICANT<<JOHN<TEST<<<<<<<<<<<<<<<<<<<',
+  'TEST000006BGD9501153M3501140<<<<<<<<<<<<<<04',
 ]
 
 export const SYNTHETIC_INDIA_VISA_FORM_HTML = `
