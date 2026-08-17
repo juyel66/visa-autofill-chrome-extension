@@ -1,7 +1,7 @@
 import type { ApplicantProfile } from '../applicant/types'
-import type { AutofillResult } from '../autofill/types'
+import type { AutofillResult, FieldSelector } from '../autofill/types'
 import type { DocumentAttachmentResult } from '../document/requirement.types'
-import type { UndoResult } from '../safety/types'
+import type { UndoResult, AutofillOperation } from '../safety/types'
 import type { WorkflowState } from '../workflow/types'
 
 export interface GenericPageDetectionResult {
@@ -26,6 +26,7 @@ export type ExtensionMessageType =
   | 'PAGE_CHANGED'
   | 'ATTACH_DOCUMENT'
   | 'EXECUTE_UNDO'
+  | 'CHECK_ATTACHMENTS'
 
 export type PingBackgroundMessage = {
   type: 'PING_BACKGROUND'
@@ -42,6 +43,7 @@ export type GetCurrentVisaPageMessage = {
 export type ExecuteAutofillMessage = {
   type: 'EXECUTE_AUTOFILL'
   applicant: ApplicantProfile
+  failedMappingIds?: string[]
 }
 
 export type StartWorkflowMessage = {
@@ -70,6 +72,12 @@ export type AttachDocumentMessage = {
 
 export type ExecuteUndoMessage = {
   type: 'EXECUTE_UNDO'
+  operation?: AutofillOperation | null
+}
+
+export type CheckAttachmentsMessage = {
+  type: 'CHECK_ATTACHMENTS'
+  requirements: { id: string; targetSelector?: FieldSelector }[]
 }
 
 export type ExtensionMessage =
@@ -83,6 +91,7 @@ export type ExtensionMessage =
   | PageChangedMessage
   | AttachDocumentMessage
   | ExecuteUndoMessage
+  | CheckAttachmentsMessage
 
 export type BackgroundPongPayload = {
   type: 'BACKGROUND_PONG'
@@ -117,6 +126,11 @@ export type DocumentAttachmentPayload = {
 export type UndoResponsePayload = {
   type: 'UNDO_COMPLETED'
   result: UndoResult
+}
+
+export type AttachmentsStatusPayload = {
+  type: 'ATTACHMENTS_STATUS'
+  statuses: Record<string, { attached: boolean; fileName?: string; fileSize?: number }>
 }
 
 export type ExtensionResponseSuccess<T> = {
