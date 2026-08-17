@@ -10,6 +10,32 @@ export type AutofillFieldStatus =
   | 'not-found'
   | 'unsupported'
   | 'already-filled'
+  | 'already-matching'
+  | 'skipped-existing'
+
+export type FailureCategory =
+  | 'page-not-recognized'
+  | 'field-not-found'
+  | 'selector-failed'
+  | 'ambiguous-target'
+  | 'unsupported-field'
+  | 'manual-required'
+  | 'validation-failed'
+  | 'option-not-found'
+  | 'readonly-field'
+  | 'disabled-field'
+  | 'stale-element'
+  | 'page-changed'
+  | 'workflow-cancelled'
+  | 'applicant-missing'
+  | 'document-missing'
+  | 'attachment-failed'
+  | 'unknown-error'
+  | 'skipped-existing'
+  | 'already-matching'
+  | 'mapping-mismatch'
+
+export type FailureSeverity = 'recoverable' | 'skippable' | 'manual-required' | 'fatal'
 
 export type FieldInputType =
   | 'text'
@@ -42,12 +68,16 @@ export interface FieldMapping {
   required?: boolean
   transform?: string
   notes?: string
+  fallbackSelector?: FieldSelector
 }
 
 export interface AutofillFieldResult {
   fieldId: string
   status: AutofillFieldStatus
   reason?: string
+  attempts?: number
+  failureType?: FailureCategory
+  pageId?: string | null
 }
 
 export interface AutofillResult {
@@ -64,6 +94,7 @@ export interface AutofillResult {
 export interface AutofillOptions {
   dryRun?: boolean
   policy?: AutofillPolicy
+  validatePageConsistency?: () => boolean
 }
 
 export interface AutofillRequest {
