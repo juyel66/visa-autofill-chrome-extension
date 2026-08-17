@@ -12,3 +12,8 @@ export * from './documents/documentService'
 export * from './compatibility'
 export * from './__tests__/compatibility.test'
 export * from './__tests__/personalPassportAutofill.test'
+export * from './__tests__/documentAutofill.test'
+export * from './__tests__/workflowHardening.test'
+export * from './__tests__/recovery.test'
+export * from './__tests__/validation.test'
+
