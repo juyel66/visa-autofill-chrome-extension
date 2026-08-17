@@ -1,1 +1,39 @@
 @import "tailwindcss";
+
+:root {
+  --color-primary: #4F46E5;
+  --color-secondary: #0EA5E9;
+  --color-bg-start: #E0F2FE;
+  --color-bg-middle: #F8FAFC;
+  --color-bg-end: #EEF2FF;
+  --color-text: #111827;
+  --color-muted: #64748B;
+  --color-border: #CBD5E1;
+  --color-accent: #6366F1;
+  --color-surface: #FFFFFF;
+}
+
+.bg-global-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-start),
+    var(--color-bg-middle),
+    var(--color-bg-end)
+  );
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: #ffffff;
+}
+
+.btn-ghost {
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
