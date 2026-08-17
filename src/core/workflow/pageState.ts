@@ -2,6 +2,7 @@ import type { WorkflowSession, WorkflowState } from './types'
 
 export function createInitialWorkflowState(): WorkflowState {
   return {
+    sessionId: null,
     status: 'idle',
     countryCode: null,
     flow: null,
@@ -10,6 +11,9 @@ export function createInitialWorkflowState(): WorkflowState {
     applicantId: null,
     completedPages: [],
     formReady: false,
+    tabId: null,
+    operations: {},
+    errors: [],
   }
 }
 
