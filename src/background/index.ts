@@ -46,16 +46,24 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === 'START_WORKFLOW') {
-      activeWorkflowState = updateWorkflowState(activeWorkflowState, {
-        status: 'ready',
-        applicantId: message.applicantId,
-      })
-      sendResponse({
-        status: 'success',
-        data: {
-          type: 'WORKFLOW_STATE_RESPONSE',
-          state: activeWorkflowState,
-        },
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const activeTab = tabs[0]
+        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+        activeWorkflowState = updateWorkflowState(activeWorkflowState, {
+          sessionId,
+          status: 'ready',
+          applicantId: message.applicantId,
+          tabId: activeTab?.id || null,
+          operations: {},
+          errors: [],
+        })
+        sendResponse({
+          status: 'success',
+          data: {
+            type: 'WORKFLOW_STATE_RESPONSE',
+            state: activeWorkflowState,
+          },
+        })
       })
       return true
     }
@@ -77,7 +85,8 @@ chrome.runtime.onMessage.addListener(
       message.type === 'GET_CURRENT_VISA_PAGE' ||
       message.type === 'EXECUTE_AUTOFILL' ||
       message.type === 'ATTACH_DOCUMENT' ||
-      message.type === 'EXECUTE_UNDO'
+      message.type === 'EXECUTE_UNDO' ||
+      message.type === 'CHECK_ATTACHMENTS'
     ) {
       chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
         const activeTab = tabs[0]
@@ -89,13 +98,64 @@ chrome.runtime.onMessage.addListener(
           return
         }
 
+        // Tab and Applicant Consistency Check
+        if (
+          activeWorkflowState.status !== 'idle' &&
+          activeWorkflowState.tabId !== null &&
+          typeof activeWorkflowState.tabId !== 'undefined' &&
+          activeTab.id !== activeWorkflowState.tabId
+        ) {
+          sendResponse({
+            status: 'error',
+            error: 'Active tab mismatch. Please return to the correct tab or restart workflow.',
+          })
+          return
+        }
+
+        // Inject page-specific operation on undo lookup
+        let finalMessage: ExtensionMessage = message
+        if (message.type === 'EXECUTE_UNDO') {
+          const currentPage = activeWorkflowState.currentPage || ''
+          const op = activeWorkflowState.operations?.[currentPage]
+          finalMessage = {
+            ...message,
+            operation: op || null,
+          }
+        }
+
         const tabResponse = await sendMessageToTab<
           | VisaPageResponsePayload
           | AutofillResponsePayload
           | WorkflowStatePayload
           | DocumentAttachmentPayload
           | UndoResponsePayload
-        >(activeTab.id, message)
+        >(activeTab.id, finalMessage)
+
+        // Store active operation on successful execute-autofill
+        if (
+          message.type === 'EXECUTE_AUTOFILL' &&
+          tabResponse.status === 'success' &&
+          tabResponse.data?.type === 'AUTOFILL_COMPLETED'
+        ) {
+          const res = tabResponse.data.result
+          if (res.operation && activeWorkflowState.currentPage) {
+            if (!activeWorkflowState.operations) {
+              activeWorkflowState.operations = {}
+            }
+            activeWorkflowState.operations[activeWorkflowState.currentPage] = res.operation
+          }
+        }
+
+        // Clear page operation mapping on successful execute-undo
+        if (
+          message.type === 'EXECUTE_UNDO' &&
+          tabResponse.status === 'success' &&
+          tabResponse.data?.type === 'UNDO_COMPLETED'
+        ) {
+          if (activeWorkflowState.operations && activeWorkflowState.currentPage) {
+            delete activeWorkflowState.operations[activeWorkflowState.currentPage]
+          }
+        }
 
         sendResponse(tabResponse)
       })
