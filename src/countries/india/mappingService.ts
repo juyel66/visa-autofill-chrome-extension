@@ -21,7 +21,11 @@ export function getIndiaVisaMappings(
       : [...REGULAR_VISA_MAPPINGS, ...EVISA_MAPPINGS]
 
   if (page && page !== 'unknown') {
-    return baseMappings.filter((m) => m.status === 'verified')
+    const verified = baseMappings.filter((m) => m.status === 'verified')
+    if (page === 'application-form') {
+      return verified
+    }
+    return verified.filter((m) => m.page === page)
   }
 
   return baseMappings
