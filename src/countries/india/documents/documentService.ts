@@ -11,7 +11,7 @@ export function getIndiaDocumentRequirements(
   page: IndiaVisaPage | null
 ): DocumentRequirement[] {
   // Only return document requirements on document upload pages or generic application form stages
-  if (page === 'document-reupload' || page === 'application-form' || page === 'application-start') {
+  if (page === 'document-upload' || page === 'document-reupload' || page === 'application-form' || page === 'application-start') {
     if (flow === 'regular') return INDIA_REGULAR_DOCUMENT_REQUIREMENTS
     if (flow === 'evisa') return INDIA_EVISA_DOCUMENT_REQUIREMENTS
     return [...INDIA_REGULAR_DOCUMENT_REQUIREMENTS, ...INDIA_EVISA_DOCUMENT_REQUIREMENTS]
