@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Button } from '../../components/ui'
 import type { ApplicantProfile } from '../../core/applicant'
 import {
@@ -12,11 +12,13 @@ import type {
   UndoResponsePayload,
   VisaPageResponsePayload,
   WorkflowStatePayload,
+  AttachmentsStatusPayload,
 } from '../../core/messaging'
 import { sendToBackground } from '../../core/messaging'
 import type { WorkflowState } from '../../core/workflow'
 import { getIndiaDocumentRequirements } from '../../countries/india'
 import type { CountryPageDetectionResult } from '../../countries/india/types'
+import { DocumentPreviewModal } from '../../components/document'
 
 export interface DashboardProps {
   selectedApplicant: ApplicantProfile | null
@@ -36,22 +38,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [docRequirements, setDocRequirements] = useState<DocumentRequirement[]>([])
   const [applicantDocs, setApplicantDocs] = useState<DocumentRecord[]>([])
   const [selectedDocMap, setSelectedDocMap] = useState<Record<string, string>>({})
+  const [confirmAttachmentReq, setConfirmAttachmentReq] = useState<DocumentRequirement | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null)
+  const [attachmentStates, setAttachmentStates] = useState<
+    Record<
+      string,
+      {
+        state: 'not-started' | 'awaiting-user' | 'attaching' | 'attached' | 'failed' | 'manual-required' | 'cancelled' | 'manual-verification-required'
+        verifiedName?: string
+        verifiedSize?: number
+        error?: string
+        retryCount?: number
+      }
+    >
+  >({})
+  const [retryCountMap, setRetryCountMap] = useState<Record<string, number>>({})
+  const [failedFieldsMap, setFailedFieldsMap] = useState<Record<string, string[]>>({})
 
   const [isCheckingPage, setIsCheckingPage] = useState<boolean>(true)
   const [isAutofilling, setIsAutofilling] = useState<boolean>(false)
   const [isUndoing, setIsUndoing] = useState<boolean>(false)
   const [canUndo, setCanUndo] = useState<boolean>(false)
-  const [isAttaching, setIsAttaching] = useState<string | null>(null)
 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg)
     setTimeout(() => {
       setToastMessage(null)
     }, 4000)
-  }
+  }, [setToastMessage])
 
   useEffect(() => {
     let isMounted = true
@@ -112,6 +129,93 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }, [selectedApplicant])
 
+  const handleStopWorkflow = useCallback(async () => {
+    setErrorMessage(null)
+    try {
+      const response = await sendToBackground<WorkflowStatePayload>({
+        type: 'STOP_WORKFLOW',
+      })
+
+      if (response.status === 'success' && response.data?.state) {
+        setWorkflowState(response.data.state)
+        setCanUndo(false)
+        showToast('Workflow session stopped.')
+      }
+    } catch {
+      setErrorMessage('Unable to stop workflow.')
+    }
+  }, [setWorkflowState, setCanUndo, showToast, setErrorMessage])
+
+  const verifyCurrentAttachments = async (requirementsList: DocumentRequirement[]) => {
+    if (requirementsList.length === 0) return
+    try {
+      const response = await sendToBackground<AttachmentsStatusPayload>({
+        type: 'CHECK_ATTACHMENTS',
+        requirements: requirementsList.map((r) => ({ id: r.id, targetSelector: r.targetSelector })),
+      })
+      if (response.status === 'success' && response.data?.statuses) {
+        const statuses = response.data.statuses
+        setAttachmentStates((prev) => {
+          const next = { ...prev }
+          let changed = false
+          for (const reqId of Object.keys(statuses)) {
+            const s = statuses[reqId]
+            if (s.attached) {
+              if (prev[reqId]?.state !== 'attached' || prev[reqId]?.verifiedName !== s.fileName) {
+                next[reqId] = {
+                  ...prev[reqId],
+                  state: 'attached',
+                  verifiedName: s.fileName,
+                  verifiedSize: s.fileSize,
+                }
+                changed = true
+              }
+            } else if (prev[reqId]?.state === 'attached') {
+              next[reqId] = { ...prev[reqId], state: 'not-started' }
+              changed = true
+            }
+          }
+          return changed ? next : prev
+        })
+      }
+    } catch (err) {
+      console.error('Failed to verify attachments:', err)
+    }
+  }
+
+  useEffect(() => {
+    if (!detection?.matched || docRequirements.length === 0) return
+
+    const timeout = setTimeout(() => {
+      verifyCurrentAttachments(docRequirements)
+    }, 0)
+
+    const interval = setInterval(() => {
+      verifyCurrentAttachments(docRequirements)
+    }, 1500)
+
+    return () => {
+      clearTimeout(timeout)
+      clearInterval(interval)
+    }
+  }, [detection, docRequirements])
+
+  useEffect(() => {
+    if (workflowState && workflowState.status !== 'idle') {
+      if (!selectedApplicant) {
+        setTimeout(() => {
+          handleStopWorkflow()
+          setErrorMessage('Selected applicant is unavailable.')
+        }, 0)
+      } else if (workflowState.applicantId && selectedApplicant.applicantId !== workflowState.applicantId) {
+        setTimeout(() => {
+          handleStopWorkflow()
+          setErrorMessage('Applicant consistency violation. Workflow stopped.')
+        }, 0)
+      }
+    }
+  }, [selectedApplicant, workflowState, handleStopWorkflow])
+
   const handleStartWorkflow = async () => {
     if (!selectedApplicant) {
       setErrorMessage('Please select an active applicant before starting workflow.')
@@ -136,47 +240,79 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }
 
-  const handleStopWorkflow = async () => {
+  const handleRetryDetection = async () => {
+    setIsCheckingPage(true)
     setErrorMessage(null)
     try {
-      const response = await sendToBackground<WorkflowStatePayload>({
-        type: 'STOP_WORKFLOW',
-      })
-
-      if (response.status === 'success' && response.data?.state) {
-        setWorkflowState(response.data.state)
-        setCanUndo(false)
-        showToast('Workflow session stopped.')
+      const response = await sendToBackground<VisaPageResponsePayload>({ type: 'GET_CURRENT_VISA_PAGE' })
+      if (response.status === 'success' && response.data?.detection) {
+        setDetection(response.data.detection as CountryPageDetectionResult)
+        if (!response.data.detection.matched || response.data.detection.page === 'unknown') {
+          setErrorMessage('Visa Autofill could not identify this page.')
+        }
       }
     } catch {
-      setErrorMessage('Unable to stop workflow.')
+      setErrorMessage('Unable to query browser tab.')
+    } finally {
+      setIsCheckingPage(false)
     }
   }
 
+
+
   const handleTriggerAutofill = async () => {
     if (!selectedApplicant) {
-      setErrorMessage('Please select an active applicant before running autofill.')
+      setErrorMessage('Please select an applicant first.')
       return
     }
 
-    if (!detection?.matched) {
-      setErrorMessage('Current page is not a supported visa application page.')
+    if (!detection?.matched || detection.page === 'unknown') {
+      setErrorMessage('Visa Autofill could not identify this page.')
+      return
+    }
+
+    const pageId = detection.page || 'unknown'
+    const retryCount = retryCountMap[pageId] || 0
+    if (retryCount >= 2) {
+      setErrorMessage('Max retries reached. Please complete manually.')
       return
     }
 
     setIsAutofilling(true)
     setErrorMessage(null)
 
+    const failedIds = failedFieldsMap[pageId] || []
+
     try {
       const response = await sendToBackground<AutofillResponsePayload>({
         type: 'EXECUTE_AUTOFILL',
         applicant: selectedApplicant,
+        failedMappingIds: failedIds,
       })
 
       if (response.status === 'success' && response.data?.result) {
         const r = response.data.result
         setCanUndo(r.filledFields > 0)
-        showToast(`⚡ Autofill finished: ${r.filledFields} filled, ${r.skippedFields} skipped, ${r.failedFields} not found.`)
+
+        // Track failed fields
+        const newFailedIds = r.results
+          .filter((res) => res.status === 'failed' || res.status === 'not-found')
+          .map((res) => res.fieldId)
+
+        setFailedFieldsMap((prev) => ({ ...prev, [pageId]: newFailedIds }))
+
+        // Increment retry count if errors exist
+        if (newFailedIds.length > 0) {
+          setRetryCountMap((prev) => ({ ...prev, [pageId]: (prev[pageId] || 0) + 1 }))
+        }
+
+        if (r.failedFields > 0 && r.filledFields > 0) {
+          showToast(`⚡ Partially completed. (${r.filledFields} filled, ${r.failedFields} failed)`)
+        } else if (r.failedFields > 0 && r.filledFields === 0) {
+          setErrorMessage('Autofill execution failed.')
+        } else {
+          showToast(`⚡ Autofill finished: ${r.filledFields} filled, ${r.skippedFields} skipped.`)
+        }
       } else if (response.status === 'error') {
         setErrorMessage(response.error || 'Autofill execution failed.')
       } else {
@@ -202,6 +338,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (response.status === 'success' && response.data?.result) {
         const r = response.data.result
         setCanUndo(false)
+        const pageId = detection?.page || 'unknown'
+        setFailedFieldsMap((prev) => {
+          const next = { ...prev }
+          delete next[pageId]
+          return next
+        })
+        setRetryCountMap((prev) => {
+          const next = { ...prev }
+          delete next[pageId]
+          return next
+        })
         showToast(`↩ Undo finished: ${r.restored} restored, ${r.skipped} user-modified skipped, ${r.notFound} not found.`)
       } else if (response.status === 'error') {
         setErrorMessage(response.error || 'Undo operation failed.')
@@ -216,9 +363,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }
 
-  const handleAttachDocument = async (requirement: DocumentRequirement, documentId: string) => {
-    setIsAttaching(requirement.id)
-    setErrorMessage(null)
+  const executeAttach = async (requirement: DocumentRequirement, documentId: string) => {
+    setConfirmAttachmentReq(null)
+    setAttachmentStates((prev) => ({
+      ...prev,
+      [requirement.id]: { state: 'attaching', retryCount: prev[requirement.id]?.retryCount || 0 },
+    }))
+
+    // 1. Verify current page matching
+    const pageRes = await sendToBackground<VisaPageResponsePayload>({ type: 'GET_CURRENT_VISA_PAGE' })
+    if (pageRes.status !== 'success' || !pageRes.data?.detection?.matched) {
+      setAttachmentStates((prev) => ({
+        ...prev,
+        [requirement.id]: { state: 'failed', error: 'Page changed. Invalidation occurred.' },
+      }))
+      return
+    }
 
     try {
       const response = await sendToBackground<DocumentAttachmentPayload>({
@@ -230,19 +390,89 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (response.status === 'success' && response.data?.result) {
         const res = response.data.result
         if (res.success) {
-          showToast(`✓ Document "${requirement.label}" attached successfully.`)
+          // Verification check
+          await verifyCurrentAttachments(docRequirements)
+          setAttachmentStates((prev) => {
+            const isVerified = prev[requirement.id]?.state === 'attached'
+            return {
+              ...prev,
+              [requirement.id]: {
+                ...prev[requirement.id],
+                state: isVerified ? 'attached' : 'manual-verification-required',
+              },
+            }
+          })
+          showToast(`✓ Document "${requirement.label}" attachment initiated.`)
         } else {
-          setErrorMessage(res.reason || 'Document attachment failed.')
+          if (res.status === 'unsupported') {
+            setAttachmentStates((prev) => ({
+              ...prev,
+              [requirement.id]: {
+                ...prev[requirement.id],
+                state: 'manual-required',
+                error: res.reason,
+              },
+            }))
+          } else {
+            setAttachmentStates((prev) => ({
+              ...prev,
+              [requirement.id]: {
+                ...prev[requirement.id],
+                state: 'failed',
+                error: res.reason,
+              },
+            }))
+          }
         }
       } else if (response.status === 'error') {
-        setErrorMessage(response.error || 'Document attachment failed.')
+        setAttachmentStates((prev) => ({
+          ...prev,
+          [requirement.id]: {
+            ...prev[requirement.id],
+            state: 'failed',
+            error: response.error || 'Attachment failed.',
+          },
+        }))
       }
     } catch (err) {
       console.error('Document attachment error:', err)
-      setErrorMessage('Unable to attach document to form field.')
-    } finally {
-      setIsAttaching(null)
+      setAttachmentStates((prev) => ({
+        ...prev,
+        [requirement.id]: {
+          ...prev[requirement.id],
+          state: 'failed',
+          error: 'Unable to attach document.',
+        },
+      }))
     }
+  }
+
+  const handleRetryAttachment = async (requirement: DocumentRequirement, documentId: string) => {
+    const currentState = attachmentStates[requirement.id]
+    const currentRetry = currentState?.retryCount || 0
+    if (currentRetry >= 3) {
+      setAttachmentStates((prev) => ({
+        ...prev,
+        [requirement.id]: {
+          ...prev[requirement.id],
+          state: 'manual-required',
+          error: 'Max retries reached. Please select manually.',
+        },
+      }))
+      return
+    }
+
+    setAttachmentStates((prev) => ({
+      ...prev,
+      [requirement.id]: {
+        ...prev[requirement.id],
+        state: 'attaching',
+        retryCount: currentRetry + 1,
+      },
+    }))
+
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    await executeAttach(requirement, documentId)
   }
 
   const formatFlowName = (flow?: string | null): string => {
@@ -366,26 +596,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Document Upload Requirements Card */}
       {detection?.matched && docRequirements.length > 0 && selectedApplicant && (
         <div className="p-2.5 rounded-lg border border-indigo-200 bg-indigo-50 text-left space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-xs text-indigo-900">
-              📄 Document Upload Requirements
+          <div className="flex items-center justify-between border-b border-indigo-100 pb-1.5">
+            <span className="font-extrabold text-xs text-indigo-900 uppercase tracking-wider">
+              📄 India Visa Documents
             </span>
             <span className="text-[9px] font-bold bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded">
-              {docRequirements.length} required
+              {docRequirements.length} Required
             </span>
           </div>
 
           <div className="space-y-2 text-xs">
             {docRequirements.map((req) => {
               const candidates = matchDocumentsForRequirement(req, applicantDocs)
-              const selectedDocId =
-                selectedDocMap[req.id] || candidates[0]?.documentId || ''
+              const selectedDocId = selectedDocMap[req.id] || candidates[0]?.documentId || ''
+              const isStale = selectedDocId && !candidates.some((c) => c.documentId === selectedDocId)
+              const activeCandidate = candidates.find((c) => c.documentId === selectedDocId)
+              const isExpired = activeCandidate?.expiryDate && new Date(activeCandidate.expiryDate) < new Date()
+              const stateObj = attachmentStates[req.id] || { state: 'not-started' }
 
               return (
                 <div
                   key={req.id}
-                  className="p-2 rounded bg-white border border-indigo-100 space-y-1.5"
+                  className="p-2 rounded-lg bg-white border border-indigo-100 space-y-2 shadow-sm"
                 >
+                  {/* Header & Status Indicator */}
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-800 text-[11px]">{req.label}</span>
                     <span
@@ -396,42 +630,269 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       }`}
                     >
                       {candidates.length > 0
-                        ? `${candidates.length} Available`
-                        : 'Missing'}
+                        ? `${req.documentType.charAt(0).toUpperCase() + req.documentType.slice(1)} ✓ Available`
+                        : '⚠ Missing'}
                     </span>
                   </div>
 
-                  {candidates.length > 0 ? (
-                    <div className="space-y-1">
-                      <select
-                        className="w-full p-1 rounded border text-[10px] bg-slate-50"
-                        value={selectedDocId}
-                        onChange={(e) =>
-                          setSelectedDocMap((prev) => ({
-                            ...prev,
-                            [req.id]: e.target.value,
-                          }))
-                        }
-                      >
-                        {candidates.map((c) => (
-                          <option key={c.documentId} value={c.documentId}>
-                            {c.fileName} ({(c.fileSize / 1024).toFixed(1)} KB)
-                          </option>
-                        ))}
-                      </select>
+                  {candidates.length === 0 ? (
+                    /* Missing Document Flow */
+                    <div className="space-y-1.5 text-center p-2 rounded bg-slate-50 border border-dashed border-slate-200">
+                      <div className="text-[10px] text-slate-600 font-semibold text-center w-full">Document missing</div>
                       <Button
                         variant="secondary"
                         size="sm"
                         fullWidth
-                        disabled={isAttaching === req.id || !selectedDocId}
-                        onClick={() => handleAttachDocument(req, selectedDocId)}
+                        onClick={() => onNavigate('documents')}
                       >
-                        {isAttaching === req.id ? 'Attaching File...' : 'Attach Document'}
+                        [ Add Document ]
                       </Button>
                     </div>
+                  ) : isStale ? (
+                    /* Deleted / Stale Document Reference */
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] text-red-600 font-semibold bg-red-50 p-1.5 rounded border border-red-200">
+                        Selected document is no longer available.
+                      </div>
+                      {candidates.length > 1 && (
+                        <select
+                          className="w-full p-1 rounded border text-[10px] bg-slate-50"
+                          value={selectedDocId}
+                          onChange={(e) => {
+                            setSelectedDocMap((prev) => ({ ...prev, [req.id]: e.target.value }))
+                            setAttachmentStates((prev) => ({ ...prev, [req.id]: { state: 'not-started' } }))
+                          }}
+                        >
+                          <option value="">Choose another document...</option>
+                          {candidates.map((c) => (
+                            <option key={c.documentId} value={c.documentId}>
+                              {c.fileName} ({(c.fileSize / 1024 / 1024).toFixed(2)} MB)
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   ) : (
-                    <div className="text-[10px] text-amber-700 italic">
-                      Upload a {req.documentType} document in the Repository first.
+                    /* Matched Candidates Available */
+                    <div className="space-y-2">
+                      {/* Candidate selector if multiple matches exist */}
+                      {candidates.length > 1 && (
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-slate-400 font-bold uppercase block">
+                            [ Choose Document ]
+                          </label>
+                          <select
+                            className="w-full p-1 rounded border text-[10px] bg-slate-50"
+                            value={selectedDocId}
+                            onChange={(e) => {
+                              setSelectedDocMap((prev) => ({ ...prev, [req.id]: e.target.value }))
+                              setAttachmentStates((prev) => ({ ...prev, [req.id]: { state: 'not-started' } }))
+                            }}
+                          >
+                            {candidates.map((c) => (
+                              <option key={c.documentId} value={c.documentId}>
+                                {c.fileName} ({(c.fileSize / 1024 / 1024).toFixed(2)} MB)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Selected Candidate Metadata Display */}
+                      {activeCandidate && (
+                        <div className="p-1.5 rounded bg-slate-50 border border-slate-100 flex items-center justify-between text-[10px]">
+                          <div className="space-y-0.5 truncate max-w-[160px]">
+                            <div className="font-bold text-slate-700 truncate">
+                              {activeCandidate.fileName}
+                            </div>
+                            <div className="text-[9px] text-slate-400">
+                              {activeCandidate.mimeType.split('/')[1].toUpperCase()} ·{' '}
+                              {(activeCandidate.fileSize / 1024 / 1024).toFixed(2)} MB
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {activeCandidate.expiryDate ? (
+                              isExpired ? (
+                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-800 uppercase animate-pulse">
+                                  Expired
+                                </span>
+                              ) : (
+                                <span className="text-[8px] text-slate-400 block font-semibold text-right">
+                                  Exp: {activeCandidate.expiryDate}
+                                </span>
+                              )
+                            ) : null}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Expiry warnings */}
+                      {isExpired && (
+                        <div className="text-[9px] font-medium text-red-600 bg-red-50 p-1.5 rounded border border-red-100">
+                          ⚠️ This document has expired. Do NOT automatically attach expired documents unless confirmed.
+                        </div>
+                      )}
+
+                      {/* Attachment Workflow Control Buttons */}
+                      {stateObj.state === 'attached' ? (
+                        /* Case 1: Successfully Attached */
+                        <div className="space-y-1">
+                          <div className="p-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold text-center">
+                            ✓ Attached ({stateObj.verifiedName || 'Verified'})
+                          </div>
+                          <div className="text-[10px] text-slate-500 italic text-center">
+                            Document requirement completed.
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            fullWidth
+                            onClick={() =>
+                              setAttachmentStates((prev) => ({
+                                ...prev,
+                                [req.id]: { state: 'not-started' },
+                              }))
+                            }
+                          >
+                            Re-attach
+                          </Button>
+                        </div>
+                      ) : stateObj.state === 'manual-verification-required' ? (
+                        /* Case 2: Verification Awaiting */
+                        <div className="space-y-1">
+                          <div className="p-1 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold text-center">
+                            ⚠ Manual verification required
+                          </div>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            fullWidth
+                            onClick={() => verifyCurrentAttachments(docRequirements)}
+                          >
+                            Verify Status
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            fullWidth
+                            onClick={() =>
+                              setAttachmentStates((prev) => ({
+                                ...prev,
+                                [req.id]: { state: 'not-started' },
+                              }))
+                            }
+                          >
+                            Re-attach
+                          </Button>
+                        </div>
+                      ) : stateObj.state === 'manual-required' ? (
+                        /* Case 3: Programmatic Selection Blocked */
+                        <div className="space-y-1.5">
+                          <div className="p-1 rounded bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-bold text-center">
+                            ⚠ Manual Action Required
+                          </div>
+                          <p className="text-[10px] text-slate-600 leading-normal">
+                            Please select the matching document in the website's file picker.
+                          </p>
+                          <div className="bg-slate-50 p-1.5 rounded border text-[9px] text-slate-500 font-medium">
+                            <strong>Instructions:</strong> Click the upload button on the form page, and pick: <strong>{activeCandidate?.fileName}</strong>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            fullWidth
+                            onClick={() => verifyCurrentAttachments(docRequirements)}
+                          >
+                            Verify Selected File
+                          </Button>
+                        </div>
+                      ) : stateObj.state === 'failed' ? (
+                        /* Case 4: Process Failure */
+                        <div className="space-y-1.5">
+                          <div className="p-1 rounded bg-red-100 border border-red-300 text-red-900 text-[10px] font-bold text-center">
+                            Document could not be attached.
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              fullWidth
+                              onClick={() => handleRetryAttachment(req, selectedDocId)}
+                            >
+                              Retry
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              fullWidth
+                              onClick={() =>
+                                setAttachmentStates((prev) => ({
+                                  ...prev,
+                                  [req.id]: { ...prev[req.id], state: 'manual-required' },
+                                }))
+                              }
+                            >
+                              Manual Upload
+                            </Button>
+                          </div>
+                        </div>
+                      ) : stateObj.state === 'attaching' ? (
+                        /* Case 5: Loading State */
+                        <div className="text-center text-[10px] text-indigo-700 font-bold py-1.5">
+                          ⏳ Attaching document...
+                        </div>
+                      ) : confirmAttachmentReq === req ? (
+                        /* Case 6: User Confirmation Overlay */
+                        <div className="space-y-1.5 p-2 rounded bg-indigo-50 border border-indigo-100">
+                          <div className="text-[10px] text-indigo-900 font-bold text-center">
+                            Use {activeCandidate?.fileName} for this requirement?
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              fullWidth
+                              onClick={() => executeAttach(req, selectedDocId)}
+                            >
+                              Confirm
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              fullWidth
+                              onClick={() => setConfirmAttachmentReq(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Default: Selection and Confirm Triggers */
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            fullWidth
+                            onClick={() => setPreviewDoc(activeCandidate || null)}
+                          >
+                            Preview
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            fullWidth
+                            onClick={() => {
+                              if (activeCandidate && activeCandidate.documentType !== req.documentType) {
+                                setErrorMessage('Document type does not match this requirement.')
+                              } else {
+                                setConfirmAttachmentReq(req)
+                              }
+                            }}
+                          >
+                            Use Document
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -506,20 +967,95 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-1.5">
             {isWorkflowActive ? (
               <div className="space-y-1.5">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    fullWidth
-                    onClick={handleTriggerAutofill}
-                    disabled={isAutofilling}
-                  >
-                    {isAutofilling ? '⚡ Filling...' : '⚡ Autofill Page'}
-                  </Button>
-                  <Button variant="ghost" size="sm" fullWidth onClick={handleStopWorkflow}>
-                    ⏹ Stop Workflow
-                  </Button>
-                </div>
+                {(!detection?.matched || detection.page === 'unknown') ? (
+                  <div className="p-2 rounded bg-amber-50 border border-amber-200 text-xs space-y-1.5 text-left">
+                    <p className="text-amber-800 font-semibold">Visa Autofill could not identify this page.</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="primary" size="sm" fullWidth onClick={handleRetryDetection}>
+                        Retry Detection
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        fullWidth
+                        onClick={() => {
+                          setErrorMessage('Manual action is required.')
+                        }}
+                      >
+                        Continue Manually
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {/* Retry controls if there are failed fields */}
+                    {(() => {
+                      const pageId = detection.page || 'unknown'
+                      const failedIds = failedFieldsMap[pageId] || []
+                      const retryCount = retryCountMap[pageId] || 0
+                      if (failedIds.length > 0) {
+                        return (
+                          <div className="p-2 rounded bg-red-50 border border-red-200 text-xs text-left space-y-1.5">
+                            <p className="text-red-800 font-semibold">
+                              Failed to fill {failedIds.length} field(s) (Attempt {retryCount}/2)
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {retryCount < 2 ? (
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  fullWidth
+                                  onClick={handleTriggerAutofill}
+                                  disabled={isAutofilling}
+                                >
+                                  {isAutofilling ? '⚡ Retrying...' : 'Retry Failed Fields'}
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  fullWidth
+                                  onClick={() => {
+                                    setErrorMessage('Manual action is required.')
+                                  }}
+                                >
+                                  Continue Manually
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                fullWidth
+                                onClick={() => {
+                                  setFailedFieldsMap((prev) => ({ ...prev, [pageId]: [] }))
+                                }}
+                              >
+                                Skip Failures
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      }
+                      return null
+                    })()}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        fullWidth
+                        onClick={handleTriggerAutofill}
+                        disabled={isAutofilling}
+                      >
+                        {isAutofilling ? '⚡ Filling...' : '⚡ Autofill Page'}
+                      </Button>
+                      <Button variant="ghost" size="sm" fullWidth onClick={handleStopWorkflow}>
+                        ⏹ Stop Workflow
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {canUndo && (
                   <Button
                     variant="secondary"
@@ -558,6 +1094,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
           Settings
         </Button>
       </div>
+      {previewDoc && (
+        <DocumentPreviewModal
+          document={previewDoc}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   )
 }
