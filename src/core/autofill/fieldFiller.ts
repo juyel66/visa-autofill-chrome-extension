@@ -34,14 +34,58 @@ export function fillField(
     }
   }
 
-  // 3. Check Policy (fill-empty)
-  if (policy === 'fill-empty') {
-    let existingValue = ''
-    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) {
-      existingValue = element.value.trim()
+  // 3. Same Value and Policy Check
+  if (element instanceof HTMLInputElement && element.type.toLowerCase() === 'checkbox') {
+    const targetChecked = value === 'true' || value === '1'
+    if (element.checked === targetChecked) {
+      return { fieldId, status: 'already-matching', reason: 'Checkbox state matches source' }
     }
-    if (existingValue !== '') {
-      return { fieldId, status: 'already-filled', reason: 'Field already contains a value' }
+    if (policy === 'fill-empty' && element.checked) {
+      return { fieldId, status: 'skipped-existing', reason: 'Checkbox is already checked' }
+    }
+  } else if (element instanceof HTMLInputElement && element.type.toLowerCase() === 'radio') {
+    const radioGroup = Array.from(
+      document.querySelectorAll<HTMLInputElement>(
+        `input[type="radio"][name="${CSS.escape(element.name)}"]`
+      )
+    )
+    const targetRadio = radioGroup.find(
+      (r) => r.value.toLowerCase() === value.toLowerCase() || r.id.toLowerCase() === value.toLowerCase()
+    )
+    if (targetRadio?.checked) {
+      return { fieldId, status: 'already-matching', reason: 'Radio option matches source' }
+    }
+    if (policy === 'fill-empty' && radioGroup.some((r) => r.checked)) {
+      return { fieldId, status: 'skipped-existing', reason: 'Radio group already has a selection' }
+    }
+  } else if (element instanceof HTMLSelectElement) {
+    const valLower = value.trim().toLowerCase()
+    let matchedOptionValue: string | null = null
+    for (const option of Array.from(element.options)) {
+      if (option.value.toLowerCase() === valLower || option.text.trim().toLowerCase() === valLower) {
+        matchedOptionValue = option.value
+        break
+      }
+    }
+    if (matchedOptionValue === null) {
+      return { fieldId, status: 'failed', reason: 'Matching option could not be found.' }
+    }
+    if (element.value === matchedOptionValue) {
+      return { fieldId, status: 'already-matching', reason: 'Dropdown option matches source' }
+    }
+    if (policy === 'fill-empty' && element.value.trim() !== '') {
+      return { fieldId, status: 'skipped-existing', reason: 'Dropdown already has a selection' }
+    }
+  } else if (
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement
+  ) {
+    const existingValue = element.value.trim()
+    if (existingValue.toLowerCase() === value.trim().toLowerCase()) {
+      return { fieldId, status: 'already-matching', reason: 'Text field value matches source' }
+    }
+    if (policy === 'fill-empty' && existingValue !== '') {
+      return { fieldId, status: 'skipped-existing', reason: 'Text field already contains a value' }
     }
   }
 
