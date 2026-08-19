@@ -1,6 +1,9 @@
 import type { GenericPageDetectionResult } from '../../core/messaging/types'
 
 export type IndiaVisaFlow = 'regular' | 'evisa' | 'unknown'
+ 
+
+
 
 export type IndiaVisaPage =
   | 'landing'
