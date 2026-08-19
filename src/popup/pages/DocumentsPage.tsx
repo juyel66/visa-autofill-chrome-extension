@@ -21,7 +21,6 @@ import type {
   PdfExtractionResult,
 } from '../../core/extraction'
 import {
-  applyExtractionToApplicant,
   extractFromMrz,
   extractFromOcrText,
   extractFromPdfText,
@@ -30,7 +29,6 @@ import {
   parsePassportMrz,
   recognizeText,
 } from '../../core/extraction'
-import { validateApplicant } from '../../core/validation'
 import { ExtractionReviewModal } from './ExtractionReviewModal'
 
 export interface DocumentsPageProps {
@@ -91,6 +89,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
     conflicts: ExtractedFieldConflict<unknown>[]
   } | null>(null)
   const [reviewTargetApplicant, setReviewTargetApplicant] = useState<ApplicantProfile | null>(null)
+  const [reviewTargetDoc, setReviewTargetDoc] = useState<DocumentRecord | null>(null)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -273,31 +272,53 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
   }
 
   const handleApplyConfirmedExtraction = async (confirmedData: ExtractedApplicantData) => {
-    const currentApplicant = reviewTargetApplicant || applicants.find((a) => a.applicantId === currentApplicantId)
-    if (!currentApplicant) {
+    const activeId = currentApplicantId || reviewTargetApplicant?.applicantId
+    if (!activeId) {
       setErrorMessage('Select an applicant before applying extracted information.')
       return
     }
 
     try {
-      const mergedApplicant = applyExtractionToApplicant(currentApplicant, confirmedData)
-      const validation = validateApplicant(mergedApplicant)
+      let docToUpdate = reviewTargetDoc
 
-      if (!validation.valid) {
-        setErrorMessage(`Validation error: ${validation.errors[0]?.message || 'Invalid data'}`)
-        return
+      if (!docToUpdate) {
+        const passDoc = documents.find((d) => d.documentType === 'passport')
+        if (passDoc) {
+          docToUpdate = passDoc
+        } else {
+          docToUpdate = {
+            documentId: `doc-${Date.now()}`,
+            applicantId: activeId,
+            documentType: 'passport',
+            fileName: 'MRZ Parsed Passport.pdf',
+            fileSize: 0,
+            fileDataUrl: '',
+            mimeType: 'application/pdf',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            status: 'processed',
+            source: 'user-upload',
+          }
+        }
       }
 
-      if (onUpdateApplicant) {
-        await onUpdateApplicant(mergedApplicant)
+      const updatedDoc: DocumentRecord = {
+        ...docToUpdate,
+        extractedData: confirmedData,
+        extractedDataConfirmed: true,
+        updatedAt: new Date().toISOString(),
       }
+
+      await saveDocument(updatedDoc)
+      await loadApplicantDocuments(activeId)
 
       setReviewState(null)
       setReviewTargetApplicant(null)
+      setReviewTargetDoc(null)
       setExtractionModal(null)
       setOcrModal(null)
       setIsMrzModalOpen(false)
-      showToast('Applicant profile updated with confirmed extraction data.')
+      showToast('Document record updated with confirmed extraction data.')
     } catch (err) {
       console.error('Failed to apply extraction data:', err)
       setErrorMessage('Unable to apply extracted information.')
@@ -407,7 +428,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
           >
             {applicants.map((app) => (
               <option key={app.applicantId} value={app.applicantId}>
-                {app.personalInfo.givenNames} {app.personalInfo.surname}
+                Profile {app.applicantId}
               </option>
             ))}
           </select>
@@ -426,7 +447,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
             <div className="text-2xl text-slate-400">📁</div>
             <div className="text-xs font-bold text-slate-700">No Documents Uploaded</div>
             <p className="text-[10px] text-slate-500 max-w-[200px] mx-auto">
-              Upload passport scans or photos to extract information for {currentApplicant?.personalInfo.givenNames}.
+              Upload passport scans or photos to extract information for Profile {currentApplicant?.applicantId}.
             </p>
           </div>
         ) : (
@@ -623,6 +644,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                 fullWidth
                 onClick={() => {
                   const extracted = extractFromPdfText(extractionModal.result.fullText)
+                  setReviewTargetDoc(extractionModal.doc)
                   handleStartReviewFromExtraction(extracted)
                 }}
               >
@@ -718,6 +740,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                 fullWidth
                 onClick={() => {
                   const extracted = extractFromOcrText(ocrModal.result)
+                  setReviewTargetDoc(ocrModal.doc)
                   handleStartReviewFromExtraction(extracted)
                 }}
               >
@@ -817,6 +840,8 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                         onClick={() => {
                           if (mrzResult.data) {
                             const extracted = extractFromMrz(mrzResult.data)
+                            const passDoc = documents.find(d => d.documentType === 'passport')
+                            setReviewTargetDoc(passDoc || null)
                             handleStartReviewFromExtraction(extracted)
                           }
                         }}
