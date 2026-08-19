@@ -28,12 +28,6 @@ export const ApplicantsPage: React.FC<ApplicantsPageProps> = ({
   const [isDeleting, setIsDeleting] = useState<boolean>(false)
   const [isDuplicating, setIsDuplicating] = useState<string | null>(null)
 
-  const maskPassport = (num?: string): string => {
-    if (!num) return 'Not Provided'
-    if (num.length <= 4) return '••••••••'
-    return `•••• ${num.slice(-4)}`
-  }
-
   const handleConfirmDelete = async (id: string) => {
     setIsDeleting(true)
     try {
@@ -56,16 +50,14 @@ export const ApplicantsPage: React.FC<ApplicantsPageProps> = ({
   const filteredApplicants = applicants.filter((app) => {
     if (!searchQuery.trim()) return true
     const q = searchQuery.toLowerCase().trim()
-    const fullName = `${app.personalInfo.givenNames || ''} ${app.personalInfo.surname || ''}`.toLowerCase()
     const id = app.applicantId.toLowerCase()
-    const nat = (app.personalInfo.nationality || '').toLowerCase()
-
-    return fullName.includes(q) || id.includes(q) || nat.includes(q)
+    const notes = (app.notes || '').toLowerCase()
+    return id.includes(q) || notes.includes(q)
   })
 
   return (
     <div
-      className="rounded-xl p-5 shadow-lg space-y-4 transition-colors duration-300 min-h-[380px] flex flex-col"
+      className="rounded-xl p-5 shadow-lg space-y-4 transition-colors duration-300 min-h-[380px] flex flex-col text-left"
       style={{
         backgroundColor: 'var(--color-surface)',
         borderColor: 'var(--color-border)',
@@ -84,7 +76,7 @@ export const ApplicantsPage: React.FC<ApplicantsPageProps> = ({
           ← Back
         </button>
         <h2 className="text-base font-extrabold" style={{ color: 'var(--color-text)' }}>
-          My Applicants ({applicants.length})
+          Profiles ({applicants.length})
         </h2>
         <Button variant="primary" size="sm" onClick={onAddApplicant}>
           + Add
@@ -96,8 +88,8 @@ export const ApplicantsPage: React.FC<ApplicantsPageProps> = ({
         <div className="relative">
           <input
             type="text"
-            className="w-full p-2 pl-8 rounded-lg border text-xs bg-white"
-            placeholder="Search applicants by name, nationality, or ID..."
+            className="w-full p-2 pl-8 rounded-lg border text-xs bg-white text-slate-800"
+            placeholder="Search profiles by ID or notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -108,7 +100,7 @@ export const ApplicantsPage: React.FC<ApplicantsPageProps> = ({
       {/* Delete Confirmation Overlay Modal */}
       {deleteConfirmId && (
         <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-left space-y-2">
-          <div className="text-xs font-bold text-red-800">Delete this applicant?</div>
+          <div className="text-xs font-bold text-red-800">Delete this profile?</div>
           <div className="text-[11px] text-red-600">
             This profile and any associated document records will be permanently deleted from local extension storage.
           </div>
@@ -145,18 +137,18 @@ export const ApplicantsPage: React.FC<ApplicantsPageProps> = ({
             </div>
             <div>
               <div className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
-                {searchQuery ? 'No matching applicants found' : 'No applicants yet'}
+                {searchQuery ? 'No matching profiles found' : 'No profiles yet'}
               </div>
               <div className="text-xs mt-1" style={{ color: 'var(--color-muted)' }}>
                 {searchQuery
                   ? 'Try a different search term.'
-                  : 'Add your first applicant profile to get started.'}
+                  : 'Add your first profile to get started.'}
               </div>
             </div>
             {!searchQuery && (
               <div className="pt-2">
                 <Button variant="primary" size="sm" onClick={onAddApplicant}>
-                  + Add Applicant
+                  + Add Profile
                 </Button>
               </div>
             )}
@@ -164,9 +156,6 @@ export const ApplicantsPage: React.FC<ApplicantsPageProps> = ({
         ) : (
           filteredApplicants.map((applicant) => {
             const isSelected = applicant.applicantId === selectedApplicantId
-            const fullName =
-              `${applicant.personalInfo.givenNames || ''} ${applicant.personalInfo.surname || ''}`.trim() ||
-              'Unnamed Applicant'
 
             return (
               <div
@@ -182,7 +171,7 @@ export const ApplicantsPage: React.FC<ApplicantsPageProps> = ({
                 {/* Header row */}
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
-                    {fullName}
+                    Profile {applicant.applicantId}
                   </span>
                   {isSelected && (
                     <span
@@ -194,16 +183,12 @@ export const ApplicantsPage: React.FC<ApplicantsPageProps> = ({
                   )}
                 </div>
 
-                {/* Details summary with masked passport */}
-                <div className="text-xs space-y-0.5" style={{ color: 'var(--color-muted)' }}>
-                  {applicant.personalInfo.nationality && (
-                    <div>Nationality: {applicant.personalInfo.nationality}</div>
-                  )}
-                  <div>Passport: {maskPassport(applicant.passport?.passportNumber)}</div>
-                  {applicant.personalInfo.dateOfBirth && (
-                    <div>DOB: {applicant.personalInfo.dateOfBirth}</div>
-                  )}
-                </div>
+                {/* Notes Summary */}
+                {applicant.notes && (
+                  <div className="text-xs italic" style={{ color: 'var(--color-muted)' }}>
+                    {applicant.notes}
+                  </div>
+                )}
 
                 {/* Action buttons */}
                 <div
