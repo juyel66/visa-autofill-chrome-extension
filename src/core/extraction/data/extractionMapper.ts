@@ -30,35 +30,32 @@ export function applyExtractionToApplicant(
     ...applicant,
     updatedAt: now,
     personalInfo: {
-      ...applicant.personalInfo,
-      surname: p.lastName?.value ? p.lastName.value : applicant.personalInfo.surname,
-      givenNames: p.firstName?.value ? p.firstName.value : applicant.personalInfo.givenNames,
-      dateOfBirth: p.dateOfBirth?.value ? p.dateOfBirth.value : applicant.personalInfo.dateOfBirth,
-      gender: p.gender?.value ? p.gender.value : applicant.personalInfo.gender,
-      nationality: p.nationality?.value ? p.nationality.value : applicant.personalInfo.nationality,
+      surname: p.lastName?.value ? p.lastName.value : (applicant.personalInfo?.surname || ''),
+      givenNames: p.firstName?.value ? p.firstName.value : (applicant.personalInfo?.givenNames || ''),
+      dateOfBirth: p.dateOfBirth?.value ? p.dateOfBirth.value : (applicant.personalInfo?.dateOfBirth || ''),
+      gender: p.gender?.value ? p.gender.value : (applicant.personalInfo?.gender || 'male'),
+      nationality: p.nationality?.value ? p.nationality.value : (applicant.personalInfo?.nationality || ''),
       townCityOfBirth: p.townCityOfBirth?.value
         ? p.townCityOfBirth.value
-        : applicant.personalInfo.townCityOfBirth,
+        : (applicant.personalInfo?.townCityOfBirth || ''),
       countryOfBirth: p.countryOfBirth?.value
         ? p.countryOfBirth.value
-        : applicant.personalInfo.countryOfBirth,
+        : (applicant.personalInfo?.countryOfBirth || ''),
     },
     passport: {
-      ...applicant.passport,
       passportNumber: pass.passportNumber?.value
         ? pass.passportNumber.value
-        : applicant.passport.passportNumber,
+        : (applicant.passport?.passportNumber || ''),
       issuingCountry: pass.issuingCountry?.value
         ? pass.issuingCountry.value
-        : applicant.passport.issuingCountry,
-      expiryDate: pass.expiryDate?.value ? pass.expiryDate.value : applicant.passport.expiryDate,
-      issueDate: pass.issueDate?.value ? pass.issueDate.value : applicant.passport.issueDate,
+        : (applicant.passport?.issuingCountry || ''),
+      expiryDate: pass.expiryDate?.value ? pass.expiryDate.value : (applicant.passport?.expiryDate || ''),
+      issueDate: pass.issueDate?.value ? pass.issueDate.value : (applicant.passport?.issueDate || ''),
     },
     contact: {
-      ...applicant.contact,
-      email: c.email?.value ? c.email.value : applicant.contact.email,
-      mobile: c.mobile?.value ? c.mobile.value : applicant.contact.mobile,
-      phone: c.phone?.value ? c.phone.value : applicant.contact.phone,
+      email: c.email?.value ? c.email.value : (applicant.contact?.email || ''),
+      mobile: c.mobile?.value ? c.mobile.value : (applicant.contact?.mobile || ''),
+      phone: c.phone?.value ? c.phone.value : (applicant.contact?.phone || ''),
     },
   }
 
