@@ -1,3 +1,5 @@
+import type { ExtractedApplicantData } from '../extraction/data/types'
+
 export type GenericDocumentCategory =
   | 'passport'
   | 'photograph'
@@ -24,6 +26,8 @@ export interface DocumentRecord {
   fileDataUrl?: string // Base64 data URL for preview and local storage
   description?: string
   expiryDate?: string
+  extractedData?: ExtractedApplicantData
+  extractedDataConfirmed?: boolean
 }
 
 // Deprecated legacy interface kept for backwards compatibility
