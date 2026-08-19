@@ -68,6 +68,23 @@ export function fillField(
       }
     }
     if (matchedOptionValue === null) {
+      for (const option of Array.from(element.options)) {
+        const optVal = option.value.trim().toLowerCase()
+        const optText = option.text.trim().toLowerCase()
+        if (
+          optVal.endsWith('-' + valLower) ||
+          optVal.endsWith(' ' + valLower) ||
+          optText.endsWith('-' + valLower) ||
+          optText.endsWith(' ' + valLower) ||
+          optText.endsWith('- ' + valLower) ||
+          optText.endsWith(' - ' + valLower)
+        ) {
+          matchedOptionValue = option.value
+          break
+        }
+      }
+    }
+    if (matchedOptionValue === null) {
       return { fieldId, status: 'failed', reason: 'Matching option could not be found.' }
     }
     if (element.value === matchedOptionValue) {
@@ -96,14 +113,31 @@ export function fillField(
   // 4. Fill by Element Type
   try {
     if (element instanceof HTMLSelectElement) {
-      // Find matching option by value or label text
       let matchedValue: string | null = null
-      const valLower = value.toLowerCase()
+      const valLower = value.trim().toLowerCase()
 
       for (const option of Array.from(element.options)) {
         if (option.value.toLowerCase() === valLower || option.text.trim().toLowerCase() === valLower) {
           matchedValue = option.value
           break
+        }
+      }
+
+      if (matchedValue === null) {
+        for (const option of Array.from(element.options)) {
+          const optVal = option.value.trim().toLowerCase()
+          const optText = option.text.trim().toLowerCase()
+          if (
+            optVal.endsWith('-' + valLower) ||
+            optVal.endsWith(' ' + valLower) ||
+            optText.endsWith('-' + valLower) ||
+            optText.endsWith(' ' + valLower) ||
+            optText.endsWith('- ' + valLower) ||
+            optText.endsWith(' - ' + valLower)
+          ) {
+            matchedValue = option.value
+            break
+          }
         }
       }
 
