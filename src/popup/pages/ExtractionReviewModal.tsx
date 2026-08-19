@@ -170,9 +170,9 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
           <div>
             <h3 className="font-bold text-sm text-slate-900">Document Intelligence Review</h3>
             <p className="text-[10px] text-slate-500">
-              Target Applicant:{' '}
+              Target Profile:{' '}
               <strong className="text-slate-800">
-                {targetApplicant.personalInfo.givenNames} {targetApplicant.personalInfo.surname}
+                {targetApplicant.applicantId}
               </strong>
             </p>
           </div>
