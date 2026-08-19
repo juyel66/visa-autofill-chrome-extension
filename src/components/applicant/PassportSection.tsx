@@ -12,9 +12,9 @@ export const PassportSection: React.FC<PassportSectionProps> = ({
   onChange,
   getFieldError,
 }) => {
-  const pass = data.passport
+  const pass = data.passport || {}
 
-  const update = (fields: Partial<typeof pass>) => {
+  const update = (fields: Partial<NonNullable<ApplicantProfile['passport']>>) => {
     onChange({
       ...data,
       passport: { ...pass, ...fields },
