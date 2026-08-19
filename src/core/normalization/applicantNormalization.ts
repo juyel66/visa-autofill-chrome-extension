@@ -116,9 +116,13 @@ export function normalizeApplicant(applicant: ApplicantProfile): ApplicantProfil
       placeOfIssue: cleanString(applicant.passport?.placeOfIssue),
       otherPassportDetails: applicant.passport?.otherPassportDetails
         ? {
-            passportNumber: applicant.passport.otherPassportDetails.passportNumber.trim(),
+            passportNumber: applicant.passport.otherPassportDetails.passportNumber
+              ? applicant.passport.otherPassportDetails.passportNumber.trim()
+              : '',
             countryOfIssue: cleanString(applicant.passport.otherPassportDetails.countryOfIssue),
-            issueDate: applicant.passport.otherPassportDetails.issueDate.trim(),
+            issueDate: applicant.passport.otherPassportDetails.issueDate
+              ? applicant.passport.otherPassportDetails.issueDate.trim()
+              : '',
             placeOfIssue: cleanString(applicant.passport.otherPassportDetails.placeOfIssue),
             nationalityInPassport: cleanString(
               applicant.passport.otherPassportDetails.nationalityInPassport
