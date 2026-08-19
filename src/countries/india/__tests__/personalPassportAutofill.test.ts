@@ -3,6 +3,7 @@ import { executeAutofill } from '../../../core/autofill/autofillEngine'
 import type { FieldMapping } from '../../../core/autofill/types'
 import { executeUndo } from '../../../core/safety/undoManager'
 import { getIndiaVisaMappings } from '../mappingService'
+import type { ApplicantProfile } from '../../../core/applicant/types'
 
 export interface PersonalPassportTestResult {
   passed: boolean
@@ -491,6 +492,162 @@ export async function runPersonalPassportAutofillTests(): Promise<PersonalPasspo
   if (fatherNameAfterIsolation !== 'FATHER TEST' || presAddr1AfterIsolation !== '') {
     failures.push(`Subtest 11 Failed: Page Isolation not enforced. father_name: "${fatherNameAfterIsolation}", pres_addr1: "${presAddr1AfterIsolation}"`)
   }
+
+  // --- Subtest 12: India Registration Mappings & Safety Verification ---
+  totalSubtests++
+  const container12 = document.createElement('div')
+  container12.innerHTML = `
+    <select id="countryname_id">
+      <option value="">Select country</option>
+      <option value="Bangladesh">Bangladesh</option>
+      <option value="India">India</option>
+    </select>
+    <select id="missioncode_id">
+      <option value="">Select Mission</option>
+      <option value="BANGLADESH-DHAKA">BANGLADESH-DHAKA</option>
+      <option value="BANGLADESH-CHITTAGONG">BANGLADESH-CHITTAGONG</option>
+    </select>
+    <select id="nationality_id">
+      <option value="">Select Nationality</option>
+      <option value="Bangladesh">Bangladesh</option>
+    </select>
+    <input type="text" id="dob_id" value="" />
+    <input type="text" id="email_id" value="" />
+    <input type="text" id="email_re_id" value="" />
+    <input type="text" id="jouryney_id" value="" />
+    <input type="text" id="captcha" value="" />
+  `
+  document.body.appendChild(container12)
+
+  // 1. Complete valid applicant profile
+  const validProfile = {
+    ...SYNTHETIC_APPLICANT_PROFILE,
+    notes: 'Mission: DHAKA',
+  }
+  const regMappings = getIndiaVisaMappings('regular', 'application-start')
+  const validRes = await executeAutofill({
+    applicant: validProfile,
+    mappings: regMappings,
+    options: { policy: 'fill-empty' },
+  })
+
+  // DOM verification
+  const countryFilled = (container12.querySelector('#countryname_id') as HTMLSelectElement).value
+  const missionFilled = (container12.querySelector('#missioncode_id') as HTMLSelectElement).value
+  const nationalityFilled = (container12.querySelector('#nationality_id') as HTMLSelectElement).value
+  const dobFilled = (container12.querySelector('#dob_id') as HTMLInputElement).value
+  const emailFilled = (container12.querySelector('#email_id') as HTMLInputElement).value
+  const emailConfirmFilled = (container12.querySelector('#email_re_id') as HTMLInputElement).value
+  const arrivalDateFilled = (container12.querySelector('#jouryney_id') as HTMLInputElement).value
+  const captchaFilled = (container12.querySelector('#captcha') as HTMLInputElement).value
+
+  // Assertions for complete valid applicant & CAPTCHA always manual
+  if (
+    countryFilled !== 'Bangladesh' ||
+    missionFilled !== 'BANGLADESH-DHAKA' ||
+    nationalityFilled !== 'Bangladesh' ||
+    dobFilled !== '15/01/1995' ||
+    emailFilled !== 'john.test@example.invalid' ||
+    emailConfirmFilled !== 'john.test@example.invalid' ||
+    arrivalDateFilled !== '01/10/2026' ||
+    captchaFilled !== ''
+  ) {
+    failures.push('Subtest 12.1 Failed: Registration autofill fields value mismatch.')
+  }
+
+  // Check CAPTCHA manual status result
+  const captchaResult = validRes.results.find((r) => r.fieldId === 'reg_captcha')
+  if (!captchaResult || captchaResult.status !== 'failed' || captchaResult.failureType !== 'manual-required') {
+    failures.push('Subtest 12.2 Failed: CAPTCHA was not correctly flagged as manual-required.')
+  }
+
+  // Reset values
+  ;(container12.querySelector('#countryname_id') as HTMLSelectElement).value = ''
+  ;(container12.querySelector('#missioncode_id') as HTMLSelectElement).value = ''
+  ;(container12.querySelector('#nationality_id') as HTMLSelectElement).value = ''
+  ;(container12.querySelector('#dob_id') as HTMLInputElement).value = ''
+  ;(container12.querySelector('#email_id') as HTMLInputElement).value = ''
+  ;(container12.querySelector('#email_re_id') as HTMLInputElement).value = ''
+  ;(container12.querySelector('#jouryney_id') as HTMLInputElement).value = ''
+  ;(container12.querySelector('#captcha') as HTMLInputElement).value = ''
+
+  // 2. Missing email profile
+  const missingEmailProfile = {
+    ...validProfile,
+    contact: { ...validProfile.contact, email: '' },
+  }
+  const resEmailMissing = await executeAutofill({
+    applicant: missingEmailProfile,
+    mappings: regMappings,
+    options: { policy: 'fill-empty' },
+  })
+  const emailResObj = resEmailMissing.results.find((r) => r.fieldId === 'reg_email')
+  if (!emailResObj || emailResObj.status !== 'failed' || emailResObj.failureType !== 'validation-failed') {
+    failures.push('Subtest 12.3 Failed: Missing email did not trigger validation-failed.')
+  }
+
+  // 3. Missing arrival date profile
+  const missingArrivalProfile = {
+    ...validProfile,
+    travel: undefined,
+  }
+  const resArrivalMissing = await executeAutofill({
+    applicant: missingArrivalProfile,
+    mappings: regMappings,
+    options: { policy: 'fill-empty' },
+  })
+  const arrivalResObj = resArrivalMissing.results.find((r) => r.fieldId === 'reg_arr_date')
+  if (!arrivalResObj || arrivalResObj.status !== 'failed' || arrivalResObj.failureType !== 'validation-failed') {
+    failures.push('Subtest 12.4 Failed: Missing arrival date did not trigger validation-failed.')
+  }
+
+  // 4. Invalid DOB profile (e.g. invalid calendar date)
+  const invalidDobProfile = {
+    ...validProfile,
+    personalInfo: { ...validProfile.personalInfo, dateOfBirth: '2026-02-30' },
+  }
+  const resInvalidDob = await executeAutofill({
+    applicant: invalidDobProfile,
+    mappings: regMappings,
+    options: { policy: 'fill-empty' },
+  })
+  const dobResObj = resInvalidDob.results.find((r) => r.fieldId === 'reg_dob')
+  if (!dobResObj || dobResObj.status !== 'failed' || dobResObj.failureType !== 'validation-failed') {
+    failures.push('Subtest 12.5 Failed: Invalid DOB 2026-02-30 did not trigger validation-failed.')
+  }
+
+  // 5. Invalid arrival date profile (e.g. format error)
+  const invalidArrivalProfile: ApplicantProfile = {
+    ...validProfile,
+    travel: {
+      purposeOfVisit: 'Tourism',
+      intendedArrivalDate: '01/10/2026',
+      intendedDepartureDate: '2026-10-15',
+    },
+  }
+  const resInvalidArrival = await executeAutofill({
+    applicant: invalidArrivalProfile,
+    mappings: regMappings,
+    options: { policy: 'fill-empty' },
+  })
+  const arrivalInvalidResObj = resInvalidArrival.results.find((r) => r.fieldId === 'reg_arr_date')
+  if (!arrivalInvalidResObj || arrivalInvalidResObj.status !== 'failed' || arrivalInvalidResObj.failureType !== 'validation-failed') {
+    failures.push('Subtest 12.6 Failed: Invalid profile arrival date format did not trigger validation-failed.')
+  }
+
+  // 6. Existing user value protection (policy: 'fill-empty')
+  ;(container12.querySelector('#email_id') as HTMLInputElement).value = 'user@example.com'
+  await executeAutofill({
+    applicant: validProfile,
+    mappings: regMappings,
+    options: { policy: 'fill-empty' },
+  })
+  const emailAfterFillEmpty = (container12.querySelector('#email_id') as HTMLInputElement).value
+  if (emailAfterFillEmpty !== 'user@example.com') {
+    failures.push('Subtest 12.7 Failed: fill-empty policy overwrote existing manual user input.')
+  }
+
+  document.body.removeChild(container12)
 
   return {
     passed: failures.length === 0,
