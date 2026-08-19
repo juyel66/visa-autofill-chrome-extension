@@ -12,9 +12,9 @@ export const PersonalInformationSection: React.FC<PersonalInformationSectionProp
   onChange,
   getFieldError,
 }) => {
-  const p = data.personalInfo
+  const p = data.personalInfo || {}
 
-  const update = (fields: Partial<typeof p>) => {
+  const update = (fields: Partial<NonNullable<ApplicantProfile['personalInfo']>>) => {
     onChange({
       ...data,
       personalInfo: { ...p, ...fields },
