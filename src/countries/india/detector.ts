@@ -24,9 +24,11 @@ export function detectIndiaVisaPage(locationInfo?: LocationInfo): CountryPageDet
   const title =
     locationInfo?.title || (typeof document !== 'undefined' ? document.title : '')
 
-  const isIndiaDomain = INDIA_COUNTRY_CONFIG.supportedDomains.some((domain) =>
-    hostname.toLowerCase().endsWith(domain.toLowerCase())
-  )
+  const isIndiaDomain = INDIA_COUNTRY_CONFIG.supportedDomains.some((domain) => {
+    const hostLower = hostname.toLowerCase()
+    const domLower = domain.toLowerCase()
+    return hostLower === domLower || hostLower.endsWith('.' + domLower)
+  })
 
   if (!isIndiaDomain) {
     return {
@@ -55,9 +57,20 @@ export function detectIndiaVisaPage(locationInfo?: LocationInfo): CountryPageDet
   let page: IndiaVisaPage = 'unknown'
   if (pathLower === '' || pathLower === '/' || pathLower === '/index.html' || pathLower.endsWith('/index.jsp')) {
     page = 'landing'
-  } else if (pathLower.includes('/registration') || pathLower.includes('/welcome.jsp')) {
+  } else if (
+    pathLower.endsWith('/visa/registration') ||
+    pathLower.includes('/registration') ||
+    pathLower.includes('/welcome.jsp')
+  ) {
     page = 'application-start'
-  } else if (pathLower.includes('/personal.jsp') || pathLower.includes('/visaonline.jsp') || pathLower.includes('/form1') || pathLower.includes('/evisaform1')) {
+  } else if (
+    pathLower.endsWith('/visa/basicdetails') ||
+    pathLower.includes('/personal.jsp') ||
+    pathLower.includes('/visaonline.jsp') ||
+    pathLower.includes('/form1') ||
+    pathLower.includes('/evisaform1') ||
+    pathLower.includes('/basicdetails')
+  ) {
     page = 'personal-details'
   } else if (pathLower.includes('/addressdetails.jsp') || pathLower.includes('/form2') || pathLower.includes('/evisaform2')) {
     page = 'address-details'
