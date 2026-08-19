@@ -8,6 +8,6 @@ export interface IndiaCountryConfig {
 export const INDIA_COUNTRY_CONFIG: IndiaCountryConfig = {
   countryCode: 'IND',
   countryName: 'India',
-  supportedDomains: ['indianvisaonline.gov.in'],
+  supportedDomains: ['indianvisaonline.gov.in', 'indianvisa-bangladesh.nic.in'],
   officialPortalUrl: 'https://indianvisaonline.gov.in/',
 }
