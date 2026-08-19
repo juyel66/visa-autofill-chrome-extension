@@ -9,6 +9,26 @@ export function resolveApplicantValue(
 ): string | undefined {
   if (!applicant || !path) return undefined
 
+  // Special derivation logic for Indian Mission
+  if (path === 'registration.indianMission') {
+    if (applicant.notes) {
+      const match = applicant.notes.match(/(?:indian\s+)?mission\s*:\s*([^\r\n]+)/i)
+      if (match && match[1]) {
+        return match[1].trim()
+      }
+    }
+    const city = applicant.presentAddress?.villageTownCity?.toLowerCase() || ''
+    const country = applicant.presentAddress?.country?.toLowerCase() || ''
+    if (country === 'bangladesh' || country.includes('bangladesh')) {
+      if (city.includes('dhaka')) return 'BANGLADESH-DHAKA'
+      if (city.includes('chittagong')) return 'BANGLADESH-CHITTAGONG'
+      if (city.includes('sylhet')) return 'BANGLADESH-SYLHET'
+      if (city.includes('rajshahi')) return 'BANGLADESH-RAJSHAHI'
+      if (city.includes('khulna')) return 'BANGLADESH-KHULNA'
+    }
+    return undefined
+  }
+
   const parts = path.split('.')
   let current: unknown = applicant
 
