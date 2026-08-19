@@ -12,19 +12,19 @@ export const AddressSection: React.FC<AddressSectionProps> = ({
   onChange,
   isPermanentSection = false,
 }) => {
-  const addr = isPermanentSection ? data.permanentAddress : data.presentAddress
+  const addr = (isPermanentSection ? data.permanentAddress : data.presentAddress) || {}
 
-  const update = (fields: Partial<typeof addr>) => {
+  const update = (fields: Partial<NonNullable<ApplicantProfile['presentAddress']>>) => {
     if (isPermanentSection) {
       onChange({
         ...data,
-        permanentAddress: { ...data.permanentAddress, ...fields },
+        permanentAddress: { ...(data.permanentAddress || {}), ...fields },
       })
     } else {
-      const updatedPresent = { ...data.presentAddress, ...fields }
-      const updatedPermanent = data.permanentAddress.sameAsPresentAddress
+      const updatedPresent = { ...(data.presentAddress || {}), ...fields }
+      const updatedPermanent = (data.permanentAddress || {}).sameAsPresentAddress
         ? { ...updatedPresent, sameAsPresentAddress: true }
-        : data.permanentAddress
+        : (data.permanentAddress || {})
 
       onChange({
         ...data,
