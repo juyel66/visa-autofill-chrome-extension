@@ -7,7 +7,7 @@ export interface FamilySectionProps {
 }
 
 export const FamilySection: React.FC<FamilySectionProps> = ({ data, onChange }) => {
-  const family = data.family
+  const family = data.family || {}
 
   const updateMember = (relation: 'father' | 'mother' | 'spouse', fields: Partial<FamilyMember>) => {
     const currentMember = family[relation] || {}
