@@ -70,6 +70,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }, 4000)
   }, [setToastMessage])
 
+  const getAutofillStatusMessage = (): { text: string; type: 'success' | 'warning' | 'error' | 'info' } => {
+    if (!detection || !detection.matched || detection.page === 'unknown' || !detection.page) {
+      return { text: 'Unsupported visa page.', type: 'info' }
+    }
+    
+    if (!selectedApplicant) {
+      return { text: 'No active profile selected.', type: 'warning' }
+    }
+
+    const list = applicantDocs || []
+    const hasPassport = list.some(d => d.documentType === 'passport')
+    if (!hasPassport) {
+      return { text: 'Confirmed document required.', type: 'warning' }
+    }
+
+    const hasConfirmedPassport = list.some(d => d.documentType === 'passport' && d.extractedDataConfirmed)
+    if (!hasConfirmedPassport) {
+      return { text: 'Review extracted document data first.', type: 'warning' }
+    }
+
+    return { text: 'Automatic Autofill Ready / Active.', type: 'success' }
+  }
+
   useEffect(() => {
     let isMounted = true
 
@@ -559,37 +582,55 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span className="animate-spin text-xs">⏳</span>
             <span>Checking browser tab...</span>
           </div>
-        ) : detection?.matched ? (
-          <div className="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-left space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-xs text-emerald-800 flex items-center gap-1">
-                <span>✓</span>
-                <span>Indian Visa Application Detected</span>
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-600 text-white uppercase">
-                Supported
-              </span>
-            </div>
-            <div className="text-[11px] text-emerald-900 grid grid-cols-2 gap-1 pt-0.5">
-              <div>
-                <span className="text-[9px] text-emerald-600 block">Flow:</span>
-                <span className="font-semibold">{formatFlowName(detection.flow)}</span>
-              </div>
-              <div>
-                <span className="text-[9px] text-emerald-600 block">Current Stage:</span>
-                <span className="font-semibold">{formatPageName(detection.page)}</span>
-              </div>
-            </div>
-          </div>
         ) : (
-          <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-left space-y-1">
-            <div className="font-bold text-xs text-slate-700">
-              No supported visa application detected.
-            </div>
-            <div className="text-[11px] text-slate-500">
-              Open <strong className="text-slate-700">indianvisaonline.gov.in</strong> to apply.
-            </div>
-          </div>
+          (() => {
+            const status = getAutofillStatusMessage()
+            let bgColor = 'bg-slate-50 border-slate-200 text-slate-700'
+            let badge = 'text-slate-600 bg-slate-100 border border-slate-300'
+            
+            if (status.type === 'success') {
+              bgColor = 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              badge = 'bg-emerald-600 text-white'
+            } else if (status.type === 'warning') {
+              bgColor = 'bg-amber-50 border-amber-200 text-amber-800'
+              badge = 'bg-amber-600 text-white'
+            } else if (status.type === 'error') {
+              bgColor = 'bg-red-50 border-red-200 text-red-800'
+              badge = 'bg-red-600 text-white'
+            }
+
+            return (
+              <div className={`p-2.5 rounded-lg border text-left space-y-1 ${bgColor}`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs flex items-center gap-1">
+                    <span>{status.type === 'success' ? '✓' : 'ℹ'}</span>
+                    <span>{status.text}</span>
+                  </span>
+                  {detection?.matched && detection.page !== 'unknown' ? (
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badge}`}>
+                      Supported
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-200 text-slate-700 border border-slate-300">
+                      Unsupported
+                    </span>
+                  )}
+                </div>
+                {detection?.matched && detection.page !== 'unknown' && (
+                  <div className="text-[11px] grid grid-cols-2 gap-1 pt-0.5 opacity-90">
+                    <div>
+                      <span className="text-[9px] block opacity-70">Flow:</span>
+                      <span className="font-semibold">{formatFlowName(detection.flow)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] block opacity-70">Current Stage:</span>
+                      <span className="font-semibold">{formatPageName(detection.page)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()
         )}
       </div>
 
@@ -935,15 +976,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </span>
           </div>
           <div className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
-            {selectedApplicant.personalInfo.givenNames} {selectedApplicant.personalInfo.surname}
+            PROFILE {selectedApplicant.applicantId}
           </div>
-          <div className="text-[11px] flex gap-3" style={{ color: 'var(--color-muted)' }}>
-            {selectedApplicant.personalInfo.nationality && (
-              <span>Nationality: {selectedApplicant.personalInfo.nationality}</span>
-            )}
-            {selectedApplicant.passport?.passportNumber && (
-              <span>PPT: {selectedApplicant.passport.passportNumber}</span>
-            )}
+          <div className="text-[11px] space-y-1 mt-1.5" style={{ color: 'var(--color-muted)' }}>
+            <div>Documents: {applicantDocs.length}</div>
+            <div>
+              Passport:{' '}
+              {applicantDocs.some(
+                (d) => d.documentType === 'passport' && d.extractedDataConfirmed
+              ) ? (
+                <span className="text-emerald-600 font-bold">Available</span>
+              ) : (
+                <span className="text-amber-600 font-bold">Not Available</span>
+              )}
+            </div>
           </div>
         </div>
       ) : (
