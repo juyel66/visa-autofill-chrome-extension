@@ -7,7 +7,7 @@ export interface EmploymentSectionProps {
 }
 
 export const EmploymentSection: React.FC<EmploymentSectionProps> = ({ data, onChange }) => {
-  const emp = data.employment
+  const emp = data.employment || {}
 
   const update = (fields: Partial<EmploymentDetails>) => {
     onChange({
