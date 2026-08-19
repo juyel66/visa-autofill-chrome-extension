@@ -133,20 +133,6 @@ export function createEmptyApplicant(id?: string): ApplicantProfile {
   const now = new Date().toISOString()
   return {
     applicantId: id || `applicant_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    personalInfo: createEmptyPersonalInfo(),
-    passport: createEmptyPassportDetails(),
-    presentAddress: createEmptyAddress(),
-    permanentAddress: createEmptyPermanentAddress(),
-    contact: {
-      phone: '',
-      mobile: '',
-      email: '',
-    },
-    family: createEmptyFamilyDetails(),
-    employment: createEmptyEmploymentDetails(),
-    travel: createEmptyTravelDetails(),
-    accommodation: createEmptyAccommodationDetails(),
-    reference: createEmptyReferenceDetails(),
     createdAt: now,
     updatedAt: now,
     notes: '',
