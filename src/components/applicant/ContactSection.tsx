@@ -12,9 +12,9 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
   onChange,
   getFieldError,
 }) => {
-  const contact = data.contact
+  const contact = data.contact || {}
 
-  const update = (fields: Partial<typeof contact>) => {
+  const update = (fields: Partial<NonNullable<ApplicantProfile['contact']>>) => {
     onChange({
       ...data,
       contact: { ...contact, ...fields },
