@@ -6,6 +6,7 @@ export type IndiaFieldSelector = FieldSelector
 export type IndiaMappingStatus = MappingStatus
 
 export type ApplicantProfileFieldPath =
+  | 'registration.indianMission'
   | 'personalInfo.surname'
   | 'personalInfo.givenNames'
   | 'personalInfo.previousName'
