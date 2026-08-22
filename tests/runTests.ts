@@ -2,18 +2,34 @@ import './setup.ts'
 
 import { runPersonalPassportAutofillTests } from '../src/countries/india/__tests__/personalPassportAutofill.test'
 import { runIndiaCompatibilityTests } from '../src/countries/india/__tests__/compatibility.test'
+import { runBangladeshSelectorTests } from '../src/countries/india/__tests__/bangladeshSelector.test'
 import { runE2EIntegrationTestSuite } from '../src/core/__tests__/e2eIntegration.test'
 import { runDocumentAutofillTests } from '../src/countries/india/__tests__/documentAutofill.test'
 import { runWorkflowHardeningTests } from '../src/countries/india/__tests__/workflowHardening.test'
 import { runRecoveryTests } from '../src/countries/india/__tests__/recovery.test'
+import { runCandidateResolverTests } from '../src/countries/india/__tests__/candidateResolver.test'
 import { runValidationTests } from '../src/countries/india/__tests__/validation.test'
 
 async function execute() {
+  console.log('--- RUNNING CANDIDATE DATA RESOLVER TESTS ---')
+  const candResolverRes = runCandidateResolverTests()
+  console.log(`Passed: ${candResolverRes.passed}, Count: ${candResolverRes.totalSubtests}`)
+  if (!candResolverRes.passed) {
+    console.error('Failures:', candResolverRes.failures)
+  }
+
   console.log('--- RUNNING INDIA COMPATIBILITY TESTS ---')
   const compatRes = runIndiaCompatibilityTests()
   console.log(`Passed: ${compatRes.passed}, Count: ${compatRes.testCount}`)
   if (!compatRes.passed) {
     console.error('Failures:', compatRes.failures)
+  }
+
+  console.log('--- RUNNING BANGLADESH SELECTOR & CANONICAL MAPPING TESTS ---')
+  const bdSelectorRes = runBangladeshSelectorTests()
+  console.log(`Passed: ${bdSelectorRes.passed}, Count: ${bdSelectorRes.testCount}`)
+  if (!bdSelectorRes.passed) {
+    console.error('Failures:', bdSelectorRes.failures)
   }
 
   console.log('--- RUNNING PERSONAL & PASSPORT & ADDITIONAL SECTIONS AUTOFILL TESTS ---')
@@ -59,7 +75,9 @@ async function execute() {
   }
   
   if (
+    candResolverRes.passed &&
     compatRes.passed &&
+    bdSelectorRes.passed &&
     autofillRes.passed &&
     docRes.passed &&
     workflowRes.passed &&
