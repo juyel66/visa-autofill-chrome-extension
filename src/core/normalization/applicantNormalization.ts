@@ -4,39 +4,35 @@ import type { Address, ApplicantProfile, FamilyMember } from '../applicant/types
  * Helper to safely trim whitespace and collapse repeated internal spaces.
  * Example: "  John   David  " -> "John David"
  */
-function cleanString(str?: string): string {
-  if (!str) return ''
-  return str.trim().replace(/\s+/g, ' ')
+function cleanString(str?: string): string | undefined {
+  if (!str) return undefined
+  const cleaned = str.trim().replace(/\s+/g, ' ')
+  return cleaned !== '' ? cleaned : undefined
 }
 
-/**
- * Helper to normalize email addresses (trimmed & lowercased).
- * Example: " JOHN@EXAMPLE.COM " -> "john@example.com"
- */
-function cleanEmail(emailStr?: string): string {
-  if (!emailStr) return ''
-  return emailStr.trim().toLowerCase()
+function cleanEmail(emailStr?: string): string | undefined {
+  if (!emailStr) return undefined
+  const cleaned = emailStr.trim().toLowerCase()
+  return cleaned !== '' ? cleaned : undefined
 }
 
-/**
- * Helper to normalize phone numbers (outer whitespace trimmed, user formatting preserved).
- */
-function cleanPhone(phoneStr?: string): string {
-  if (!phoneStr) return ''
-  return phoneStr.trim()
+function cleanPhone(phoneStr?: string): string | undefined {
+  if (!phoneStr) return undefined
+  const cleaned = phoneStr.trim()
+  return cleaned !== '' ? cleaned : undefined
 }
 
 /**
  * Helper to normalize an Address object immutably.
  */
-function cleanAddress<T extends Address>(addr?: T): T {
-  if (!addr) return {} as T
+function cleanAddress<T extends Address>(addr?: T): T | undefined {
+  if (!addr) return undefined
   return {
     ...addr,
     addressLine1: cleanString(addr.addressLine1),
-    addressLine2: addr.addressLine2 ? cleanString(addr.addressLine2) : '',
+    addressLine2: cleanString(addr.addressLine2),
     villageTownCity: cleanString(addr.villageTownCity),
-    district: addr.district ? cleanString(addr.district) : '',
+    district: cleanString(addr.district),
     stateProvince: cleanString(addr.stateProvince),
     country: cleanString(addr.country),
     postalCode: cleanString(addr.postalCode),
@@ -46,20 +42,12 @@ function cleanAddress<T extends Address>(addr?: T): T {
 /**
  * Helper to normalize a FamilyMember object immutably.
  */
-function cleanFamilyMember(member?: FamilyMember): FamilyMember {
-  if (!member) {
-    return {
-      name: '',
-      nationality: '',
-      previousNationality: '',
-      placeOfBirth: '',
-      countryOfBirth: '',
-    }
-  }
+function cleanFamilyMember(member?: FamilyMember): FamilyMember | undefined {
+  if (!member) return undefined
   return {
     name: cleanString(member.name),
     nationality: cleanString(member.nationality),
-    previousNationality: member.previousNationality ? cleanString(member.previousNationality) : '',
+    previousNationality: cleanString(member.previousNationality),
     placeOfBirth: cleanString(member.placeOfBirth),
     countryOfBirth: cleanString(member.countryOfBirth),
   }
@@ -79,68 +67,60 @@ export function normalizeApplicant(applicant: ApplicantProfile): ApplicantProfil
   return {
     ...applicant,
     applicantId: applicant.applicantId ? applicant.applicantId.trim() : '',
-    personalInfo: {
-      ...applicant.personalInfo,
-      surname: cleanString(applicant.personalInfo?.surname),
-      givenNames: cleanString(applicant.personalInfo?.givenNames),
-      previousName: applicant.personalInfo?.previousName
-        ? cleanString(applicant.personalInfo.previousName)
-        : '',
-      dateOfBirth: applicant.personalInfo?.dateOfBirth
-        ? applicant.personalInfo.dateOfBirth.trim()
-        : '',
-      townCityOfBirth: cleanString(applicant.personalInfo?.townCityOfBirth),
-      countryOfBirth: cleanString(applicant.personalInfo?.countryOfBirth),
-      nationalIdNumber: applicant.personalInfo?.nationalIdNumber
-        ? cleanString(applicant.personalInfo.nationalIdNumber)
-        : '',
-      religion: cleanString(applicant.personalInfo?.religion),
-      visibleIdentificationMarks: applicant.personalInfo?.visibleIdentificationMarks
-        ? cleanString(applicant.personalInfo.visibleIdentificationMarks)
-        : '',
-      educationalQualification: cleanString(applicant.personalInfo?.educationalQualification),
-      nationality: cleanString(applicant.personalInfo?.nationality),
-      previousNationality: applicant.personalInfo?.previousNationality
-        ? cleanString(applicant.personalInfo.previousNationality)
-        : '',
-    },
-    passport: {
-      ...applicant.passport,
-      passportNumber: applicant.passport?.passportNumber
-        ? applicant.passport.passportNumber.trim()
-        : '',
-      passportType: cleanString(applicant.passport?.passportType),
-      issuingCountry: cleanString(applicant.passport?.issuingCountry),
-      issueDate: applicant.passport?.issueDate ? applicant.passport.issueDate.trim() : '',
-      expiryDate: applicant.passport?.expiryDate ? applicant.passport.expiryDate.trim() : '',
-      placeOfIssue: cleanString(applicant.passport?.placeOfIssue),
-      otherPassportDetails: applicant.passport?.otherPassportDetails
-        ? {
-            passportNumber: applicant.passport.otherPassportDetails.passportNumber
-              ? applicant.passport.otherPassportDetails.passportNumber.trim()
-              : '',
-            countryOfIssue: cleanString(applicant.passport.otherPassportDetails.countryOfIssue),
-            issueDate: applicant.passport.otherPassportDetails.issueDate
-              ? applicant.passport.otherPassportDetails.issueDate.trim()
-              : '',
-            placeOfIssue: cleanString(applicant.passport.otherPassportDetails.placeOfIssue),
-            nationalityInPassport: cleanString(
-              applicant.passport.otherPassportDetails.nationalityInPassport
-            ),
-          }
-        : undefined,
-    },
+    personalInfo: applicant.personalInfo
+      ? {
+          ...applicant.personalInfo,
+          surname: cleanString(applicant.personalInfo.surname),
+          givenNames: cleanString(applicant.personalInfo.givenNames),
+          previousName: cleanString(applicant.personalInfo.previousName),
+          dateOfBirth: cleanString(applicant.personalInfo.dateOfBirth),
+          townCityOfBirth: cleanString(applicant.personalInfo.townCityOfBirth),
+          countryOfBirth: cleanString(applicant.personalInfo.countryOfBirth),
+          nationalIdNumber: cleanString(applicant.personalInfo.nationalIdNumber),
+          religion: cleanString(applicant.personalInfo.religion),
+          visibleIdentificationMarks: cleanString(applicant.personalInfo.visibleIdentificationMarks),
+          educationalQualification: cleanString(applicant.personalInfo.educationalQualification),
+          nationality: cleanString(applicant.personalInfo.nationality),
+          previousNationality: cleanString(applicant.personalInfo.previousNationality),
+        }
+      : undefined,
+    passport: applicant.passport
+      ? {
+          ...applicant.passport,
+          passportNumber: cleanString(applicant.passport.passportNumber),
+          passportType: cleanString(applicant.passport.passportType),
+          issuingCountry: cleanString(applicant.passport.issuingCountry),
+          issueDate: cleanString(applicant.passport.issueDate),
+          expiryDate: cleanString(applicant.passport.expiryDate),
+          placeOfIssue: cleanString(applicant.passport.placeOfIssue),
+          otherPassportDetails: applicant.passport.otherPassportDetails
+            ? {
+                passportNumber: cleanString(applicant.passport.otherPassportDetails.passportNumber),
+                countryOfIssue: cleanString(applicant.passport.otherPassportDetails.countryOfIssue),
+                issueDate: cleanString(applicant.passport.otherPassportDetails.issueDate),
+                placeOfIssue: cleanString(applicant.passport.otherPassportDetails.placeOfIssue),
+                nationalityInPassport: cleanString(
+                  applicant.passport.otherPassportDetails.nationalityInPassport
+                ),
+              }
+            : undefined,
+        }
+      : undefined,
     presentAddress: cleanAddress(applicant.presentAddress),
-    permanentAddress: {
-      ...cleanAddress(applicant.permanentAddress),
-      sameAsPresentAddress: Boolean(applicant.permanentAddress?.sameAsPresentAddress),
-    },
-    contact: {
-      ...applicant.contact,
-      email: cleanEmail(applicant.contact?.email),
-      mobile: cleanPhone(applicant.contact?.mobile),
-      phone: applicant.contact?.phone ? cleanPhone(applicant.contact.phone) : '',
-    },
+    permanentAddress: applicant.permanentAddress
+      ? {
+          ...cleanAddress(applicant.permanentAddress),
+          sameAsPresentAddress: Boolean(applicant.permanentAddress.sameAsPresentAddress),
+        }
+      : undefined,
+    contact: applicant.contact
+      ? {
+          ...applicant.contact,
+          email: cleanEmail(applicant.contact.email),
+          mobile: cleanPhone(applicant.contact.mobile),
+          phone: cleanPhone(applicant.contact.phone),
+        }
+      : undefined,
     family: {
       ...applicant.family,
       father: cleanFamilyMember(applicant.family?.father),
