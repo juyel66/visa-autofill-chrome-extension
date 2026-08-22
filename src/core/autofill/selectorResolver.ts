@@ -1,9 +1,9 @@
 import type { FieldSelector } from './types'
 
 /**
- * Queries all matching target HTMLElements using developer-defined selector strategies.
+ * Single selector strategy resolution helper.
  */
-export function resolveElements(selector?: FieldSelector): HTMLElement[] {
+function resolveSingleSelector(selector: FieldSelector): HTMLElement[] {
   if (!selector || !selector.value || typeof document === 'undefined') {
     return []
   }
@@ -77,10 +77,32 @@ export function resolveElements(selector?: FieldSelector): HTMLElement[] {
 }
 
 /**
+ * Queries all matching target HTMLElements using single or candidate array selector strategies.
+ * Returns explicit empty array [] if no target element matches.
+ */
+export function resolveElements(selector?: FieldSelector | FieldSelector[]): HTMLElement[] {
+  if (!selector) {
+    return []
+  }
+
+  if (Array.isArray(selector)) {
+    for (const cand of selector) {
+      const els = resolveSingleSelector(cand)
+      if (els.length > 0) {
+        return els
+      }
+    }
+    return []
+  }
+
+  return resolveSingleSelector(selector)
+}
+
+/**
  * Resolves a single target DOM HTMLElement.
  * Returns null if no elements are matched, or if multiple elements match (ambiguous target).
  */
-export function resolveElement(selector?: FieldSelector): HTMLElement | null {
+export function resolveElement(selector?: FieldSelector | FieldSelector[]): HTMLElement | null {
   const els = resolveElements(selector)
   return els.length === 1 ? els[0] : null
 }
