@@ -1,8 +1,7 @@
-import { executeAutofill, resolveElement } from '../core/autofill'
+import { executeAutofill, resolveCandidateData, resolveElement } from '../core/autofill'
 import { attachDocumentToField, getDocumentsByApplicantId } from '../core/document'
 import type { DocumentRecord } from '../core/document/types'
 import type { ApplicantProfile } from '../core/applicant/types'
-import { applyExtractionToApplicant } from '../core/extraction/data/extractionMapper'
 import type {
   AutofillResponsePayload,
   ContentPongPayload,
@@ -208,31 +207,25 @@ chrome.runtime.onMessage.addListener(
       }
 
       const applicantId = message.applicant.applicantId
-      const baseProfile: ApplicantProfile = {
-        applicantId,
-        createdAt: message.applicant.createdAt || new Date().toISOString(),
-        updatedAt: message.applicant.updatedAt || new Date().toISOString(),
-        notes: message.applicant.notes,
-      }
 
       chrome.storage.local.get(['visa_autofill_documents'], (res) => {
         const documents = (res.visa_autofill_documents || []) as DocumentRecord[]
-        const applicantDocs = documents.filter((d) => d.applicantId === applicantId)
 
-        let targetDoc = applicantDocs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed && d.extractedData)
-        if (!targetDoc) {
-          targetDoc = applicantDocs.find((d) => d.extractedDataConfirmed && d.extractedData)
-        }
+        const candRes = resolveCandidateData({
+          profileId: applicantId,
+          documents,
+          notes: message.applicant.notes,
+        })
 
-        if (!targetDoc || !targetDoc.extractedData) {
+        if (candRes.status !== 'READY' || !candRes.applicant) {
           sendResponse({
             status: 'error',
-            error: 'Review extracted document data first.',
+            error: candRes.reason || 'Review extracted document data first.',
           })
           return
         }
 
-        const tempProfile = applyExtractionToApplicant(baseProfile, targetDoc.extractedData)
+        const tempProfile = candRes.applicant
 
         const validation = validateApplicant(tempProfile)
         if (!validation.valid) {
@@ -466,25 +459,18 @@ async function attemptAutomaticAutofill() {
     }
 
     const documents = (result.visa_autofill_documents || []) as DocumentRecord[]
-    const applicantDocs = documents.filter((d) => d.applicantId === selectedApplicantId)
+    const candRes = resolveCandidateData({
+      profileId: selectedApplicantId,
+      documents,
+      notes: activeApplicant.notes,
+    })
 
-    let targetDoc = applicantDocs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed && d.extractedData)
-    if (!targetDoc) {
-      targetDoc = applicantDocs.find((d) => d.extractedDataConfirmed && d.extractedData)
-    }
-
-    if (!targetDoc || !targetDoc.extractedData) {
-      console.log('[VISA AUTOFILL] Auto-trigger skipped: No compatible document with confirmed candidate data found.')
+    if (candRes.status !== 'READY' || !candRes.applicant || !candRes.provenance) {
+      console.log(`[VISA AUTOFILL] Auto-trigger skipped: ${candRes.reason || 'Candidate data is not READY.'}`)
       return
     }
 
-    const baseProfile: ApplicantProfile = {
-      applicantId: activeApplicant.applicantId,
-      createdAt: activeApplicant.createdAt,
-      updatedAt: activeApplicant.updatedAt,
-      notes: activeApplicant.notes,
-    }
-    const tempProfile = applyExtractionToApplicant(baseProfile, targetDoc.extractedData)
+    const tempProfile = candRes.applicant
 
     activeState = updateWorkflowState(activeState, {
       status: 'ready',
@@ -492,7 +478,9 @@ async function attemptAutomaticAutofill() {
     })
 
     const mappings = getIndiaVisaMappings(detection.flow, detection.page)
-    console.log(`[VISA AUTOFILL] Automatically triggering autofill on "${detection.page}" using confirmed data from document "${targetDoc.fileName}".`)
+    console.log(
+      `[VISA AUTOFILL] Automatically triggering autofill on "${detection.page}" using confirmed data from document "${candRes.provenance.documentId}".`
+    )
 
     const autofillResult = await executeAutofill({
       mappings,

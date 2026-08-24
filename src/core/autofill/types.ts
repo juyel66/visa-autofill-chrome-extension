@@ -62,7 +62,7 @@ export interface FieldMapping {
   targetField: string
   sourceField?: string
   sourceType?: 'applicant-profile' | 'country-specific' | 'manual'
-  selector?: FieldSelector
+  selector?: FieldSelector | FieldSelector[]
   inputType: FieldInputType
   status: MappingStatus
   required?: boolean

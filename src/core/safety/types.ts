@@ -16,7 +16,7 @@ export type ChangeStatus =
 export interface AutofillChange {
   operationId: string
   fieldId: string
-  targetSelector?: FieldSelector
+  targetSelector?: FieldSelector | FieldSelector[]
   status: ChangeStatus
   previousState: FieldState
   newState: FieldState
