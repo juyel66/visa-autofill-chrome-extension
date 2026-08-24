@@ -52,6 +52,7 @@ function syncCurrentPageState(): WorkflowState {
     latestOperation = null
     return activeState
   }
+// mapping functions
 
   const mappings = getIndiaVisaMappings(detection.flow, detection.page)
   const ready = isFormReady(mappings)
