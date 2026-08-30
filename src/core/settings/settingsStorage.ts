@@ -10,6 +10,9 @@ export const getSettings = async (): Promise<AppSettings> => {
       return
     }
 
+
+    
+
     chrome.storage.local.get([SETTINGS_STORAGE_KEY], (result) => {
       if (chrome.runtime?.lastError) {
         console.error('Error fetching settings from storage:', chrome.runtime.lastError)
