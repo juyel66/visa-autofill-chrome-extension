@@ -235,7 +235,7 @@ export async function runE2EIntegrationTestSuite(): Promise<E2EIntegrationReport
 
       document.body.removeChild(container)
 
-      const passed = filledSurname === 'APPLICANT' && filledPassport === 'TEST000000'
+      const passed = filledSurname === 'APPLICANT' && filledPassport === 'TEST00000'
       stageResults.push({
         stageName: 'Stage 7: Generic AutofillEngine DOM Execution',
         passed,
@@ -266,7 +266,7 @@ export async function runE2EIntegrationTestSuite(): Promise<E2EIntegrationReport
         <input type="text" id="surname" value="APPLICANT" />
         <input type="text" id="given_name" value="JOHN MODIFIED" />
         <input type="text" id="dob" value="1995-01-15" />
-        <input type="text" id="passport_no" value="TEST000000" />
+        <input type="text" id="passport_no" value="TEST00000" />
       `
       document.body.appendChild(container)
 

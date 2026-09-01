@@ -52,10 +52,10 @@ export const compareApplicantWithExtraction = (
       decision = 'use-extracted'
     } else if (existingTrimmed.toLowerCase() === extractedTrimmed.toLowerCase()) {
       status = 'matches'
-      decision = 'keep-existing'
+      decision = 'use-extracted'
     } else {
       status = 'conflict'
-      decision = 'keep-existing'
+      decision = 'use-extracted'
     }
 
     reviewItems.push({
@@ -95,6 +95,10 @@ export const compareApplicantWithExtraction = (
         : undefined
     )
     checkField('personalInfo.nationality', 'Nationality', applicant.personalInfo?.nationality, extracted.personal.nationality)
+    checkField('personalInfo.nationalIdNumber', 'Citizenship / National ID', applicant.personalInfo?.nationalIdNumber, extracted.personal.nationalIdNumber)
+    checkField('personalInfo.religion', 'Religion', applicant.personalInfo?.religion, extracted.personal.religion)
+    checkField('personalInfo.educationalQualification', 'Educational Qualification', applicant.personalInfo?.educationalQualification, extracted.personal.educationalQualification)
+    checkField('personalInfo.previousNationality', 'Previous Nationality', applicant.personalInfo?.previousNationality, extracted.personal.previousNationality)
   }
 
   // Passport Info
@@ -150,7 +154,10 @@ export const applyReviewDecisions = (
       const sectionKey = parts[0] as keyof ApplicantProfile
       const fieldKey = parts[1]
 
-      if (sectionKey && fieldKey && typeof updated[sectionKey] === 'object' && updated[sectionKey] !== null) {
+      if (sectionKey && fieldKey) {
+        if (!updated[sectionKey] || typeof updated[sectionKey] !== 'object') {
+          ;(updated as unknown as Record<string, unknown>)[sectionKey] = {}
+        }
         const targetSection = updated[sectionKey] as unknown as Record<string, unknown>
         targetSection[fieldKey] = targetValue
       }

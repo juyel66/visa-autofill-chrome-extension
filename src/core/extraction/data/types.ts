@@ -20,6 +20,9 @@ export interface ExtractedApplicantData {
     gender?: ExtractedField<Gender>
     nationality?: ExtractedField<string>
     previousNationality?: ExtractedField<string>
+    nationalIdNumber?: ExtractedField<string>
+    religion?: ExtractedField<string>
+    educationalQualification?: ExtractedField<string>
   }
   passport?: {
     passportNumber?: ExtractedField<string>

@@ -31,6 +31,8 @@ export function runCandidateResolverTests(): CandidateResolverTestResult {
         dateOfBirth: { value: '1992-05-15', confidence: 0.99, source: 'pdf-text' },
         gender: { value: 'male', confidence: 0.99, source: 'pdf-text' },
         nationality: { value: 'BGD', confidence: 0.99, source: 'pdf-text' },
+        townCityOfBirth: { value: 'Dhaka', confidence: 0.99, source: 'pdf-text' },
+        countryOfBirth: { value: 'Bangladesh', confidence: 0.99, source: 'pdf-text' },
       },
       passport: {
         passportNumber: { value: 'A12345678', confidence: 0.99, source: 'pdf-text' },
@@ -67,39 +69,37 @@ export function runCandidateResolverTests(): CandidateResolverTestResult {
     },
   }
 
+  const otherDoc: DocumentRecord = {
+    documentId: 'doc-other-001',
+    applicantId: 'profile-001',
+    documentType: 'other',
+    fileName: 'Other.pdf',
+    mimeType: 'application/pdf',
+    fileSize: 300 * 1024,
+    status: 'processed',
+    source: 'user-upload',
+    createdAt: '2026-08-20T00:00:00Z',
+    updatedAt: '2026-08-20T00:00:00Z',
+    extractedDataConfirmed: true,
+  }
+
   const otherProfileDoc: DocumentRecord = {
     ...validPassportDoc,
     documentId: 'doc-pass-other',
     applicantId: 'profile-999',
   }
 
-  // 1. Profile contains identifier semantics only
+  // Regression Test 1: Confirmed PDF DOB is used
   totalSubtests++
   const res1 = resolveCandidateData({
     profileId: 'profile-001',
     documents: [validPassportDoc],
   })
-  if (res1.status !== 'READY' || !res1.applicant || res1.applicant.applicantId !== 'profile-001') {
-    failures.push(`Test 1 Failed: Profile container semantics violation. Got status: ${res1.status}`)
+  if (res1.status !== 'READY' || res1.applicant?.personalInfo?.dateOfBirth !== '1992-05-15') {
+    failures.push(`Test 1 Failed: Expected DOB 1992-05-15 from confirmed PDF, got ${res1.applicant?.personalInfo?.dateOfBirth}`)
   }
 
-  // 2. Confirmed PDF DOB is returned
-  totalSubtests++
-  if (res1.applicant?.personalInfo?.dateOfBirth !== '1992-05-15') {
-    failures.push(`Test 2 Failed: Expected DOB 1992-05-15 from confirmed PDF, got ${res1.applicant?.personalInfo?.dateOfBirth}`)
-  }
-
-  // 3. Profile DOB cannot override PDF DOB
-  totalSubtests++
-  const res3 = resolveCandidateData({
-    profileId: 'profile-001',
-    documents: [validPassportDoc],
-  })
-  if (res3.applicant?.personalInfo?.dateOfBirth !== '1992-05-15') {
-    failures.push('Test 3 Failed: Profile values attempted to override confirmed PDF DOB.')
-  }
-
-  // 4. Missing PDF DOB returns undefined (requiring manual input)
+  // Regression Test 2: Profile DOB is never used as fallback
   totalSubtests++
   const docNoDob: DocumentRecord = {
     ...validPassportDoc,
@@ -112,117 +112,196 @@ export function runCandidateResolverTests(): CandidateResolverTestResult {
       },
     },
   }
-  const res4 = resolveCandidateData({
+  const res2 = resolveCandidateData({
     profileId: 'profile-001',
     requestedDocumentId: 'doc-no-dob',
     documents: [docNoDob],
   })
-  if (res4.applicant?.personalInfo?.dateOfBirth !== undefined) {
-    failures.push(`Test 4 Failed: Missing PDF DOB should yield undefined, got ${res4.applicant?.personalInfo?.dateOfBirth}`)
+  if (res2.applicant?.personalInfo?.dateOfBirth !== undefined) {
+    failures.push(`Test 2 Failed: Profile DOB should never be used as fallback; expected undefined, got ${res2.applicant?.personalInfo?.dateOfBirth}`)
   }
 
-  // 5. Confirmed passport document is selected over random PDF/photo
+  // Regression Test 3: Confirmed PDF passport number is used
   totalSubtests++
-  const res5 = resolveCandidateData({
+  if (res1.applicant?.passport?.passportNumber !== 'A12345678') {
+    failures.push(`Test 3 Failed: Expected passport number A12345678 from confirmed PDF, got ${res1.applicant?.passport?.passportNumber}`)
+  }
+
+  // Regression Test 4: Profile passport number is never used as fallback
+  totalSubtests++
+  const docNoPassport: DocumentRecord = {
+    ...validPassportDoc,
+    documentId: 'doc-no-passport',
+    extractedData: {
+      ...validPassportDoc.extractedData,
+      passport: {
+        ...validPassportDoc.extractedData?.passport,
+        passportNumber: undefined,
+      },
+    },
+  }
+  const res4 = resolveCandidateData({
     profileId: 'profile-001',
-    documents: [photoDoc, validPassportDoc],
+    requestedDocumentId: 'doc-no-passport',
+    documents: [docNoPassport],
   })
-  if (res5.provenance?.documentId !== 'doc-pass-001') {
-    failures.push(`Test 5 Failed: Passport document was not selected over photo document. Got ${res5.provenance?.documentId}`)
+  if (res4.applicant?.passport?.passportNumber !== undefined) {
+    failures.push(`Test 4 Failed: Profile passport number should never be used as fallback; expected undefined, got ${res4.applicant?.passport?.passportNumber}`)
   }
 
-  // 6. Wrong document type is rejected for passport fields
+  // Regression Test 5: Confirmed PDF nationality is used
   totalSubtests++
+  if (res1.applicant?.personalInfo?.nationality !== 'BGD') {
+    failures.push(`Test 5 Failed: Expected nationality BGD from confirmed PDF, got ${res1.applicant?.personalInfo?.nationality}`)
+  }
+
+  // Regression Test 6: Profile nationality is never used as fallback
+  totalSubtests++
+  const docNoNat: DocumentRecord = {
+    ...validPassportDoc,
+    documentId: 'doc-no-nat',
+    extractedData: {
+      ...validPassportDoc.extractedData,
+      personal: {
+        ...validPassportDoc.extractedData?.personal,
+        nationality: undefined,
+      },
+    },
+  }
   const res6 = resolveCandidateData({
+    profileId: 'profile-001',
+    requestedDocumentId: 'doc-no-nat',
+    documents: [docNoNat],
+  })
+  if (res6.applicant?.personalInfo?.nationality !== undefined) {
+    failures.push(`Test 6 Failed: Profile nationality should never be used as fallback; expected undefined, got ${res6.applicant?.personalInfo?.nationality}`)
+  }
+
+  // Regression Test 7: Confirmed PDF name is used (givenNames & surname)
+  totalSubtests++
+  if (res1.applicant?.personalInfo?.givenNames !== 'JOHN' || res1.applicant?.personalInfo?.surname !== 'DOE') {
+    failures.push(`Test 7 Failed: Expected name JOHN DOE from confirmed PDF, got ${res1.applicant?.personalInfo?.givenNames} ${res1.applicant?.personalInfo?.surname}`)
+  }
+
+  // Regression Test 8: Missing PDF DOB yields undefined (requiring manual input on form)
+  totalSubtests++
+  if (res2.applicant?.personalInfo?.dateOfBirth !== undefined) {
+    failures.push('Test 8 Failed: Missing PDF DOB must be undefined / manual-required.')
+  }
+
+  // Regression Test 9: Missing PDF passport number yields undefined (requiring manual input on form)
+  totalSubtests++
+  if (res4.applicant?.passport?.passportNumber !== undefined) {
+    failures.push('Test 9 Failed: Missing PDF passport number must be undefined / manual-required.')
+  }
+
+  // Regression Test 10: Unconfirmed extraction blocks autofill data resolution (returns REVIEW_REQUIRED)
+  totalSubtests++
+  const res10 = resolveCandidateData({
+    profileId: 'profile-001',
+    documents: [unconfirmedPassportDoc],
+  })
+  if (res10.status !== 'REVIEW_REQUIRED' || res10.applicant !== undefined) {
+    failures.push(`Test 10 Failed: Unconfirmed extraction must return REVIEW_REQUIRED with no applicant data, got ${res10.status}`)
+  }
+
+  // Regression Test 11: Confirmed extraction enables autofill data resolution (returns READY)
+  totalSubtests++
+  const res11 = resolveCandidateData({
+    profileId: 'profile-001',
+    documents: [validPassportDoc],
+  })
+  if (res11.status !== 'READY' || !res11.applicant) {
+    failures.push(`Test 11 Failed: Confirmed extraction must return READY, got ${res11.status}`)
+  }
+
+  // Regression Test 12: Candidate data from another profile is rejected (returns NOT_READY)
+  totalSubtests++
+  const res12 = resolveCandidateData({
+    profileId: 'profile-001',
+    requestedDocumentId: 'doc-pass-other',
+    documents: [otherProfileDoc],
+  })
+  if (res12.status !== 'NOT_READY') {
+    failures.push(`Test 12 Failed: Candidate data from another profile was not rejected, got status ${res12.status}`)
+  }
+
+  // Regression Test 13: Candidate data from another / non-existent document is rejected
+  totalSubtests++
+  const res13 = resolveCandidateData({
+    profileId: 'profile-001',
+    requestedDocumentId: 'non-existent-doc',
+    documents: [validPassportDoc],
+  })
+  if (res13.status !== 'NOT_READY') {
+    failures.push(`Test 13 Failed: Non-existent documentId should return NOT_READY, got ${res13.status}`)
+  }
+
+  // Regression Test 14: Correct passport document is selected among multiple documents (Passport vs Other vs Photo)
+  totalSubtests++
+  const res14 = resolveCandidateData({
+    profileId: 'profile-001',
+    documents: [otherDoc, photoDoc, validPassportDoc],
+  })
+  if (res14.status !== 'READY' || res14.provenance?.documentId !== 'doc-pass-001') {
+    failures.push(`Test 14 Failed: Passport document was not selected over photo and other docs. Got ${res14.provenance?.documentId}`)
+  }
+
+  // Regression Test 15: Stale / previous candidate data is not reused across profiles/sessions
+  totalSubtests++
+  const res15 = resolveCandidateData({
+    profileId: 'profile-002', // Profile 002 has no documents
+    documents: [validPassportDoc],
+  })
+  if (res15.status === 'READY' || res15.applicant !== undefined) {
+    failures.push('Test 15 Failed: Candidate data from previous profile was reused for different profileId.')
+  }
+
+  // Regression Test 16: No partial PDF autofill occurs before confirmation
+  totalSubtests++
+  const res16 = resolveCandidateData({
+    profileId: 'profile-001',
+    requestedDocumentId: 'doc-pass-unconfirmed',
+    documents: [unconfirmedPassportDoc],
+  })
+  if (res16.status !== 'REVIEW_REQUIRED' || res16.applicant !== undefined) {
+    failures.push('Test 16 Failed: Unconfirmed document must never return partial applicant data.')
+  }
+
+  // Regression Test 17: Incompatible document category returns COMPATIBLE_DOCUMENT_REQUIRED
+  totalSubtests++
+  const res17 = resolveCandidateData({
     profileId: 'profile-001',
     requestedDocumentId: 'doc-photo-001',
     preferredDocumentType: 'passport',
     documents: [photoDoc],
   })
-  if (res6.status !== 'COMPATIBLE_DOCUMENT_REQUIRED') {
-    failures.push(`Test 6 Failed: Wrong document category should return COMPATIBLE_DOCUMENT_REQUIRED, got ${res6.status}`)
+  if (res17.status !== 'COMPATIBLE_DOCUMENT_REQUIRED') {
+    failures.push(`Test 17 Failed: Incompatible document category should return COMPATIBLE_DOCUMENT_REQUIRED, got ${res17.status}`)
   }
 
-  // 7. Candidate data from another profile is rejected
-  totalSubtests++
-  const res7 = resolveCandidateData({
-    profileId: 'profile-001',
-    requestedDocumentId: 'doc-pass-other',
-    documents: [otherProfileDoc],
-  })
-  if (res7.status !== 'NOT_READY') {
-    failures.push(`Test 7 Failed: Document from another profile was not rejected. Got status ${res7.status}`)
-  }
-
-  // 8. Candidate data from non-existent document is rejected
-  totalSubtests++
-  const res8 = resolveCandidateData({
-    profileId: 'profile-001',
-    requestedDocumentId: 'non-existent-doc',
-    documents: [validPassportDoc],
-  })
-  if (res8.status !== 'NOT_READY') {
-    failures.push(`Test 8 Failed: Non-existent documentId should return NOT_READY, got ${res8.status}`)
-  }
-
-  // 9. Unconfirmed extraction blocks autofill (REVIEW_REQUIRED)
-  totalSubtests++
-  const res9 = resolveCandidateData({
-    profileId: 'profile-001',
-    documents: [unconfirmedPassportDoc],
-  })
-  if (res9.status !== 'REVIEW_REQUIRED') {
-    failures.push(`Test 9 Failed: Unconfirmed extraction must return REVIEW_REQUIRED, got ${res9.status}`)
-  }
-
-  // 10. Confirmed extraction enables autofill (READY)
-  totalSubtests++
-  const res10 = resolveCandidateData({
-    profileId: 'profile-001',
-    documents: [validPassportDoc],
-  })
-  if (res10.status !== 'READY') {
-    failures.push(`Test 10 Failed: Confirmed extraction must return READY, got ${res10.status}`)
-  }
-
-  // 11. Missing email does not cause fake email data
-  totalSubtests++
-  if (res10.applicant?.contact?.email !== undefined) {
-    failures.push(`Test 11 Failed: Missing PDF email should yield undefined, got ${res10.applicant?.contact?.email}`)
-  }
-
-  // 12. Missing arrival date does not create a fake date
-  totalSubtests++
-  if (res10.applicant?.travel?.intendedArrivalDate !== undefined) {
-    failures.push(`Test 12 Failed: Missing arrival date should yield undefined, got ${res10.applicant?.travel?.intendedArrivalDate}`)
-  }
-
-  // 13. No stale candidate data is reused across sessions
-  totalSubtests++
-  const res13 = resolveCandidateData({
-    profileId: 'profile-002', // No documents for profile-002
-    documents: [validPassportDoc],
-  })
-  if (res13.status === 'READY') {
-    failures.push('Test 13 Failed: Candidate data from previous profile was reused for different profileId.')
-  }
-
-  // 14. Provenance metadata contains documentId and profileId
+  // Regression Test 18: Provenance metadata contains profileId, documentId, and sourceType 'confirmed-document'
   totalSubtests++
   if (
-    !res10.provenance ||
-    res10.provenance.profileId !== 'profile-001' ||
-    res10.provenance.documentId !== 'doc-pass-001' ||
-    res10.provenance.sourceType !== 'confirmed-document'
+    !res11.provenance ||
+    res11.provenance.profileId !== 'profile-001' ||
+    res11.provenance.documentId !== 'doc-pass-001' ||
+    res11.provenance.sourceType !== 'confirmed-document'
   ) {
-    failures.push('Test 14 Failed: Provenance metadata missing or incorrect.')
+    failures.push('Test 18 Failed: Provenance metadata missing or incorrect.')
   }
 
-  // 15. CAPTCHA remains strictly manual
+  // Regression Test 19: Missing registration-specific fields (email, arrival date) yield undefined without fake data
+  totalSubtests++
+  if (res11.applicant?.contact?.email !== undefined || res11.applicant?.travel?.intendedArrivalDate !== undefined) {
+    failures.push('Test 19 Failed: Missing registration fields should be undefined without fake data.')
+  }
+
+  // Regression Test 20: CAPTCHA mapping remains strictly manual
   totalSubtests++
   const captchaMap = BANGLADESH_VISA_MAPPINGS.find((m) => m.targetField === 'captcha')
   if (!captchaMap || captchaMap.sourceType !== 'manual') {
-    failures.push('Test 15 Failed: CAPTCHA mapping must remain sourceType: manual.')
+    failures.push('Test 20 Failed: CAPTCHA mapping must remain sourceType: manual.')
   }
 
   return {

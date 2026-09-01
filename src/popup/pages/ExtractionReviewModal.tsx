@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Button } from '../../components/ui'
-import type { ApplicantProfile } from '../../core/applicant'
+import type { ApplicantProfile, Gender } from '../../core/applicant'
 import type {
   ExtractedApplicantData,
   ExtractedFieldConflict,
@@ -21,6 +21,9 @@ export interface ExtractionReviewModalProps {
   onConfirm: (confirmedData: ExtractedApplicantData) => void
   onClose: () => void
 }
+
+
+export interwwc = new int ew
 
 export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
   targetApplicant,
@@ -116,14 +119,42 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
           confirmedPayload.personal!.dateOfBirth = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'nationality') {
           confirmedPayload.personal!.nationality = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'gender') {
+          confirmedPayload.personal!.gender = { value: finalVal as Gender, source: item.source || 'manual-review' }
+        } else if (key === 'townCityOfBirth') {
+          confirmedPayload.personal!.townCityOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'countryOfBirth') {
+          confirmedPayload.personal!.countryOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'nationalIdNumber') {
+          confirmedPayload.personal!.nationalIdNumber = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'religion') {
+          confirmedPayload.personal!.religion = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'educationalQualification') {
+          confirmedPayload.personal!.educationalQualification = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'previousNationality') {
+          confirmedPayload.personal!.previousNationality = { value: finalVal, source: item.source || 'manual-review' }
         }
       } else if (sec === 'passport') {
         if (key === 'passportNumber') {
           confirmedPayload.passport!.passportNumber = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'passportType') {
+          confirmedPayload.passport!.passportType = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'issuingCountry') {
           confirmedPayload.passport!.issuingCountry = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'issueDate') {
+          confirmedPayload.passport!.issueDate = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'expiryDate') {
           confirmedPayload.passport!.expiryDate = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'placeOfIssue') {
+          confirmedPayload.passport!.placeOfIssue = { value: finalVal, source: item.source || 'manual-review' }
+        }
+      } else if (sec === 'contact') {
+        if (key === 'email') {
+          confirmedPayload.contact!.email = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'mobile') {
+          confirmedPayload.contact!.mobile = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'phone') {
+          confirmedPayload.contact!.phone = { value: finalVal, source: item.source || 'manual-review' }
         }
       }
     })
@@ -137,10 +168,10 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
       source === 'mrz'
         ? 'bg-emerald-100 text-emerald-800'
         : source === 'pdf-text'
-        ? 'bg-blue-100 text-blue-800'
-        : source === 'ocr'
-        ? 'bg-purple-100 text-purple-800'
-        : 'bg-slate-100 text-slate-700'
+          ? 'bg-blue-100 text-blue-800'
+          : source === 'ocr'
+            ? 'bg-purple-100 text-purple-800'
+            : 'bg-slate-100 text-slate-700'
 
     return (
       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${color}`}>
@@ -292,44 +323,40 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleDecisionChange(idx, 'keep-existing')}
-                      className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${
-                        item.decision === 'keep-existing'
+                      className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${item.decision === 'keep-existing'
                           ? 'bg-slate-700 text-white'
                           : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                      }`}
+                        }`}
                     >
                       Keep Existing
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDecisionChange(idx, 'use-extracted')}
-                      className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${
-                        item.decision === 'use-extracted'
+                      className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${item.decision === 'use-extracted'
                           ? 'bg-indigo-600 text-white font-bold'
                           : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
-                      }`}
+                        }`}
                     >
                       Use Extracted
                     </button>
                     <button
                       type="button"
                       onClick={() => handleStartEdit(idx, item.editedValue || item.extractedValue)}
-                      className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${
-                        item.decision === 'edit'
+                      className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${item.decision === 'edit'
                           ? 'bg-amber-600 text-white font-bold'
                           : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-                      }`}
+                        }`}
                     >
                       {item.decision === 'edit' ? 'Edited' : 'Edit'}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDecisionChange(idx, 'ignore')}
-                      className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${
-                        item.decision === 'ignore'
+                      className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${item.decision === 'ignore'
                           ? 'bg-red-700 text-white'
                           : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
+                        }`}
                     >
                       Ignore
                     </button>

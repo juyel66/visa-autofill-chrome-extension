@@ -3,12 +3,12 @@ import { normalizeApplicant } from '../../normalization'
 import type { ExtractedApplicantData } from './types'
 
 /**
- * Safely merges user-confirmed candidate extraction data into an existing ApplicantProfile object.
+ * Maps user-confirmed candidate extraction data into an ApplicantProfile object for autofill.
  * 
  * Rules:
- * 1. Does NOT mutate original input applicant.
- * 2. Only overwrites fields that are explicitly provided with non-empty values in confirmedData.
- * 3. Preserves all existing profile values when extraction data has no value.
+ * 1. Confirmed PDF candidate data is the sole source of truth for personal and passport fields.
+ * 2. Does NOT fall back to pre-existing applicant profile personal or passport values.
+ * 3. Any field missing in confirmedData is left undefined (requiring manual input if required by form).
  * 4. Runs normalizeApplicant() on the final merged object.
  * 5. Updates the updatedAt ISO timestamp.
  */
@@ -37,9 +37,14 @@ export function applyExtractionToApplicant(
       nationality: p.nationality?.value ? p.nationality.value : undefined,
       townCityOfBirth: p.townCityOfBirth?.value ? p.townCityOfBirth.value : undefined,
       countryOfBirth: p.countryOfBirth?.value ? p.countryOfBirth.value : undefined,
+      nationalIdNumber: p.nationalIdNumber?.value ? p.nationalIdNumber.value : undefined,
+      religion: p.religion?.value ? p.religion.value : undefined,
+      educationalQualification: p.educationalQualification?.value ? p.educationalQualification.value : undefined,
+      previousNationality: p.previousNationality?.value ? p.previousNationality.value : undefined,
     },
     passport: {
       passportNumber: pass.passportNumber?.value ? pass.passportNumber.value : undefined,
+      passportType: pass.passportType?.value ? pass.passportType.value : undefined,
       issuingCountry: pass.issuingCountry?.value ? pass.issuingCountry.value : undefined,
       expiryDate: pass.expiryDate?.value ? pass.expiryDate.value : undefined,
       issueDate: pass.issueDate?.value ? pass.issueDate.value : undefined,
