@@ -23,8 +23,6 @@ export interface ExtractionReviewModalProps {
 }
 
 
-export interwwc = new int ew
-
 export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
   targetApplicant,
   initialData,
@@ -324,8 +322,8 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                       type="button"
                       onClick={() => handleDecisionChange(idx, 'keep-existing')}
                       className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${item.decision === 'keep-existing'
-                          ? 'bg-slate-700 text-white'
-                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                        ? 'bg-slate-700 text-white'
+                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                         }`}
                     >
                       Keep Existing
@@ -334,8 +332,8 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                       type="button"
                       onClick={() => handleDecisionChange(idx, 'use-extracted')}
                       className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${item.decision === 'use-extracted'
-                          ? 'bg-indigo-600 text-white font-bold'
-                          : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                        ? 'bg-indigo-600 text-white font-bold'
+                        : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
                         }`}
                     >
                       Use Extracted
@@ -344,8 +342,8 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                       type="button"
                       onClick={() => handleStartEdit(idx, item.editedValue || item.extractedValue)}
                       className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${item.decision === 'edit'
-                          ? 'bg-amber-600 text-white font-bold'
-                          : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                        ? 'bg-amber-600 text-white font-bold'
+                        : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
                         }`}
                     >
                       {item.decision === 'edit' ? 'Edited' : 'Edit'}
@@ -354,8 +352,8 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                       type="button"
                       onClick={() => handleDecisionChange(idx, 'ignore')}
                       className={`px-2 py-1 rounded font-semibold cursor-pointer transition ${item.decision === 'ignore'
-                          ? 'bg-red-700 text-white'
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        ? 'bg-red-700 text-white'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                         }`}
                     >
                       Ignore
