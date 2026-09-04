@@ -23,6 +23,8 @@ export interface ExtractionReviewModalProps {
 }
 
 
+
+
 export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
   targetApplicant,
   initialData,
