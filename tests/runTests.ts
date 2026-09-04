@@ -33,7 +33,7 @@ async function execute() {
   }
 
   console.log('--- RUNNING BANGLADESH SELECTOR & CANONICAL MAPPING TESTS ---')
-  const bdSelectorRes = runBangladeshSelectorTests()
+  const bdSelectorRes = await runBangladeshSelectorTests()
   console.log(`Passed: ${bdSelectorRes.passed}, Count: ${bdSelectorRes.testCount}`)
   if (!bdSelectorRes.passed) {
     console.error('Failures:', bdSelectorRes.failures)
