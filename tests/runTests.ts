@@ -1,6 +1,7 @@
 import './setup.ts'
 
 import { runPersonalPassportAutofillTests } from '../src/countries/india/__tests__/personalPassportAutofill.test'
+import { runDomVerificationAutofillTests } from '../src/core/autofill/__tests__/domVerificationAutofill.test'
 import { runIndiaCompatibilityTests } from '../src/countries/india/__tests__/compatibility.test'
 import { runBangladeshSelectorTests } from '../src/countries/india/__tests__/bangladeshSelector.test'
 import { runE2EIntegrationTestSuite } from '../src/core/__tests__/e2eIntegration.test'
@@ -11,6 +12,12 @@ import { runCandidateResolverTests } from '../src/countries/india/__tests__/cand
 import { runValidationTests } from '../src/countries/india/__tests__/validation.test'
 
 async function execute() {
+  console.log('--- RUNNING DOM VERIFICATION & AUTOFILL HARDENING TESTS ---')
+  const domVerifyRes = await runDomVerificationAutofillTests()
+  console.log(`Passed: ${domVerifyRes.passed}, Count: ${domVerifyRes.totalSubtests}`)
+  if (!domVerifyRes.passed) {
+    console.error('Failures:', domVerifyRes.failures)
+  }
   console.log('--- RUNNING CANDIDATE DATA RESOLVER TESTS ---')
   const candResolverRes = runCandidateResolverTests()
   console.log(`Passed: ${candResolverRes.passed}, Count: ${candResolverRes.totalSubtests}`)
@@ -75,6 +82,7 @@ async function execute() {
   }
   
   if (
+    domVerifyRes.passed &&
     candResolverRes.passed &&
     compatRes.passed &&
     bdSelectorRes.passed &&
