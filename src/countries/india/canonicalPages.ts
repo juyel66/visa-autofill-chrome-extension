@@ -1,12 +1,35 @@
-import type { IndiaVisaPage } from './types'
+import type { CanonicalIndiaVisaPage } from './types'
+
+export const CANONICAL_INDIA_VISA_PAGES = {
+  REGISTRATION: 'REGISTRATION',
+  BASIC_DETAILS: 'BASIC_DETAILS',
+  ADDRESS_DETAILS: 'ADDRESS_DETAILS',
+  FAMILY_DETAILS: 'FAMILY_DETAILS',
+  OCCUPATION_DETAILS: 'OCCUPATION_DETAILS',
+  TRAVEL_DETAILS: 'TRAVEL_DETAILS',
+  REFERENCE_DETAILS: 'REFERENCE_DETAILS',
+  DOCUMENT_UPLOAD: 'DOCUMENT_UPLOAD',
+  DOCUMENT_REUPLOAD: 'DOCUMENT_REUPLOAD',
+  LANDING: 'LANDING',
+  APPLICATION_FORM: 'APPLICATION_FORM',
+  PARTIAL_APPLICATION: 'PARTIAL_APPLICATION',
+  PRINT_APPLICATION: 'PRINT_APPLICATION',
+  STATUS: 'STATUS',
+  LOGIN: 'LOGIN',
+  OTP: 'OTP',
+  CAPTCHA: 'CAPTCHA',
+  PAYMENT: 'PAYMENT',
+  REVIEW: 'REVIEW',
+  UNKNOWN: 'UNKNOWN',
+} as const
 
 /**
- * Normalizes any page identifier or path string into a single canonical IndiaVisaPage identity.
- * Maps legacy/alternate names like 'application-start' to canonical 'registration',
- * and 'personal-details' to canonical 'basic-details'.
+ * Normalizes any page identifier or path string into a single canonical CanonicalIndiaVisaPage identity.
+ * Maps legacy/alternate names like 'application-start', '/visa/Registration', and 'registration'
+ * to canonical 'REGISTRATION', and 'personal-details', '/visa/BasicDetails' to 'BASIC_DETAILS'.
  */
-export function normalizePageIdentity(page?: string | null): IndiaVisaPage {
-  if (!page) return 'unknown'
+export function normalizePageIdentity(page?: string | null): CanonicalIndiaVisaPage {
+  if (!page) return 'UNKNOWN'
   const p = page.toLowerCase().trim()
 
   switch (p) {
@@ -16,7 +39,7 @@ export function normalizePageIdentity(page?: string | null): IndiaVisaPage {
     case '/visa/registration.jsp':
     case 'registration.jsp':
     case 'welcome.jsp':
-      return 'registration'
+      return 'REGISTRATION'
 
     case 'basic-details':
     case 'basicdetails':
@@ -28,82 +51,108 @@ export function normalizePageIdentity(page?: string | null): IndiaVisaPage {
     case 'personal.jsp':
     case 'form1':
     case 'evisaform1':
-      return 'basic-details'
+      return 'BASIC_DETAILS'
 
     case 'address-details':
+    case 'addressdetails':
+    case 'address_details':
+    case '/visa/addressdetails.jsp':
     case 'addressdetails.jsp':
     case 'form2':
     case 'evisaform2':
-      return 'address-details'
+      return 'ADDRESS_DETAILS'
 
     case 'family-details':
+    case 'familydetails':
+    case 'family_details':
+    case '/visa/familydetails.jsp':
     case 'familydetails.jsp':
-      return 'family-details'
+      return 'FAMILY_DETAILS'
 
     case 'occupation-details':
+    case 'occupationdetails':
+    case 'occupation_details':
     case 'profession':
+    case '/visa/occupationdetails.jsp':
     case 'occupationdetails.jsp':
     case 'form4':
     case 'evisaform4':
-      return 'occupation-details'
+      return 'OCCUPATION_DETAILS'
 
     case 'travel-details':
+    case 'traveldetails':
+    case 'travel_details':
     case 'visa-details':
+    case 'visadetails':
+    case '/visa/visadetails.jsp':
     case 'visadetails.jsp':
     case 'form3':
     case 'evisaform3':
-      return 'travel-details'
+      return 'TRAVEL_DETAILS'
 
     case 'reference-details':
+    case 'referencedetails':
+    case 'reference_details':
     case 'references':
     case 'accommodation':
+    case '/visa/referencedetails.jsp':
     case 'referencedetails.jsp':
     case 'form5':
     case 'evisaform5':
-      return 'reference-details'
+      return 'REFERENCE_DETAILS'
 
     case 'document-upload':
+    case 'documentupload':
+    case 'document_upload':
     case 'uploadphoto.jsp':
-      return 'document-upload'
+      return 'DOCUMENT_UPLOAD'
 
     case 'document-reupload':
+    case 'documentreupload':
+    case 'document_reupload':
     case 'reupload':
-      return 'document-reupload'
+      return 'DOCUMENT_REUPLOAD'
 
     case 'landing':
     case 'index.html':
     case 'index.jsp':
-      return 'landing'
+      return 'LANDING'
 
     case 'application-form':
-      return 'application-form'
+    case 'applicationform':
+    case 'application_form':
+      return 'APPLICATION_FORM'
 
     case 'partial-application':
-      return 'partial-application'
+    case 'partialapplication':
+    case 'partial_application':
+      return 'PARTIAL_APPLICATION'
 
     case 'print-application':
-      return 'print-application'
+    case 'printapplication':
+    case 'print_application':
+      return 'PRINT_APPLICATION'
 
     case 'status':
-      return 'status'
+      return 'STATUS'
 
     case 'login':
-      return 'login'
+      return 'LOGIN'
 
     case 'otp':
-      return 'otp'
+      return 'OTP'
 
     case 'captcha':
-      return 'captcha'
+      return 'CAPTCHA'
 
     case 'payment':
-      return 'payment'
+      return 'PAYMENT'
 
     case 'review':
-      return 'review'
+      return 'REVIEW'
 
     default:
-      return 'unknown'
+      return 'UNKNOWN'
   }
 }
 
@@ -114,5 +163,6 @@ export function arePagesEquivalent(pageA?: string | null, pageB?: string | null)
   if (!pageA || !pageB) return false
   const normA = normalizePageIdentity(pageA)
   const normB = normalizePageIdentity(pageB)
-  return normA !== 'unknown' && normA === normB
+  return normA !== 'UNKNOWN' && normA === normB
 }
+
