@@ -34,6 +34,8 @@ export type FailureCategory =
   | 'skipped-existing'
   | 'already-matching'
   | 'mapping-mismatch'
+  | 'value-verification-failed'
+  | 'source-data-missing'
 
 export type FailureSeverity = 'recoverable' | 'skippable' | 'manual-required' | 'fatal'
 
@@ -54,7 +56,12 @@ export interface FieldSelector {
   value: string
 }
 
-export type MappingStatus = 'verified' | 'unverified' | 'unsupported'
+export type MappingStatus =
+  | 'verified'
+  | 'unverified'
+  | 'needs-verification'
+  | 'manual-required'
+  | 'unsupported'
 
 export interface FieldMapping {
   id: string
