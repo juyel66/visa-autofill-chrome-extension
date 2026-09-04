@@ -17,26 +17,26 @@ export async function runDocumentAutofillTests(): Promise<DocumentTestResult> {
   const failures: string[] = []
   let totalSubtests = 0
 
-  // 1. Upload page detection (Stage: document-upload)
+  // 1. Upload page detection (Stage: DOCUMENT_UPLOAD)
   totalSubtests++
   const detUpload = detectIndiaVisaPage({
     href: 'https://indianvisaonline.gov.in/visa/uploadphoto.jsp',
     hostname: 'indianvisaonline.gov.in',
     pathname: '/visa/uploadphoto.jsp',
   })
-  if (detUpload.page !== 'document-upload' || !detUpload.matched) {
-    failures.push(`Subtest 1 Failed: Expected page to be document-upload, got ${detUpload.page}`)
+  if (detUpload.page !== 'DOCUMENT_UPLOAD' || !detUpload.matched) {
+    failures.push(`Subtest 1 Failed: Expected page to be DOCUMENT_UPLOAD, got ${detUpload.page}`)
   }
 
-  // 2. Reupload page detection (Stage: document-reupload)
+  // 2. Reupload page detection (Stage: DOCUMENT_REUPLOAD)
   totalSubtests++
   const detReupload = detectIndiaVisaPage({
     href: 'https://indianvisaonline.gov.in/visa/reupload.jsp',
     hostname: 'indianvisaonline.gov.in',
     pathname: '/visa/reupload.jsp',
   })
-  if (detReupload.page !== 'document-reupload' || !detReupload.matched) {
-    failures.push(`Subtest 2 Failed: Expected page to be document-reupload, got ${detReupload.page}`)
+  if (detReupload.page !== 'DOCUMENT_REUPLOAD' || !detReupload.matched) {
+    failures.push(`Subtest 2 Failed: Expected page to be DOCUMENT_REUPLOAD, got ${detReupload.page}`)
   }
 
   // 3. Load regular requirements
