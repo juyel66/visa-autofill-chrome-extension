@@ -74,18 +74,18 @@ export function detectIndiaVisaPage(locationInfo?: LocationInfo): CountryPageDet
     page = 'BASIC_DETAILS'
   } else if (pathLower.includes('/addressdetails.jsp') || pathLower.includes('/form2') || pathLower.includes('/evisaform2')) {
     page = 'ADDRESS_DETAILS'
-  } else if (pathLower.includes('/familydetails.jsp')) {
+  } else if (pathLower.includes('/familydetails') || pathLower.includes('/familydetails.jsp')) {
     page = 'FAMILY_DETAILS'
   } else if (pathLower.includes('/occupationdetails.jsp') || pathLower.includes('/form4') || pathLower.includes('/evisaform4')) {
     page = 'OCCUPATION_DETAILS'
-  } else if (pathLower.includes('/visadetails.jsp') || pathLower.includes('/form3') || pathLower.includes('/evisaform3')) {
+  } else if (pathLower.includes('/visadetails') || pathLower.includes('/visadetails.jsp') || pathLower.includes('/form3') || pathLower.includes('/evisaform3')) {
     page = 'TRAVEL_DETAILS'
+  } else if (pathLower.includes('/additionalquestions') || pathLower.includes('/additionalquestions.jsp')) {
+    page = 'ADDITIONAL_QUESTIONS'
   } else if (pathLower.includes('/referencedetails.jsp') || pathLower.includes('/form5') || pathLower.includes('/evisaform5')) {
     page = 'REFERENCE_DETAILS'
   } else if (
     pathLower.includes('/form') ||
-    pathLower.includes('/visadetails') ||
-    pathLower.includes('/familydetails') ||
     pathLower.includes('/personal')
   ) {
     page = 'APPLICATION_FORM'
@@ -97,8 +97,14 @@ export function detectIndiaVisaPage(locationInfo?: LocationInfo): CountryPageDet
     page = 'STATUS'
   } else if (pathLower.includes('/reupload')) {
     page = 'DOCUMENT_REUPLOAD'
-  } else if (pathLower.includes('/upload') || pathLower.includes('/uploadphoto.jsp')) {
+  } else if (
+    pathLower.includes('/photoupload') ||
+    pathLower.includes('/uploadphoto') ||
+    pathLower.includes('/upload') ||
+    pathLower.includes('/uploadphoto.jsp')
+  ) {
     page = 'DOCUMENT_UPLOAD'
+
   } else if (pathLower.includes('/login') || pathLower.includes('login.jsp')) {
     page = 'LOGIN'
   } else if (pathLower.includes('/otp') || pathLower.includes('otp.jsp')) {
