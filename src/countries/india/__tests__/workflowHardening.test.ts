@@ -39,8 +39,8 @@ export async function runWorkflowHardeningTests(): Promise<WorkflowTestResult> {
     hostname: 'indianvisaonline.gov.in',
     pathname: '/visa/login.jsp',
   })
-  if (loginDet.page !== 'login') {
-    failures.push(`Subtest 1 Failed: Expected login page, got ${loginDet.page}`)
+  if (loginDet.page !== 'LOGIN') {
+    failures.push(`Subtest 1 Failed: Expected LOGIN page, got ${loginDet.page}`)
   }
 
   // 2. Detect OTP Page via URL
@@ -50,8 +50,8 @@ export async function runWorkflowHardeningTests(): Promise<WorkflowTestResult> {
     hostname: 'indianvisaonline.gov.in',
     pathname: '/visa/otp.jsp',
   })
-  if (otpDet.page !== 'otp') {
-    failures.push(`Subtest 2 Failed: Expected otp page, got ${otpDet.page}`)
+  if (otpDet.page !== 'OTP') {
+    failures.push(`Subtest 2 Failed: Expected OTP page, got ${otpDet.page}`)
   }
 
   // 3. Detect CAPTCHA Page via URL
@@ -61,8 +61,8 @@ export async function runWorkflowHardeningTests(): Promise<WorkflowTestResult> {
     hostname: 'indianvisaonline.gov.in',
     pathname: '/visa/captcha.jsp',
   })
-  if (captchaDet.page !== 'captcha') {
-    failures.push(`Subtest 3 Failed: Expected captcha page, got ${captchaDet.page}`)
+  if (captchaDet.page !== 'CAPTCHA') {
+    failures.push(`Subtest 3 Failed: Expected CAPTCHA page, got ${captchaDet.page}`)
   }
 
   // 4. Detect Payment Page via URL
@@ -72,8 +72,8 @@ export async function runWorkflowHardeningTests(): Promise<WorkflowTestResult> {
     hostname: 'indianvisaonline.gov.in',
     pathname: '/visa/payment.jsp',
   })
-  if (paymentDet.page !== 'payment') {
-    failures.push(`Subtest 4 Failed: Expected payment page, got ${paymentDet.page}`)
+  if (paymentDet.page !== 'PAYMENT') {
+    failures.push(`Subtest 4 Failed: Expected PAYMENT page, got ${paymentDet.page}`)
   }
 
   // 5. Detect Review Page via URL
@@ -83,8 +83,8 @@ export async function runWorkflowHardeningTests(): Promise<WorkflowTestResult> {
     hostname: 'indianvisaonline.gov.in',
     pathname: '/visa/preview.jsp',
   })
-  if (reviewDet.page !== 'review') {
-    failures.push(`Subtest 5 Failed: Expected review page, got ${reviewDet.page}`)
+  if (reviewDet.page !== 'REVIEW') {
+    failures.push(`Subtest 5 Failed: Expected REVIEW page, got ${reviewDet.page}`)
   }
 
   // 6. Workflow State initialization updates fields correctly
