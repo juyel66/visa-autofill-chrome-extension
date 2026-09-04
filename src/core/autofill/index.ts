@@ -6,3 +6,6 @@ export * from './eventDispatcher'
 export * from './fieldFiller'
 export * from './autofillEngine'
 export * from './candidateResolver'
+export * from './domVerifier'
+export * from './dateNormalizer'
+
