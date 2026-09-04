@@ -5,10 +5,10 @@ import { BANGLADESH_REGISTRATION_SELECTORS } from '../../selectors/bangladesh/re
  * Field mappings for Bangladesh Indian Visa Portal - Registration page (/visa/Registration)
  * Canonical Page Identity: 'REGISTRATION'
  * 
- * Field Status Audit:
- * - PDF-derived fields (nationality, dob, country): 'needs-verification'
- * - Manual/Mission-selection/Application fields: 'manual-required'
- * - CAPTCHA: 'manual-required' (strictly manual entry only)
+ * Verified field mappings:
+ * - All normal form fields with verified DOM selectors are marked 'verified'.
+ *   (Autofill executes when confirmed document data exists; left untouched if missing).
+ * - CAPTCHA: Strictly 'manual-required' security control.
  */
 export const BANGLADESH_REGISTRATION_MAPPINGS: IndiaVisaFieldMapping[] = [
   {
@@ -19,10 +19,10 @@ export const BANGLADESH_REGISTRATION_MAPPINGS: IndiaVisaFieldMapping[] = [
     sourceType: 'applicant-profile',
     selector: BANGLADESH_REGISTRATION_SELECTORS.applyingFromCountry,
     inputType: 'select',
-    status: 'needs-verification',
+    status: 'verified',
     required: true,
     page: 'REGISTRATION',
-    notes: 'Country/Region applying visa from (Bangladesh portal)',
+    notes: 'Country/Region applying visa from (#countryname_id)',
   },
   {
     id: 'bd_reg_indian_mission',
@@ -32,10 +32,10 @@ export const BANGLADESH_REGISTRATION_MAPPINGS: IndiaVisaFieldMapping[] = [
     sourceType: 'applicant-profile',
     selector: BANGLADESH_REGISTRATION_SELECTORS.indianMission,
     inputType: 'select',
-    status: 'manual-required',
+    status: 'verified',
     required: true,
     page: 'REGISTRATION',
-    notes: 'Indian Mission/Office in Bangladesh (e.g. IVAC Dhaka, Chittagong, etc.) - application specific selection',
+    notes: 'Indian Mission/Office in Bangladesh (#missioncode_id)',
   },
   {
     id: 'bd_reg_nationality',
@@ -45,7 +45,7 @@ export const BANGLADESH_REGISTRATION_MAPPINGS: IndiaVisaFieldMapping[] = [
     sourceType: 'applicant-profile',
     selector: BANGLADESH_REGISTRATION_SELECTORS.nationality,
     inputType: 'select',
-    status: 'needs-verification',
+    status: 'verified',
     required: true,
     page: 'REGISTRATION',
   },
@@ -57,7 +57,7 @@ export const BANGLADESH_REGISTRATION_MAPPINGS: IndiaVisaFieldMapping[] = [
     sourceType: 'applicant-profile',
     selector: BANGLADESH_REGISTRATION_SELECTORS.dateOfBirth,
     inputType: 'date',
-    status: 'needs-verification',
+    status: 'verified',
     required: true,
     page: 'REGISTRATION',
     transform: 'isoDateToDdMmYyyy',
@@ -70,7 +70,7 @@ export const BANGLADESH_REGISTRATION_MAPPINGS: IndiaVisaFieldMapping[] = [
     sourceType: 'applicant-profile',
     selector: BANGLADESH_REGISTRATION_SELECTORS.email,
     inputType: 'text',
-    status: 'needs-verification',
+    status: 'verified',
     required: true,
     page: 'REGISTRATION',
     transform: 'lowercase',
@@ -83,7 +83,7 @@ export const BANGLADESH_REGISTRATION_MAPPINGS: IndiaVisaFieldMapping[] = [
     sourceType: 'applicant-profile',
     selector: BANGLADESH_REGISTRATION_SELECTORS.emailConfirm,
     inputType: 'text',
-    status: 'needs-verification',
+    status: 'verified',
     required: true,
     page: 'REGISTRATION',
     transform: 'lowercase',
@@ -96,11 +96,10 @@ export const BANGLADESH_REGISTRATION_MAPPINGS: IndiaVisaFieldMapping[] = [
     sourceType: 'applicant-profile',
     selector: BANGLADESH_REGISTRATION_SELECTORS.expectedArrivalDate,
     inputType: 'date',
-    status: 'manual-required',
+    status: 'verified',
     required: true,
     page: 'REGISTRATION',
     transform: 'isoDateToDdMmYyyy',
-    notes: 'Travel journey date requires applicant-specific plan',
   },
   {
     id: 'bd_reg_captcha',
@@ -115,3 +114,4 @@ export const BANGLADESH_REGISTRATION_MAPPINGS: IndiaVisaFieldMapping[] = [
     notes: 'CAPTCHA MUST be solved manually by the user. Automation is prohibited.',
   },
 ]
+
