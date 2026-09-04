@@ -197,6 +197,10 @@ export function runBangladeshSelectorTests(): { passed: boolean; testCount: numb
     hostname: 'fake-indianvisa-bangladesh.nic.in.attacker.com',
     pathname: '/visa/BasicDetails',
   })
+  if (unsupportedDetection1.matched || unsupportedDetection2.matched) {
+    failures.push('Test 13 Failed: Unsupported / lookalike domains were not rejected.')
+  }
+
   if (typeof document !== 'undefined') {
     document.body.innerHTML = ''
   }
@@ -207,5 +211,6 @@ export function runBangladeshSelectorTests(): { passed: boolean; testCount: numb
     failures,
   }
 }
+
 
 
