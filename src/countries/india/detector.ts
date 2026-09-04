@@ -54,15 +54,15 @@ export function detectIndiaVisaPage(locationInfo?: LocationInfo): CountryPageDet
   }
 
   // 2. Page Stage Classification
-  let page: IndiaVisaPage = 'unknown'
+  let page: IndiaVisaPage = 'UNKNOWN'
   if (pathLower === '' || pathLower === '/' || pathLower === '/index.html' || pathLower.endsWith('/index.jsp')) {
-    page = 'landing'
+    page = 'LANDING'
   } else if (
     pathLower.endsWith('/visa/registration') ||
     pathLower.includes('/registration') ||
     pathLower.includes('/welcome.jsp')
   ) {
-    page = 'application-start'
+    page = 'REGISTRATION'
   } else if (
     pathLower.endsWith('/visa/basicdetails') ||
     pathLower.includes('/personal.jsp') ||
@@ -71,59 +71,59 @@ export function detectIndiaVisaPage(locationInfo?: LocationInfo): CountryPageDet
     pathLower.includes('/evisaform1') ||
     pathLower.includes('/basicdetails')
   ) {
-    page = 'personal-details'
+    page = 'BASIC_DETAILS'
   } else if (pathLower.includes('/addressdetails.jsp') || pathLower.includes('/form2') || pathLower.includes('/evisaform2')) {
-    page = 'address-details'
+    page = 'ADDRESS_DETAILS'
   } else if (pathLower.includes('/familydetails.jsp')) {
-    page = 'family-details'
+    page = 'FAMILY_DETAILS'
   } else if (pathLower.includes('/occupationdetails.jsp') || pathLower.includes('/form4') || pathLower.includes('/evisaform4')) {
-    page = 'occupation-details'
+    page = 'OCCUPATION_DETAILS'
   } else if (pathLower.includes('/visadetails.jsp') || pathLower.includes('/form3') || pathLower.includes('/evisaform3')) {
-    page = 'travel-details'
+    page = 'TRAVEL_DETAILS'
   } else if (pathLower.includes('/referencedetails.jsp') || pathLower.includes('/form5') || pathLower.includes('/evisaform5')) {
-    page = 'reference-details'
+    page = 'REFERENCE_DETAILS'
   } else if (
     pathLower.includes('/form') ||
     pathLower.includes('/visadetails') ||
     pathLower.includes('/familydetails') ||
     pathLower.includes('/personal')
   ) {
-    page = 'application-form'
+    page = 'APPLICATION_FORM'
   } else if (pathLower.includes('/partial') || pathLower.includes('/completepartially')) {
-    page = 'partial-application'
+    page = 'PARTIAL_APPLICATION'
   } else if (pathLower.includes('/print')) {
-    page = 'print-application'
+    page = 'PRINT_APPLICATION'
   } else if (pathLower.includes('/status') || pathLower.includes('/checkstatus')) {
-    page = 'status'
+    page = 'STATUS'
   } else if (pathLower.includes('/reupload')) {
-    page = 'document-reupload'
+    page = 'DOCUMENT_REUPLOAD'
   } else if (pathLower.includes('/upload') || pathLower.includes('/uploadphoto.jsp')) {
-    page = 'document-upload'
+    page = 'DOCUMENT_UPLOAD'
   } else if (pathLower.includes('/login') || pathLower.includes('login.jsp')) {
-    page = 'login'
+    page = 'LOGIN'
   } else if (pathLower.includes('/otp') || pathLower.includes('otp.jsp')) {
-    page = 'otp'
+    page = 'OTP'
   } else if (pathLower.includes('/captcha') || pathLower.includes('captcha.jsp')) {
-    page = 'captcha'
+    page = 'CAPTCHA'
   } else if (pathLower.includes('/payment') || pathLower.includes('payment.jsp') || pathLower.includes('/pay')) {
-    page = 'payment'
+    page = 'PAYMENT'
   } else if (
     pathLower.includes('/review') ||
     pathLower.includes('/preview') ||
     pathLower.includes('preview.jsp') ||
     pathLower.includes('viewdetails.jsp')
   ) {
-    page = 'review'
+    page = 'REVIEW'
   }
 
   // DOM structural fallbacks
-  if (typeof document !== 'undefined' && page === 'unknown') {
+  if (typeof document !== 'undefined' && page === 'UNKNOWN') {
     if (document.querySelector('input[type="password"]')) {
-      page = 'login'
+      page = 'LOGIN'
     } else if (document.querySelector('input[name*="otp" i], input[id*="otp" i]')) {
-      page = 'otp'
+      page = 'OTP'
     } else if (document.querySelector('img[src*="captcha" i], input[name*="captcha" i]')) {
-      page = 'captcha'
+      page = 'CAPTCHA'
     }
   }
 
