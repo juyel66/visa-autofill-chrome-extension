@@ -23,6 +23,6 @@ export interface DocumentExtractionResult {
   documentId: string
   extractionType: 'pdf-text' | 'ocr' | 'mrz'
   status: PdfExtractionStatus
-  extractedAt: string // ISO 8601 string
+  extractedAt: string // ISO 8601 string.
   result: PdfExtractionResult
 }
