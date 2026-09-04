@@ -20,6 +20,8 @@ export const CANONICAL_INDIA_VISA_PAGES = {
   CAPTCHA: 'CAPTCHA',
   PAYMENT: 'PAYMENT',
   REVIEW: 'REVIEW',
+  ADDITIONAL_QUESTIONS: 'ADDITIONAL_QUESTIONS',
+  PHOTO_UPLOAD: 'PHOTO_UPLOAD',
   UNKNOWN: 'UNKNOWN',
 } as const
 
@@ -65,6 +67,7 @@ export function normalizePageIdentity(page?: string | null): CanonicalIndiaVisaP
     case 'family-details':
     case 'familydetails':
     case 'family_details':
+    case '/visa/familydetails':
     case '/visa/familydetails.jsp':
     case 'familydetails.jsp':
       return 'FAMILY_DETAILS'
@@ -84,6 +87,8 @@ export function normalizePageIdentity(page?: string | null): CanonicalIndiaVisaP
     case 'travel_details':
     case 'visa-details':
     case 'visadetails':
+    case 'visa_details':
+    case '/visa/visadetails':
     case '/visa/visadetails.jsp':
     case 'visadetails.jsp':
     case 'form3':
@@ -104,8 +109,20 @@ export function normalizePageIdentity(page?: string | null): CanonicalIndiaVisaP
     case 'document-upload':
     case 'documentupload':
     case 'document_upload':
+    case 'photo-upload':
+    case 'photoupload':
+    case 'photo_upload':
+    case '/visa/photoupload':
+    case '/visa/photoupload.jsp':
     case 'uploadphoto.jsp':
       return 'DOCUMENT_UPLOAD'
+
+    case 'additional-questions':
+    case 'additionalquestions':
+    case 'additional_questions':
+    case '/visa/additionalquestions':
+    case '/visa/additionalquestions.jsp':
+      return 'ADDITIONAL_QUESTIONS'
 
     case 'document-reupload':
     case 'documentreupload':
@@ -155,6 +172,7 @@ export function normalizePageIdentity(page?: string | null): CanonicalIndiaVisaP
       return 'UNKNOWN'
   }
 }
+
 
 /**
  * Checks if two page identifiers refer to the same canonical page identity.
