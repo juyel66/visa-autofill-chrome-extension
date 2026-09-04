@@ -62,6 +62,21 @@ export function runBangladeshSelectorTests(): { passed: boolean; testCount: numb
     failures.push(`Test 3 Failed: BasicDetails page did not resolve to canonical BASIC_DETAILS. Got detection.page='${basicDetection.page}', norm='${basicCanonical}'`)
   }
 
+  // Test 3b: Mapping service returns Bangladesh mappings for both canonical pages
+  testCount++
+  const regServiceMappings = getIndiaVisaMappings('regular', 'REGISTRATION', 'indianvisa-bangladesh.nic.in')
+  const basicServiceMappings = getIndiaVisaMappings('regular', 'BASIC_DETAILS', 'indianvisa-bangladesh.nic.in')
+  if (
+    regServiceMappings.length !== BANGLADESH_REGISTRATION_MAPPINGS.length ||
+    basicServiceMappings.length !== BANGLADESH_BASIC_DETAILS_MAPPINGS.length ||
+    !BANGLADESH_VISA_SELECTORS.applyingFromCountry ||
+    !BANGLADESH_VISA_SELECTORS.surname ||
+    REGULAR_VISA_MAPPINGS.length === 0
+  ) {
+    failures.push('Test 3b Failed: Mapping service or selector re-exports did not return expected definitions.')
+  }
+
+
   // Test 4: Registration candidate selectors resolve against Registration fixture
   testCount++
   if (typeof document !== 'undefined') {
