@@ -15,8 +15,11 @@ export function getIndiaVisaMappings(
   page: IndiaVisaPage | null,
   domain?: string | null
 ): IndiaVisaFieldMapping[] {
+  const effectiveDomain =
+    domain || (typeof window !== 'undefined' ? window.location.hostname : '')
   const isBangladesh = Boolean(
-    domain && domain.toLowerCase().includes('indianvisa-bangladesh.nic.in')
+    effectiveDomain &&
+      effectiveDomain.toLowerCase().includes('indianvisa-bangladesh.nic.in')
   )
 
   const baseMappings = isBangladesh
@@ -27,13 +30,13 @@ export function getIndiaVisaMappings(
     ? EVISA_MAPPINGS
     : [...REGULAR_VISA_MAPPINGS, ...EVISA_MAPPINGS]
 
-  if (page && page !== 'unknown') {
+  if (page && page !== 'unknown' && page !== 'UNKNOWN') {
     const canonicalPage = normalizePageIdentity(page)
     const candidates = isBangladesh
       ? baseMappings
       : baseMappings.filter((m) => m.status === 'verified')
 
-    if (canonicalPage === 'application-form') {
+    if (canonicalPage === 'APPLICATION_FORM') {
       return candidates
     }
     return candidates.filter((m) => m.page && arePagesEquivalent(m.page, canonicalPage))
