@@ -25,6 +25,8 @@ export type CanonicalIndiaVisaPage =
   | 'CAPTCHA'
   | 'PAYMENT'
   | 'REVIEW'
+  | 'ADDITIONAL_QUESTIONS'
+  | 'PHOTO_UPLOAD'
   | 'UNKNOWN'
 
 export type IndiaVisaPage =
@@ -39,8 +41,11 @@ export type IndiaVisaPage =
   | 'family-details'
   | 'occupation-details'
   | 'travel-details'
+  | 'visa-details'
   | 'reference-details'
   | 'document-upload'
+  | 'photo-upload'
+  | 'additional-questions'
   | 'partial-application'
   | 'print-application'
   | 'status'
@@ -51,6 +56,7 @@ export type IndiaVisaPage =
   | 'payment'
   | 'review'
   | 'unknown'
+
 
 export interface CountryPageDetectionResult extends GenericPageDetectionResult {
   country: 'india' | null
