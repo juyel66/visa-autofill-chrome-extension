@@ -63,8 +63,8 @@ export function runIndiaCompatibilityTests(): { passed: boolean; testCount: numb
 
   // Test 7: Bangladesh India Visa BasicDetails Detection
   testCount++
-  if (bdDomainMatch.page !== 'personal-details') {
-    failures.push(`Test 7 Failed: Expected page 'personal-details' for BasicDetails, got '${bdDomainMatch.page}'`)
+  if (bdDomainMatch.page !== 'BASIC_DETAILS') {
+    failures.push(`Test 7 Failed: Expected page 'BASIC_DETAILS' for BasicDetails, got '${bdDomainMatch.page}'`)
   }
 
   // Test 8: Bangladesh India Visa Registration Detection
@@ -75,8 +75,8 @@ export function runIndiaCompatibilityTests(): { passed: boolean; testCount: numb
     href: 'https://indianvisa-bangladesh.nic.in/visa/Registration',
     title: 'Indian Visa Online',
   })
-  if (!bdRegMatch.matched || bdRegMatch.page !== 'application-start') {
-    failures.push(`Test 8 Failed: Expected page 'application-start' for Registration, got '${bdRegMatch.page}'`)
+  if (!bdRegMatch.matched || bdRegMatch.page !== 'REGISTRATION') {
+    failures.push(`Test 8 Failed: Expected page 'REGISTRATION' for Registration, got '${bdRegMatch.page}'`)
   }
 
   // Test 9: Unrelated .nic.in Domain Rejection
@@ -97,8 +97,8 @@ export function runIndiaCompatibilityTests(): { passed: boolean; testCount: numb
     pathname: '/visa/someunknownpath',
     href: 'https://indianvisa-bangladesh.nic.in/visa/someunknownpath',
   })
-  if (!unsupportedPathMatch.matched || unsupportedPathMatch.page !== 'unknown') {
-    failures.push(`Test 10 Failed: Expected page 'unknown' for unsupported path on supported domain, got '${unsupportedPathMatch.page}'`)
+  if (!unsupportedPathMatch.matched || unsupportedPathMatch.page !== 'UNKNOWN') {
+    failures.push(`Test 10 Failed: Expected page 'UNKNOWN' for unsupported path on supported domain, got '${unsupportedPathMatch.page}'`)
   }
 
   // Test 11: Malicious Lookalike Domain Rejection
