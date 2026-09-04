@@ -5,7 +5,30 @@ export type IndiaVisaFlow = 'regular' | 'evisa' | 'unknown'
 
 
 
+export type CanonicalIndiaVisaPage =
+  | 'REGISTRATION'
+  | 'BASIC_DETAILS'
+  | 'ADDRESS_DETAILS'
+  | 'FAMILY_DETAILS'
+  | 'OCCUPATION_DETAILS'
+  | 'TRAVEL_DETAILS'
+  | 'REFERENCE_DETAILS'
+  | 'DOCUMENT_UPLOAD'
+  | 'DOCUMENT_REUPLOAD'
+  | 'LANDING'
+  | 'APPLICATION_FORM'
+  | 'PARTIAL_APPLICATION'
+  | 'PRINT_APPLICATION'
+  | 'STATUS'
+  | 'LOGIN'
+  | 'OTP'
+  | 'CAPTCHA'
+  | 'PAYMENT'
+  | 'REVIEW'
+  | 'UNKNOWN'
+
 export type IndiaVisaPage =
+  | CanonicalIndiaVisaPage
   | 'landing'
   | 'application-start'
   | 'registration'
