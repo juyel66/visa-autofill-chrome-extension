@@ -170,3 +170,140 @@ export const SYNTHETIC_ACCOMMODATION_REFERENCE_FORM_HTML = `
 </body>
 </html>
 `
+
+/**
+ * Minimal candidate/observed DOM fixture for Bangladesh Indian Visa Registration Page:
+ * https://indianvisa-bangladesh.nic.in/visa/Registration
+ * 
+ * Form controls reflect standard NIC visa portal structure:
+ * - Country applying from: select (code vs name)
+ * - Indian Mission: select (manual-required)
+ * - Nationality: select
+ * - Date of Birth: text/date input
+ * - Email & Email Confirm: text input
+ * - Expected Arrival Date: text/date input (manual-required)
+ * - CAPTCHA: text input (manual-required)
+ */
+export const BANGLADESH_REGISTRATION_FIXTURE_HTML = `
+<!DOCTYPE html>
+<html>
+<head><title>Online Visa Application - Registration (Bangladesh Portal)</title></head>
+<body>
+  <form id="reg_form" action="/visa/Registration" method="post">
+    <!-- Country Applying From -->
+    <select id="countryname_id" name="country">
+      <option value="">Select Country...</option>
+      <option value="BGD">BANGLADESH</option>
+      <option value="USA">UNITED STATES</option>
+    </select>
+
+    <!-- Indian Mission (Manual Required) -->
+    <select id="missioncode_id" name="indian_mission">
+      <option value="">Select Mission...</option>
+      <option value="BD01">BANGLADESH - DHAKA (IVAC)</option>
+      <option value="BD02">BANGLADESH - CHITTAGONG (IVAC)</option>
+    </select>
+
+    <!-- Nationality -->
+    <select id="nationality_id" name="nationality">
+      <option value="">Select Nationality...</option>
+      <option value="BGD">BANGLADESH</option>
+      <option value="IND">INDIA</option>
+    </select>
+
+    <!-- Date of Birth -->
+    <input type="text" id="dob_id" name="dob" placeholder="DD/MM/YYYY" value="" />
+
+    <!-- Email -->
+    <input type="text" id="email_id" name="email" value="" />
+
+    <!-- Email Confirm -->
+    <input type="text" id="email_re_id" name="email_re" value="" />
+
+    <!-- Expected Date of Arrival (Manual Required) -->
+    <input type="text" id="journey_id" name="arr_date" placeholder="DD/MM/YYYY" value="" />
+
+    <!-- CAPTCHA (Manual Required) -->
+    <input type="text" id="captcha" name="captcha" value="" />
+  </form>
+</body>
+</html>
+`
+
+/**
+ * Minimal candidate/observed DOM fixture for Bangladesh Indian Visa Basic Details Page:
+ * https://indianvisa-bangladesh.nic.in/visa/BasicDetails
+ * 
+ * Form controls reflect standard NIC visa portal structure:
+ * - Applicant Surname & Given Name
+ * - Gender (Select control & Radio group fallback support)
+ * - Date of Birth & Birth Places
+ * - National ID, Religion, Education
+ * - Passport Details (Number, Issue Place, Dates)
+ */
+export const BANGLADESH_BASIC_DETAILS_FIXTURE_HTML = `
+<!DOCTYPE html>
+<html>
+<head><title>Online Visa Application - Basic Details (Bangladesh Portal)</title></head>
+<body>
+  <form id="basic_details_form" action="/visa/BasicDetails" method="post">
+    <!-- Surname & Given Name -->
+    <input type="text" id="applicant_surname" name="applicant_surname" value="" />
+    <input type="text" id="applicant_given_name" name="applicant_given_name" value="" />
+
+    <!-- Gender (Select control) -->
+    <select id="gender" name="gender">
+      <option value="">Select Gender...</option>
+      <option value="M">MALE</option>
+      <option value="F">FEMALE</option>
+      <option value="T">TRANSGENDER</option>
+    </select>
+
+    <!-- Date of Birth -->
+    <input type="text" id="dob" name="dob" placeholder="DD/MM/YYYY" value="" />
+
+    <!-- Place of Birth -->
+    <input type="text" id="city_of_birth" name="city_of_birth" value="" />
+    <select id="country_of_birth" name="country_of_birth">
+      <option value="">Select Country of Birth...</option>
+      <option value="BGD">BANGLADESH</option>
+      <option value="IND">INDIA</option>
+    </select>
+
+    <!-- National ID -->
+    <input type="text" id="national_id" name="national_id" value="" />
+
+    <!-- Religion -->
+    <select id="religion" name="religion">
+      <option value="">Select Religion...</option>
+      <option value="ISLAM">ISLAM</option>
+      <option value="HINDU">HINDUISM</option>
+      <option value="BUDDHISM">BUDDHISM</option>
+      <option value="CHRISTIANITY">CHRISTIANITY</option>
+    </select>
+
+    <!-- Educational Qualification -->
+    <select id="educational_qualification" name="educational_qualification">
+      <option value="">Select Qualification...</option>
+      <option value="GRADUATE">GRADUATE</option>
+      <option value="POST GRADUATE">POST GRADUATE</option>
+      <option value="HIGHER SECONDARY">HIGHER SECONDARY</option>
+    </select>
+
+    <!-- Nationality -->
+    <select id="nationality" name="nationality">
+      <option value="">Select Nationality...</option>
+      <option value="BGD">BANGLADESH</option>
+      <option value="IND">INDIA</option>
+    </select>
+
+    <!-- Passport Details -->
+    <input type="text" id="passport_number" name="passport_number" value="" />
+    <input type="text" id="place_of_issue" name="place_of_issue" value="" />
+    <input type="text" id="issue_date" name="issue_date" placeholder="DD/MM/YYYY" value="" />
+    <input type="text" id="expiry_date" name="expiry_date" placeholder="DD/MM/YYYY" value="" />
+  </form>
+</body>
+</html>
+`
+
