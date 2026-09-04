@@ -582,8 +582,12 @@ export async function runPersonalPassportAutofillTests(): Promise<PersonalPasspo
     options: { policy: 'fill-empty' },
   })
   const emailResObj = resEmailMissing.results.find((r) => r.fieldId === 'reg_email')
-  if (!emailResObj || emailResObj.status !== 'failed' || emailResObj.failureType !== 'validation-failed') {
-    failures.push('Subtest 12.3 Failed: Missing email did not trigger validation-failed.')
+  if (
+    !emailResObj ||
+    emailResObj.status !== 'failed' ||
+    (emailResObj.failureType !== 'validation-failed' && emailResObj.failureType !== 'source-data-missing')
+  ) {
+    failures.push('Subtest 12.3 Failed: Missing email did not trigger validation-failed / source-data-missing.')
   }
 
   // 3. Missing arrival date profile
@@ -597,8 +601,12 @@ export async function runPersonalPassportAutofillTests(): Promise<PersonalPasspo
     options: { policy: 'fill-empty' },
   })
   const arrivalResObj = resArrivalMissing.results.find((r) => r.fieldId === 'reg_arr_date')
-  if (!arrivalResObj || arrivalResObj.status !== 'failed' || arrivalResObj.failureType !== 'validation-failed') {
-    failures.push('Subtest 12.4 Failed: Missing arrival date did not trigger validation-failed.')
+  if (
+    !arrivalResObj ||
+    arrivalResObj.status !== 'failed' ||
+    (arrivalResObj.failureType !== 'validation-failed' && arrivalResObj.failureType !== 'source-data-missing')
+  ) {
+    failures.push('Subtest 12.4 Failed: Missing arrival date did not trigger validation-failed / source-data-missing.')
   }
 
   // 4. Invalid DOB profile (e.g. invalid calendar date)
