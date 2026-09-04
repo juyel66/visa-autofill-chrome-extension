@@ -34,8 +34,10 @@ export function getFailureSeverity(category: FailureCategory): FailureSeverity {
     case 'disabled-field':
     case 'ambiguous-target':
     case 'mapping-mismatch':
+    case 'source-data-missing':
       return 'manual-required'
 
+    case 'value-verification-failed':
     case 'page-not-recognized':
     case 'validation-failed':
     case 'page-changed':
@@ -156,7 +158,19 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
       continue
     }
 
-    if (mapping.status === 'unverified') {
+    if (mapping.status === 'manual-required' || mapping.sourceType === 'manual') {
+      results.push({
+        fieldId: mapping.id,
+        status: 'failed',
+        failureType: 'manual-required',
+        reason: 'Manual entry required for this field.',
+        attempts: 0,
+      })
+      failedCount++
+      continue
+    }
+
+    if (mapping.status === 'unverified' || mapping.status === 'needs-verification') {
       results.push({
         fieldId: mapping.id,
         status: 'skipped',
@@ -175,19 +189,6 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
         attempts: 0,
       })
       skippedCount++
-      continue
-    }
-
-    // Check manual-only field sourceType gate
-    if (mapping.sourceType === 'manual') {
-      results.push({
-        fieldId: mapping.id,
-        status: 'failed',
-        failureType: 'manual-required',
-        reason: 'Manual entry required for this field.',
-        attempts: 0,
-      })
-      failedCount++
       continue
     }
 
@@ -321,16 +322,16 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
             fieldResult = {
               fieldId: mapping.id,
               status: 'failed',
-              failureType: 'validation-failed',
-              reason: 'Required source field is missing from applicant profile.',
+              failureType: 'source-data-missing',
+              reason: 'Required source field is missing from confirmed applicant document data.',
               attempts,
             }
-            break // non-recoverable validation-failed, do not retry
+            break // non-recoverable, do not retry
           }
           fieldResult = {
             fieldId: mapping.id,
             status: 'skipped',
-            reason: 'Applicant profile contains no value for source field',
+            reason: 'Applicant confirmed data contains no value for optional field.',
             attempts,
           }
           success = true
@@ -344,24 +345,26 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
         // Capture previous state
         const previousState = captureFieldState(element)
 
-        // Execute DOM Fill
+        // Execute DOM Fill with verification
         const fillRes = fillField(element, mapping, resolvedValue, policy, dryRun)
 
         // Capture new state
         const newState = captureFieldState(element)
 
         // Set failureType based on fillField results
-        let failureType: FailureCategory | undefined
-        if (fillRes.status === 'failed' || fillRes.status === 'not-found') {
-          if (fillRes.reason?.includes('Matching option')) {
-            failureType = 'option-not-found'
-          } else {
-            failureType = 'unknown-error'
+        let failureType: FailureCategory | undefined = fillRes.failureType
+        if (!failureType) {
+          if (fillRes.status === 'failed' || fillRes.status === 'not-found') {
+            if (fillRes.reason?.includes('Matching option') || fillRes.reason?.includes('dropdown option')) {
+              failureType = 'option-not-found'
+            } else {
+              failureType = 'unknown-error'
+            }
+          } else if (fillRes.status === 'already-matching') {
+            failureType = 'already-matching'
+          } else if (fillRes.status === 'skipped-existing') {
+            failureType = 'skipped-existing'
           }
-        } else if (fillRes.status === 'already-matching') {
-          failureType = 'already-matching'
-        } else if (fillRes.status === 'skipped-existing') {
-          failureType = 'skipped-existing'
         }
 
         fieldResult = {
