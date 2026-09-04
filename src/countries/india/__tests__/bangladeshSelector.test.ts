@@ -33,8 +33,11 @@ import {
   BANGLADESH_ADDITIONAL_QUESTIONS_FIXTURE_HTML,
   BANGLADESH_PHOTO_UPLOAD_FIXTURE_HTML,
 } from './fixtures'
+import { applyExtractionToApplicant } from '../../../core/extraction/data/extractionMapper'
+import { executeAutofill } from '../../../core/autofill/autofillEngine'
+import { getCoverageMatrixStats } from '../coverageMatrix'
 
-export function runBangladeshSelectorTests(): { passed: boolean; testCount: number; failures: string[] } {
+export async function runBangladeshSelectorTests(): Promise<{ passed: boolean; testCount: number; failures: string[] }> {
   const failures: string[] = []
   let testCount = 0
 
@@ -214,14 +217,14 @@ export function runBangladeshSelectorTests(): { passed: boolean; testCount: numb
   const photoControls = getBangladeshPageControls('DOCUMENT_UPLOAD')
 
   if (
-    totalVerifiedCount < 40 ||
-    regControls.length === 0 ||
-    basicControls.length === 0 ||
-    familyControls.length === 0 ||
-    travelControls.length === 0 ||
-    qControls.length === 0 ||
-    photoControls.length === 0 ||
-    BANGLADESH_FIELD_REGISTRY.length === 0
+    totalVerifiedCount !== 105 ||
+    regControls.length !== 8 ||
+    basicControls.length !== 22 ||
+    familyControls.length !== 32 ||
+    travelControls.length !== 27 ||
+    qControls.length !== 21 ||
+    photoControls.length !== 4 ||
+    BANGLADESH_FIELD_REGISTRY.length !== 114
   ) {
     failures.push(`Test 13 Failed: Registry did not return expected control counts. Total verified: ${totalVerifiedCount}`)
   }
@@ -247,6 +250,135 @@ export function runBangladeshSelectorTests(): { passed: boolean; testCount: numb
     failures.push('Test 15 Failed: Unsupported / lookalike domains were not rejected.')
   }
 
+  // Test 16: Coverage matrix validates against registry controls
+  testCount++
+  const stats = getCoverageMatrixStats()
+  if (
+    stats.total !== 114 ||
+    stats.verifiedAutofillable !== 104 ||
+    stats.securityManual !== 3 ||
+    stats.technicalIgnored !== 7 ||
+    stats.directlyExtracted !== 12
+  ) {
+    failures.push(
+      `Test 16 Failed: Coverage matrix stats mismatch. Got total=${stats.total}, autofillable=${stats.verifiedAutofillable}, manual=${stats.securityManual}, technical=${stats.technicalIgnored}, extracted=${stats.directlyExtracted}.`
+    )
+  }
+
+  // Test 17: Zero Profile Fallback Rule (applyExtractionToApplicant isolates confirmed data)
+  testCount++
+  const originalProfile = {
+    applicantId: 'test-app-1',
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
+    personalInfo: {
+      surname: 'OLD_SURNAME',
+      givenNames: 'OLD_GIVEN',
+      religion: 'OLD_RELIGION',
+    },
+    passport: {
+      passportNumber: 'OLD_PPT',
+    },
+  }
+  const extractedConfirmed = {
+    personal: {
+      lastName: { value: 'RAHMAN', source: 'mrz' as const, confidence: 95 },
+    },
+    passport: {
+      passportNumber: { value: 'A12345678', source: 'mrz' as const, confidence: 98 },
+    },
+  }
+  const mappedProfile = applyExtractionToApplicant(originalProfile, extractedConfirmed)
+  if (
+    mappedProfile.personalInfo?.surname !== 'RAHMAN' ||
+    mappedProfile.passport?.passportNumber !== 'A12345678' ||
+    mappedProfile.personalInfo?.givenNames !== undefined ||
+    mappedProfile.personalInfo?.religion !== undefined
+  ) {
+    failures.push('Test 17 Failed: applyExtractionToApplicant did not strictly isolate confirmed document data.')
+  }
+
+  // Test 18: Missing extracted source causes skip without DOM mutation
+  testCount++
+  if (typeof document !== 'undefined') {
+    document.body.innerHTML = `
+      <div>
+        <input type="text" id="religion" name="appl.religion" value="EXISTING_USER_INPUT" />
+        <input type="text" id="surname" name="appl.surname" value="" />
+      </div>
+    `
+    const religionInput = document.getElementById('religion') as HTMLInputElement
+    const surnameInput = document.getElementById('surname') as HTMLInputElement
+
+    // Autofill with candidate profile that lacks religion
+    const singleMapping = BANGLADESH_BASIC_DETAILS_MAPPINGS.find((m) => m.id === 'bd_basic_surname')!
+    const religionMapping = BANGLADESH_BASIC_DETAILS_MAPPINGS.find((m) => m.id === 'bd_basic_religion')!
+
+    await executeAutofill({
+      mappings: [singleMapping, religionMapping],
+      applicant: mappedProfile,
+    })
+
+    if (surnameInput.value !== 'RAHMAN') {
+      failures.push(`Test 18 Failed: Surname was not filled. Got '${surnameInput.value}'`)
+    }
+    if (religionInput.value !== 'EXISTING_USER_INPUT') {
+      failures.push(`Test 18 Failed: Field with missing source was mutated. Got '${religionInput.value}'`)
+    }
+  }
+
+  // Test 19: Date normalization transform (isoDateToDdMmYyyy)
+  testCount++
+  const dobProfile = {
+    applicantId: 'test-dob',
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
+    personalInfo: {
+      dateOfBirth: '1990-05-15',
+    },
+  }
+  if (typeof document !== 'undefined') {
+    document.body.innerHTML = '<input type="text" id="dob_id" name="appl.birthdate" value="" />'
+    const dobInput = document.getElementById('dob_id') as HTMLInputElement
+    const dobMapping = BANGLADESH_REGISTRATION_MAPPINGS.find((m) => m.id === 'bd_reg_dob')!
+    await executeAutofill({
+      mappings: [dobMapping],
+      applicant: dobProfile,
+    })
+    if (dobInput.value !== '15/05/1990') {
+      failures.push(`Test 19 Failed: Date was not formatted to DD/MM/YYYY. Got '${dobInput.value}'`)
+    }
+  }
+
+  // Test 20: Select options matching
+  testCount++
+  const genderProfile = {
+    applicantId: 'test-gender',
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
+    personalInfo: {
+      gender: 'male' as const,
+    },
+  }
+  if (typeof document !== 'undefined') {
+    document.body.innerHTML = `
+      <select id="gender" name="appl.applsex">
+        <option value="">Select Gender</option>
+        <option value="MALE">MALE</option>
+        <option value="FEMALE">FEMALE</option>
+      </select>
+    `
+    const genderSelect = document.getElementById('gender') as HTMLSelectElement
+    const genderMapping = BANGLADESH_BASIC_DETAILS_MAPPINGS.find((m) => m.id === 'bd_basic_gender')!
+    await executeAutofill({
+      mappings: [genderMapping],
+      applicant: genderProfile,
+    })
+    if (genderSelect.value !== 'MALE') {
+      failures.push(`Test 20 Failed: Select gender option was not matched. Got '${genderSelect.value}'`)
+    }
+  }
+
   if (typeof document !== 'undefined') {
     document.body.innerHTML = ''
   }
@@ -257,6 +389,7 @@ export function runBangladeshSelectorTests(): { passed: boolean; testCount: numb
     failures,
   }
 }
+
 
 
 
