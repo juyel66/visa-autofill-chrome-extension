@@ -78,6 +78,27 @@ export interface TravelDetails {
   countriesToVisit?: string[]
   previousVisitToCountry?: boolean
   travelCompanions?: string[]
+  duration?: string
+  visaEntryType?: string
+  entryPoint?: string
+  exitPoint?: string
+  countriesVisited?: string
+  visitedSaarc?: boolean
+}
+
+export interface PreviousVisaDetails {
+  hasPreviousVisa?: boolean
+  visaNumber?: string
+  visaType?: string
+  placeOfIssue?: string
+  dateOfIssue?: string // YYYY-MM-DD
+  visitedAddress1?: string
+  visitedAddress2?: string
+  visitedAddress3?: string
+  hasRefusal?: boolean
+  refusalDetails?: string
+  countriesVisited?: string
+  hasSaarcVisit?: boolean
 }
 
 export interface AccommodationDetails {
@@ -90,6 +111,8 @@ export interface AccommodationDetails {
 
 export interface ReferenceDetails {
   name?: string
+  addressLine1?: string
+  addressLine2?: string
   address?: Address | string
   phone?: string
   email?: string
@@ -111,6 +134,7 @@ export interface PersonalInfo {
   nationality?: string
   nationalityAcquiredBy?: NationalityAcquiredBy
   previousNationality?: string
+  maritalStatus?: string
 }
 
 export interface ApplicantProfile {
@@ -123,8 +147,10 @@ export interface ApplicantProfile {
   family?: FamilyDetails
   employment?: EmploymentDetails
   travel?: TravelDetails
+  previousVisa?: PreviousVisaDetails
   accommodation?: AccommodationDetails
   reference?: ReferenceDetails
+  sponsorMission?: ReferenceDetails
   createdAt: string // ISO timestamp string
   updatedAt: string // ISO timestamp string
   notes?: string
