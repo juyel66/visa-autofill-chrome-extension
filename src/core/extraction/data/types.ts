@@ -8,6 +8,47 @@ export interface ExtractedField<T> {
   confidence?: number // 0 to 100
 }
 
+export interface ExtractedFamilyMember {
+  name?: ExtractedField<string>
+  nationality?: ExtractedField<string>
+  previousNationality?: ExtractedField<string>
+  placeOfBirth?: ExtractedField<string>
+  countryOfBirth?: ExtractedField<string>
+}
+
+export interface ExtractedTravelData {
+  duration?: ExtractedField<string>
+  visaEntryType?: ExtractedField<string>
+  journeyDate?: ExtractedField<string> // YYYY-MM-DD
+  intendedArrivalDate?: ExtractedField<string> // YYYY-MM-DD
+  entryPoint?: ExtractedField<string>
+  exitPoint?: ExtractedField<string>
+  purposeOfVisit?: ExtractedField<string>
+  countriesVisited?: ExtractedField<string>
+  visitedSaarc?: ExtractedField<boolean>
+}
+
+export interface ExtractedPreviousVisa {
+  hasPreviousVisa?: ExtractedField<boolean>
+  visaNumber?: ExtractedField<string>
+  visaType?: ExtractedField<string>
+  placeOfIssue?: ExtractedField<string>
+  dateOfIssue?: ExtractedField<string> // YYYY-MM-DD
+  visitedAddress1?: ExtractedField<string>
+  visitedAddress2?: ExtractedField<string>
+  visitedAddress3?: ExtractedField<string>
+  hasRefusal?: ExtractedField<boolean>
+  refusalDetails?: ExtractedField<string>
+}
+
+export interface ExtractedReference {
+  name?: ExtractedField<string>
+  addressLine1?: ExtractedField<string>
+  addressLine2?: ExtractedField<string>
+  phone?: ExtractedField<string>
+  email?: ExtractedField<string>
+}
+
 export interface ExtractedApplicantData {
   personal?: {
     firstName?: ExtractedField<string>
@@ -23,6 +64,7 @@ export interface ExtractedApplicantData {
     nationalIdNumber?: ExtractedField<string>
     religion?: ExtractedField<string>
     educationalQualification?: ExtractedField<string>
+    maritalStatus?: ExtractedField<string>
   }
   passport?: {
     passportNumber?: ExtractedField<string>
@@ -37,6 +79,49 @@ export interface ExtractedApplicantData {
     mobile?: ExtractedField<string>
     phone?: ExtractedField<string>
   }
+  presentAddress?: {
+    addressLine1?: ExtractedField<string>
+    addressLine2?: ExtractedField<string>
+    villageTownCity?: ExtractedField<string>
+    district?: ExtractedField<string>
+    stateProvince?: ExtractedField<string>
+    country?: ExtractedField<string>
+    postalCode?: ExtractedField<string>
+    phone?: ExtractedField<string>
+  }
+  permanentAddress?: {
+    addressLine1?: ExtractedField<string>
+    addressLine2?: ExtractedField<string>
+    villageTownCity?: ExtractedField<string>
+    district?: ExtractedField<string>
+    stateProvince?: ExtractedField<string>
+    country?: ExtractedField<string>
+    postalCode?: ExtractedField<string>
+  }
+  family?: {
+    father?: ExtractedFamilyMember
+    mother?: ExtractedFamilyMember
+    spouse?: ExtractedFamilyMember
+    hasPakistanRelation?: ExtractedField<boolean>
+    pakistanRelationDetails?: ExtractedField<string>
+  }
+  employment?: {
+    presentOccupation?: ExtractedField<string>
+    employerName?: ExtractedField<string>
+    designationRank?: ExtractedField<string>
+    employerAddress?: ExtractedField<string>
+    employerPhone?: ExtractedField<string>
+    pastOccupation?: ExtractedField<string>
+    hasMilitaryService?: ExtractedField<boolean>
+    militaryOrganization?: ExtractedField<string>
+    militaryDesignation?: ExtractedField<string>
+    militaryRank?: ExtractedField<string>
+    militaryPlaceOfPosting?: ExtractedField<string>
+  }
+  travel?: ExtractedTravelData
+  previousVisa?: ExtractedPreviousVisa
+  sponsorIndia?: ExtractedReference
+  sponsorMission?: ExtractedReference
 }
 
 export interface ExtractedFieldConflict<T> {
