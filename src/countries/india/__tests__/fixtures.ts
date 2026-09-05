@@ -244,9 +244,6 @@ export const BANGLADESH_BASIC_DETAILS_FIXTURE_HTML = `
       <option value="T">TRANSGENDER</option>
     </select>
 
-    <!-- Date of Birth -->
-    <input type="text" id="dob" name="appl.birthdate" placeholder="DD/MM/YYYY" value="" />
-
     <!-- Place of Birth -->
     <input type="text" id="birth_place" name="appl.placbrth" value="" />
     <select id="country_birth" name="appl.country_of_birth">
@@ -278,15 +275,10 @@ export const BANGLADESH_BASIC_DETAILS_FIXTURE_HTML = `
       <option value="HIGHER SECONDARY">HIGHER SECONDARY</option>
     </select>
 
-    <!-- Nationality -->
+    <!-- Nationality By -->
     <select id="nationality_by" name="appl.nationality_by">
       <option value="By Birth">By Birth</option>
       <option value="Naturalization">Naturalization</option>
-    </select>
-    <select id="nationality" name="appl.nationality">
-      <option value="">Select Nationality...</option>
-      <option value="BGD">BANGLADESH</option>
-      <option value="IND">INDIA</option>
     </select>
 
     <!-- Passport Details -->
@@ -337,26 +329,57 @@ export const BANGLADESH_FAMILY_DETAILS_FIXTURE_HTML = `
     <input type="text" id="perm_address2" name="appl.perm_add2" value="" />
     <input type="text" id="perm_address3" name="appl.perm_add3" value="" />
 
-    <!-- Parents & Marital -->
+    <!-- Parents, Spouse & Marital -->
     <input type="text" id="fthrname" name="appl.fthrname" value="" />
     <input type="text" id="father_place_of_birth" name="appl.father_place_of_birth" value="" />
     <select id="father_country_of_birth" name="appl.father_country_of_birth">
+      <option value="">Select...</option>
       <option value="BGD">BANGLADESH</option>
     </select>
     <select id="father_nationality" name="appl.father_nationality">
+      <option value="">Select...</option>
       <option value="BGD">BANGLADESH</option>
+    </select>
+    <select id="father_prev_nationality" name="appl.father_prev_nationality">
+      <option value="">Select...</option>
+      <option value="BGD">BANGLADESH</option>
+      <option value="GBR">BRITISH</option>
     </select>
     <input type="text" id="mother_name" name="appl.mother_name" value="" />
     <input type="text" id="mother_place_of_birth" name="appl.mother_place_of_birth" value="" />
     <select id="mother_country_of_birth" name="appl.mother_country_of_birth">
+      <option value="">Select...</option>
       <option value="BGD">BANGLADESH</option>
     </select>
     <select id="mother_nationality" name="appl.mother_nationality">
+      <option value="">Select...</option>
       <option value="BGD">BANGLADESH</option>
     </select>
+    <select id="mother_prev_nationality" name="appl.mother_prev_nationality">
+      <option value="">Select...</option>
+      <option value="BGD">BANGLADESH</option>
+      <option value="GBR">BRITISH</option>
+    </select>
     <select id="marital_status" name="appl.marital_status">
+      <option value="">Select...</option>
+      <option value="0">Married</option>
+      <option value="1">Single</option>
       <option value="Single">Single</option>
       <option value="Married">Married</option>
+    </select>
+    <input type="text" id="spouse_name" name="appl.spouse_name" value="" />
+    <input type="text" id="spouse_birth_place" name="appl.spouse_place_birth" value="" />
+    <select id="spouse_birth_country" name="appl.spouse_country_birth">
+      <option value="">Select...</option>
+      <option value="BGD">BANGLADESH</option>
+    </select>
+    <select id="spouse_nationality" name="appl.spouse_nationality">
+      <option value="">Select...</option>
+      <option value="BGD">BANGLADESH</option>
+    </select>
+    <select id="spouse_prev_nationality" name="appl.spouse_prev_nationality">
+      <option value="">Select...</option>
+      <option value="BGD">BANGLADESH</option>
     </select>
 
     <!-- Grandparents -->
@@ -366,7 +389,15 @@ export const BANGLADESH_FAMILY_DETAILS_FIXTURE_HTML = `
 
     <!-- Occupation -->
     <select id="occupation" name="appl.occupation">
+      <option value="">Select Occupation...</option>
+      <option value="BUSINESS PERSON">BUSINESS PERSON</option>
       <option value="BUSINESS">BUSINESS</option>
+      <option value="ENGINEER">ENGINEER</option>
+      <option value="DOCTOR">DOCTOR</option>
+      <option value="GOVERNMENT SERVICE">GOVERNMENT SERVICE</option>
+      <option value="STUDENT">STUDENT</option>
+      <option value="PRIVATE SERVICE">PRIVATE SERVICE</option>
+      <option value="SELF EMPLOYED/ FREELANCER">SELF EMPLOYED/ FREELANCER</option>
       <option value="SERVICE">SERVICE</option>
     </select>
     <input type="text" id="empname" name="appl.empname" value="" />
@@ -375,6 +406,8 @@ export const BANGLADESH_FAMILY_DETAILS_FIXTURE_HTML = `
     <input type="text" id="empphone" name="appl.empphone" value="" />
     <select id="previous_occupation" name="appl.previous_occupation">
       <option value="">None</option>
+      <option value="STUDENT">STUDENT</option>
+      <option value="PRIVATE SERVICE">PRIVATE SERVICE</option>
     </select>
     <input type="radio" id="prev_org1" name="appl.prev_org" value="Y" />
     <input type="radio" id="prev_org2" name="appl.prev_org" value="N" />
@@ -406,11 +439,24 @@ export const BANGLADESH_VISA_DETAILS_FIXTURE_HTML = `
     </select>
     <input type="text" id="jouryney_id" name="appl.journeydate" placeholder="DD/MM/YYYY" value="" />
     <select id="entrypoint" name="appl.entrypoint">
+      <option value="">Select Entry Port...</option>
       <option value="HARIDASPUR">HARIDASPUR</option>
       <option value="CHENNAI">CHENNAI</option>
+      <option value="DELHI">DELHI</option>
+      <option value="KOLKATA">KOLKATA</option>
+      <option value="MUMBAI">MUMBAI</option>
+      <option value="GEEDE">GEEDE</option>
+      <option value="CHANGRA BANDHA">CHANGRA BANDHA</option>
     </select>
     <select id="exitpointprc" name="appl.exitpoint">
+      <option value="">Select Exit Port...</option>
       <option value="HARIDASPUR">HARIDASPUR</option>
+      <option value="CHENNAI">CHENNAI</option>
+      <option value="DELHI">DELHI</option>
+      <option value="KOLKATA">KOLKATA</option>
+      <option value="MUMBAI">MUMBAI</option>
+      <option value="GEEDE">GEEDE</option>
+      <option value="CHANGRA BANDHA">CHANGRA BANDHA</option>
     </select>
 
     <!-- Old Visa -->
@@ -421,7 +467,13 @@ export const BANGLADESH_VISA_DETAILS_FIXTURE_HTML = `
     <input type="text" id="prv_visit_add3" name="appl.prv_visit_add3" value="" />
     <input type="text" id="old_visa_no" name="appl.old_visa_no" value="" />
     <select id="old_visa_type_id" name="appl.old_visa_type_id">
+      <option value="">Select Old Visa Type...</option>
       <option value="TOURIST">TOURIST</option>
+      <option value="BUSINESS">BUSINESS</option>
+      <option value="MEDICAL">MEDICAL</option>
+      <option value="ENTRY">ENTRY</option>
+      <option value="STUDENT">STUDENT</option>
+      <option value="EMPLOYMENT">EMPLOYMENT</option>
     </select>
     <input type="text" id="oldvisaissueplace" name="appl.oldvisaissueplace" value="" />
     <input type="text" id="oldvisaissuedate" name="appl.oldvisaissuedate" value="" />
