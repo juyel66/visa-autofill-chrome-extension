@@ -37,6 +37,8 @@ import { applyExtractionToApplicant } from '../../../core/extraction/data/extrac
 import { executeAutofill } from '../../../core/autofill/autofillEngine'
 import { getCoverageMatrixStats } from '../coverageMatrix'
 
+import type { IndiaFieldSelector } from '../mapping.types'
+
 export async function runBangladeshSelectorTests(): Promise<{ passed: boolean; testCount: number; failures: string[] }> {
   const failures: string[] = []
   let testCount = 0
@@ -217,23 +219,33 @@ export async function runBangladeshSelectorTests(): Promise<{ passed: boolean; t
   const photoControls = getBangladeshPageControls('DOCUMENT_UPLOAD')
 
   if (
-    totalVerifiedCount !== 105 ||
+    totalVerifiedCount !== 107 ||
     regControls.length !== 8 ||
-    basicControls.length !== 22 ||
-    familyControls.length !== 32 ||
+    basicControls.length !== 20 ||
+    familyControls.length !== 39 ||
     travelControls.length !== 27 ||
     qControls.length !== 21 ||
     photoControls.length !== 4 ||
-    BANGLADESH_FIELD_REGISTRY.length !== 114
+    BANGLADESH_FIELD_REGISTRY.length !== 119
   ) {
-    failures.push(`Test 13 Failed: Registry did not return expected control counts. Total verified: ${totalVerifiedCount}`)
+    failures.push(`Test 13 Failed: Registry did not return expected control counts. Total verified: ${totalVerifiedCount}, total: ${BANGLADESH_FIELD_REGISTRY.length}`)
+  }
+
+  // Helper to extract primary DOM selector string
+  function getPrimarySelector(selector: IndiaFieldSelector | IndiaFieldSelector[] | undefined): string {
+    if (!selector) return ''
+    const primary = Array.isArray(selector) ? selector[0] : selector
+    if (primary.strategy === 'id') return `#${primary.value}`
+    if (primary.strategy === 'css') return primary.value
+    if (primary.strategy === 'name') return `[name="${primary.value}"]`
+    return ''
   }
 
   // Test 14: Submit buttons and technical controls are not mapped for autofill
   testCount++
-  const continueMapping = BANGLADESH_VISA_MAPPINGS.find((m) => m.targetField === 'continue' || m.targetField === 'exit')
+  const continueMapping = BANGLADESH_VISA_MAPPINGS.find((m) => m.targetField === 'continue' || m.targetField === 'exit' || m.targetField === 'upload')
   if (continueMapping) {
-    failures.push('Test 14 Failed: Submit/Exit buttons must not be included in automated field mappings.')
+    failures.push('Test 14 Failed: Submit/Exit/Upload buttons must not be included in automated field mappings.')
   }
 
   // Test 15: Unsupported / lookalike domains remain rejected
@@ -254,11 +266,11 @@ export async function runBangladeshSelectorTests(): Promise<{ passed: boolean; t
   testCount++
   const stats = getCoverageMatrixStats()
   if (
-    stats.total !== 114 ||
-    stats.verifiedAutofillable !== 104 ||
-    stats.securityManual !== 3 ||
+    stats.total !== 119 ||
+    stats.verifiedAutofillable !== 106 ||
+    stats.securityManual !== 6 ||
     stats.technicalIgnored !== 7 ||
-    stats.directlyExtracted !== 12
+    stats.directlyExtracted !== 66
   ) {
     failures.push(
       `Test 16 Failed: Coverage matrix stats mismatch. Got total=${stats.total}, autofillable=${stats.verifiedAutofillable}, manual=${stats.securityManual}, technical=${stats.technicalIgnored}, extracted=${stats.directlyExtracted}.`
@@ -364,8 +376,8 @@ export async function runBangladeshSelectorTests(): Promise<{ passed: boolean; t
     document.body.innerHTML = `
       <select id="gender" name="appl.applsex">
         <option value="">Select Gender</option>
-        <option value="MALE">MALE</option>
-        <option value="FEMALE">FEMALE</option>
+        <option value="M">MALE</option>
+        <option value="F">FEMALE</option>
       </select>
     `
     const genderSelect = document.getElementById('gender') as HTMLSelectElement
@@ -374,8 +386,110 @@ export async function runBangladeshSelectorTests(): Promise<{ passed: boolean; t
       mappings: [genderMapping],
       applicant: genderProfile,
     })
-    if (genderSelect.value !== 'MALE') {
+    if (genderSelect.value !== 'M') {
       failures.push(`Test 20 Failed: Select gender option was not matched. Got '${genderSelect.value}'`)
+    }
+  }
+
+  // Test 21: Consistency Audit - Every mapping selector exists in the canonical Bangladesh registry
+  testCount++
+  const registrySelectors = new Set(BANGLADESH_FIELD_REGISTRY.map((r) => getPrimarySelector(r.selectors)))
+  for (const m of BANGLADESH_VISA_MAPPINGS) {
+    const sel = getPrimarySelector(m.selector)
+    if (sel && !registrySelectors.has(sel)) {
+      failures.push(`Test 21 Failed: Mapping ${m.id} uses selector '${sel}' which is not in BANGLADESH_FIELD_REGISTRY.`)
+    }
+  }
+
+  // Test 22: Obsolete selector prohibition - No mapping or registry control uses obsolete/synthetic selectors
+  testCount++
+  const obsoleteSelectors = ['#dob', '#nationality', '#applicant_surname', '#city_of_birth', '#indian_mission', '#arr_date']
+  for (const m of BANGLADESH_VISA_MAPPINGS) {
+    const sel = getPrimarySelector(m.selector)
+    if (sel && obsoleteSelectors.includes(sel)) {
+      failures.push(`Test 22 Failed: Mapping ${m.id} references obsolete selector '${sel}'.`)
+    }
+  }
+  for (const r of BANGLADESH_FIELD_REGISTRY) {
+    const sel = getPrimarySelector(r.selectors)
+    if (obsoleteSelectors.includes(sel)) {
+      failures.push(`Test 22 Failed: Registry field ${r.controlId} references obsolete selector '${sel}'.`)
+    }
+  }
+
+  // Test 23: Registration DOB is strictly #dob_id and Nationality is strictly #nationality_id
+  testCount++
+  const regDobMapping = BANGLADESH_REGISTRATION_MAPPINGS.find((m) => m.id === 'bd_reg_dob')
+  const regNatMapping = BANGLADESH_REGISTRATION_MAPPINGS.find((m) => m.id === 'bd_reg_nationality')
+  const regDobSel = getPrimarySelector(regDobMapping?.selector)
+  const regNatSel = getPrimarySelector(regNatMapping?.selector)
+  if (regDobSel !== '#dob_id') {
+    failures.push(`Test 23 Failed: Registration DOB selector must be '#dob_id'. Got '${regDobSel}'`)
+  }
+  if (regNatSel !== '#nationality_id') {
+    failures.push(`Test 23 Failed: Registration Nationality selector must be '#nationality_id'. Got '${regNatSel}'`)
+  }
+  // Verify Basic Details does not contain DOB or Nationality
+  const basicDobControl = BANGLADESH_FIELD_REGISTRY.find((r) => r.page === 'BASIC_DETAILS' && getPrimarySelector(r.selectors) === '#dob')
+  const basicNatControl = BANGLADESH_FIELD_REGISTRY.find((r) => r.page === 'BASIC_DETAILS' && getPrimarySelector(r.selectors) === '#nationality')
+  if (basicDobControl || basicNatControl) {
+    failures.push('Test 23 Failed: Basic Details must not contain fake #dob or #nationality controls.')
+  }
+
+  // Test 24: Select Option Mismatch Safety - Does NOT select arbitrary options when value is missing
+  testCount++
+  if (typeof document !== 'undefined') {
+    document.body.innerHTML = `
+      <select id="country_birth" name="appl.country_of_birth">
+        <option value="">Select Country of Birth...</option>
+        <option value="BGD">BANGLADESH</option>
+        <option value="IND">INDIA</option>
+      </select>
+    `
+    const countrySelect = document.getElementById('country_birth') as HTMLSelectElement
+    const mismatchedProfile = {
+      applicantId: 'test-mismatch',
+      createdAt: '2025-01-01T00:00:00Z',
+      updatedAt: '2025-01-01T00:00:00Z',
+      personalInfo: {
+        countryOfBirth: 'NON_EXISTENT_COUNTRY',
+      },
+    }
+    const countryMapping = BANGLADESH_BASIC_DETAILS_MAPPINGS.find((m) => m.id === 'bd_basic_country_of_birth')!
+    await executeAutofill({
+      mappings: [countryMapping],
+      applicant: mismatchedProfile,
+    })
+    if (countrySelect.value !== '') {
+      failures.push(`Test 24 Failed: Mismatched select option selected an arbitrary value '${countrySelect.value}'. Expected ''`)
+    }
+  }
+
+  // Test 25: Extracted Nationality reaches #nationality_id on Registration
+  testCount++
+  if (typeof document !== 'undefined') {
+    document.body.innerHTML = `
+      <select id="nationality_id" name="appl.nationality">
+        <option value="">Select Nationality...</option>
+        <option value="BGD">BANGLADESH</option>
+        <option value="IND">INDIA</option>
+      </select>
+    `
+    const natSelect = document.getElementById('nationality_id') as HTMLSelectElement
+    const natProfile = {
+      applicantId: 'test-nat',
+      createdAt: '2025-01-01T00:00:00Z',
+      updatedAt: '2025-01-01T00:00:00Z',
+      personalInfo: {
+        nationality: 'Bangladesh',
+      },
+    }
+    await executeAutofill({
+      mappings: [regNatMapping!],
+      applicant: natProfile,
+    })
+    if (natSelect.value !== 'BGD') {
+      failures.push(`Test 25 Failed: Extracted nationality did not select 'BGD' in #nationality_id. Got '${natSelect.value}'`)
     }
   }
 
