@@ -524,7 +524,7 @@ export async function runPersonalPassportAutofillTests(): Promise<PersonalPasspo
     ...SYNTHETIC_APPLICANT_PROFILE,
     notes: 'Mission: DHAKA',
   }
-  const regMappings = getIndiaVisaMappings('regular', 'application-start')
+  const regMappings = getIndiaVisaMappings('regular', 'application-start', 'indianvisaonline.gov.in')
   const validRes = await executeAutofill({
     applicant: validProfile,
     mappings: regMappings,
