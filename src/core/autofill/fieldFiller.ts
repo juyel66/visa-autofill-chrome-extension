@@ -91,9 +91,16 @@ export function fillField(
         `input[type="radio"][name="${CSS.escape(element.name)}"]`
       )
     )
-    const targetRadio = radioGroup.find(
-      (r) => r.value.toLowerCase() === strValue.toLowerCase() || r.id.toLowerCase() === strValue.toLowerCase()
-    )
+    const isTrue = strValue.toLowerCase() === 'true' || strValue.toLowerCase() === 'yes' || strValue === '1' || strValue.toLowerCase() === 'y'
+    const isFalse = strValue.toLowerCase() === 'false' || strValue.toLowerCase() === 'no' || strValue === '0' || strValue.toLowerCase() === 'n'
+    const targetRadio = radioGroup.find((r) => {
+      const rVal = r.value.toLowerCase()
+      const rId = r.id.toLowerCase()
+      if (rVal === strValue.toLowerCase() || rId === strValue.toLowerCase()) return true
+      if (isTrue && (rVal === 'y' || rVal === 'yes' || rVal === '1' || rVal === 'true' || rId.endsWith('1') || rId.includes('yes'))) return true
+      if (isFalse && (rVal === 'n' || rVal === 'no' || rVal === '0' || rVal === 'false' || rId.endsWith('2') || rId.includes('no'))) return true
+      return false
+    })
     if (targetRadio?.checked) {
       return { fieldId, status: 'already-matching', failureType: 'already-matching', reason: 'Radio option matches source' }
     }
@@ -231,11 +238,16 @@ export function fillField(
           `input[type="radio"][name="${CSS.escape(element.name)}"]`
         )
       )
-      const matchingRadios = radioGroup.filter(
-        (r) =>
-          r.value.toLowerCase() === strValue.toLowerCase() ||
-          r.id.toLowerCase() === strValue.toLowerCase()
-      )
+      const isTrue = strValue.toLowerCase() === 'true' || strValue.toLowerCase() === 'yes' || strValue === '1' || strValue.toLowerCase() === 'y'
+      const isFalse = strValue.toLowerCase() === 'false' || strValue.toLowerCase() === 'no' || strValue === '0' || strValue.toLowerCase() === 'n'
+      const matchingRadios = radioGroup.filter((r) => {
+        const rVal = r.value.toLowerCase()
+        const rId = r.id.toLowerCase()
+        if (rVal === strValue.toLowerCase() || rId === strValue.toLowerCase()) return true
+        if (isTrue && (rVal === 'y' || rVal === 'yes' || rVal === '1' || rVal === 'true' || rId.endsWith('1') || rId.includes('yes'))) return true
+        if (isFalse && (rVal === 'n' || rVal === 'no' || rVal === '0' || rVal === 'false' || rId.endsWith('2') || rId.includes('no'))) return true
+        return false
+      })
 
       if (matchingRadios.length === 0) {
         return { fieldId, status: 'failed', failureType: 'option-not-found', reason: `Radio option "${strValue}" not found` }
