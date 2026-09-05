@@ -1,4 +1,4 @@
-import type { Address, ApplicantProfile, FamilyMember } from '../applicant/types'
+import type { Address, ApplicantProfile, FamilyMember, PreviousVisaDetails, ReferenceDetails, TravelDetails } from '../applicant/types'
 
 /**
  * Helper to safely trim whitespace and collapse repeated internal spaces.
@@ -27,7 +27,7 @@ function cleanPhone(phoneStr?: string): string | undefined {
  */
 function cleanAddress<T extends Address>(addr?: T): T | undefined {
   if (!addr) return undefined
-  return {
+  const res = {
     ...addr,
     addressLine1: cleanString(addr.addressLine1),
     addressLine2: cleanString(addr.addressLine2),
@@ -37,6 +37,11 @@ function cleanAddress<T extends Address>(addr?: T): T | undefined {
     country: cleanString(addr.country),
     postalCode: cleanString(addr.postalCode),
   }
+  const hasValues = Boolean(
+    res.addressLine1 || res.addressLine2 || res.villageTownCity ||
+    res.district || res.stateProvince || res.country || res.postalCode
+  )
+  return hasValues ? res : undefined
 }
 
 /**
@@ -44,13 +49,89 @@ function cleanAddress<T extends Address>(addr?: T): T | undefined {
  */
 function cleanFamilyMember(member?: FamilyMember): FamilyMember | undefined {
   if (!member) return undefined
-  return {
+  const res = {
     name: cleanString(member.name),
     nationality: cleanString(member.nationality),
     previousNationality: cleanString(member.previousNationality),
     placeOfBirth: cleanString(member.placeOfBirth),
     countryOfBirth: cleanString(member.countryOfBirth),
   }
+  const hasValues = Boolean(res.name || res.nationality || res.previousNationality || res.placeOfBirth || res.countryOfBirth)
+  return hasValues ? res : undefined
+}
+
+/**
+ * Helper to normalize a ReferenceDetails object immutably.
+ */
+function cleanReference(ref?: ReferenceDetails): ReferenceDetails | undefined {
+  if (!ref) return undefined
+  const res: ReferenceDetails = {
+    name: cleanString(ref.name),
+    addressLine1: cleanString(ref.addressLine1),
+    addressLine2: cleanString(ref.addressLine2),
+    address: typeof ref.address === 'string' ? cleanString(ref.address) : cleanAddress(ref.address as Address),
+    phone: cleanPhone(ref.phone),
+    email: cleanEmail(ref.email),
+  }
+  const hasValues = Boolean(res.name || res.addressLine1 || res.addressLine2 || res.address || res.phone || res.email)
+  return hasValues ? res : undefined
+}
+
+/**
+ * Helper to normalize a PreviousVisaDetails object immutably.
+ */
+function cleanPreviousVisa(visa?: PreviousVisaDetails): PreviousVisaDetails | undefined {
+  if (!visa) return undefined
+  const res: PreviousVisaDetails = {
+    hasPreviousVisa: visa.hasPreviousVisa,
+    visaNumber: cleanString(visa.visaNumber),
+    visaType: cleanString(visa.visaType),
+    placeOfIssue: cleanString(visa.placeOfIssue),
+    dateOfIssue: cleanString(visa.dateOfIssue),
+    visitedAddress1: cleanString(visa.visitedAddress1),
+    visitedAddress2: cleanString(visa.visitedAddress2),
+    visitedAddress3: cleanString(visa.visitedAddress3),
+    hasRefusal: visa.hasRefusal,
+    refusalDetails: cleanString(visa.refusalDetails),
+    countriesVisited: cleanString(visa.countriesVisited),
+    hasSaarcVisit: visa.hasSaarcVisit,
+  }
+  const hasValues = Boolean(
+    res.hasPreviousVisa !== undefined || res.visaNumber || res.visaType || res.placeOfIssue || res.dateOfIssue ||
+    res.visitedAddress1 || res.visitedAddress2 || res.visitedAddress3 ||
+    res.hasRefusal !== undefined || res.refusalDetails || res.countriesVisited || res.hasSaarcVisit !== undefined
+  )
+  return hasValues ? res : undefined
+}
+
+/**
+ * Helper to normalize a TravelDetails object immutably.
+ */
+function cleanTravel(travel?: TravelDetails): TravelDetails | undefined {
+  if (!travel) return undefined
+  const res: TravelDetails = {
+    purposeOfVisit: cleanString(travel.purposeOfVisit),
+    intendedArrivalDate: cleanString(travel.intendedArrivalDate),
+    intendedDepartureDate: cleanString(travel.intendedDepartureDate),
+    duration: cleanString(travel.duration),
+    visaEntryType: cleanString(travel.visaEntryType),
+    entryPoint: cleanString(travel.entryPoint),
+    exitPoint: cleanString(travel.exitPoint),
+    countriesVisited: cleanString(travel.countriesVisited),
+    visitedSaarc: travel.visitedSaarc,
+    countriesToVisit: travel.countriesToVisit?.map((c) => cleanString(c)).filter((c): c is string => Boolean(c)),
+    previousVisitToCountry: travel.previousVisitToCountry,
+    travelCompanions: travel.travelCompanions?.map((c) => cleanString(c)).filter((c): c is string => Boolean(c)),
+  }
+  const hasValues = Boolean(
+    res.purposeOfVisit || res.intendedArrivalDate || res.intendedDepartureDate ||
+    res.duration || res.visaEntryType || res.entryPoint || res.exitPoint ||
+    res.countriesVisited || res.visitedSaarc !== undefined ||
+    (res.countriesToVisit && res.countriesToVisit.length > 0) ||
+    res.previousVisitToCountry !== undefined ||
+    (res.travelCompanions && res.travelCompanions.length > 0)
+  )
+  return hasValues ? res : undefined
 }
 
 /**
@@ -82,6 +163,7 @@ export function normalizeApplicant(applicant: ApplicantProfile): ApplicantProfil
           educationalQualification: cleanString(applicant.personalInfo.educationalQualification),
           nationality: cleanString(applicant.personalInfo.nationality),
           previousNationality: cleanString(applicant.personalInfo.previousNationality),
+          maritalStatus: cleanString(applicant.personalInfo.maritalStatus),
         }
       : undefined,
     passport: applicant.passport
@@ -121,43 +203,37 @@ export function normalizeApplicant(applicant: ApplicantProfile): ApplicantProfil
           phone: cleanPhone(applicant.contact.phone),
         }
       : undefined,
-    family: {
-      ...applicant.family,
-      father: cleanFamilyMember(applicant.family?.father),
-      mother: cleanFamilyMember(applicant.family?.mother),
-      spouse: applicant.family?.spouse ? cleanFamilyMember(applicant.family.spouse) : undefined,
-      pakistanRelationDetails: applicant.family?.pakistanRelationDetails
-        ? cleanString(applicant.family.pakistanRelationDetails)
-        : '',
-    },
-    employment: {
-      ...applicant.employment,
-      presentOccupation: cleanString(applicant.employment?.presentOccupation),
-      designationRank: applicant.employment?.designationRank
-        ? cleanString(applicant.employment.designationRank)
-        : '',
-      employerName: applicant.employment?.employerName
-        ? cleanString(applicant.employment.employerName)
-        : '',
-      employerPhone: applicant.employment?.employerPhone
-        ? cleanPhone(applicant.employment.employerPhone)
-        : '',
-      pastOccupation: applicant.employment?.pastOccupation
-        ? cleanString(applicant.employment.pastOccupation)
-        : '',
-    },
-    travel: applicant.travel
+    family: applicant.family
       ? {
-          ...applicant.travel,
-          purposeOfVisit: cleanString(applicant.travel.purposeOfVisit),
-          intendedArrivalDate: applicant.travel.intendedArrivalDate
-            ? applicant.travel.intendedArrivalDate.trim()
-            : '',
-          intendedDepartureDate: applicant.travel.intendedDepartureDate
-            ? applicant.travel.intendedDepartureDate.trim()
-            : '',
+          ...applicant.family,
+          father: cleanFamilyMember(applicant.family.father),
+          mother: cleanFamilyMember(applicant.family.mother),
+          spouse: applicant.family.spouse ? cleanFamilyMember(applicant.family.spouse) : undefined,
+          hasPakistanRelation: applicant.family.hasPakistanRelation,
+          pakistanRelationDetails: cleanString(applicant.family.pakistanRelationDetails),
         }
       : undefined,
+    employment: applicant.employment
+      ? {
+          ...applicant.employment,
+          presentOccupation: cleanString(applicant.employment.presentOccupation),
+          designationRank: cleanString(applicant.employment.designationRank),
+          employerName: cleanString(applicant.employment.employerName),
+          employerAddress:
+            typeof applicant.employment.employerAddress === 'string'
+              ? cleanString(applicant.employment.employerAddress)
+              : cleanAddress(applicant.employment.employerAddress as Address),
+          employerPhone: cleanPhone(applicant.employment.employerPhone),
+          pastOccupation: cleanString(applicant.employment.pastOccupation),
+          hasMilitaryService: applicant.employment.hasMilitaryService,
+          militaryOrganization: cleanString(applicant.employment.militaryOrganization),
+          militaryDesignation: cleanString(applicant.employment.militaryDesignation),
+          militaryPlaceOfPosting: cleanString(applicant.employment.militaryPlaceOfPosting),
+          militaryRank: cleanString(applicant.employment.militaryRank),
+        }
+      : undefined,
+    travel: cleanTravel(applicant.travel),
+    previousVisa: cleanPreviousVisa(applicant.previousVisa),
     accommodation: applicant.accommodation
       ? {
           ...applicant.accommodation,
@@ -166,14 +242,8 @@ export function normalizeApplicant(applicant: ApplicantProfile): ApplicantProfil
           phone: cleanPhone(applicant.accommodation.phone),
         }
       : undefined,
-    reference: applicant.reference
-      ? {
-          ...applicant.reference,
-          name: cleanString(applicant.reference.name),
-          phone: cleanPhone(applicant.reference.phone),
-          email: applicant.reference.email ? cleanEmail(applicant.reference.email) : '',
-        }
-      : undefined,
-    notes: applicant.notes ? cleanString(applicant.notes) : '',
+    reference: cleanReference(applicant.reference),
+    sponsorMission: cleanReference(applicant.sponsorMission),
+    notes: cleanString(applicant.notes),
   }
 }
