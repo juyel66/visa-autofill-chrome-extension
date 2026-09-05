@@ -8,6 +8,7 @@ import type { IndiaVisaFlow, IndiaVisaPage } from './types'
 /**
  * Returns strongly typed India visa field mappings matching the detected flow, page stage, and domain.
  * 
+ * 
  * Read-only mapping query service. Does NOT execute DOM queries or autofill actions.
  */
 export function getIndiaVisaMappings(
