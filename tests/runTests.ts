@@ -10,6 +10,8 @@ import { runWorkflowHardeningTests } from '../src/countries/india/__tests__/work
 import { runRecoveryTests } from '../src/countries/india/__tests__/recovery.test'
 import { runCandidateResolverTests } from '../src/countries/india/__tests__/candidateResolver.test'
 import { runValidationTests } from '../src/countries/india/__tests__/validation.test'
+import { runAddressFamilyExtractionTests } from '../src/countries/india/__tests__/addressFamilyExtraction.test'
+import { runTravelDetailsExtractionTests } from '../src/countries/india/__tests__/travelDetailsExtraction.test'
 
 async function execute() {
   console.log('--- RUNNING DOM VERIFICATION & AUTOFILL HARDENING TESTS ---')
@@ -37,6 +39,20 @@ async function execute() {
   console.log(`Passed: ${bdSelectorRes.passed}, Count: ${bdSelectorRes.testCount}`)
   if (!bdSelectorRes.passed) {
     console.error('Failures:', bdSelectorRes.failures)
+  }
+
+  console.log('--- RUNNING ADDRESS & FAMILY DETAILS EXTRACTION TESTS ---')
+  const addrFamRes = await runAddressFamilyExtractionTests()
+  console.log(`Passed: ${addrFamRes.passed}, Count: ${addrFamRes.totalSubtests}`)
+  if (!addrFamRes.passed) {
+    console.error('Failures:', addrFamRes.failures)
+  }
+
+  console.log('--- RUNNING TRAVEL & VISA DETAILS EXTRACTION TESTS (TASK 051) ---')
+  const travelRes = await runTravelDetailsExtractionTests()
+  console.log(`Passed: ${travelRes.passed}, Count: ${travelRes.testCount}`)
+  if (!travelRes.passed) {
+    console.error('Failures:', travelRes.failures)
   }
 
   console.log('--- RUNNING PERSONAL & PASSPORT & ADDITIONAL SECTIONS AUTOFILL TESTS ---')
@@ -86,6 +102,8 @@ async function execute() {
     candResolverRes.passed &&
     compatRes.passed &&
     bdSelectorRes.passed &&
+    addrFamRes.passed &&
+    travelRes.passed &&
     autofillRes.passed &&
     docRes.passed &&
     workflowRes.passed &&
