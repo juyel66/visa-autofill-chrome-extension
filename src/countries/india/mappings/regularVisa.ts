@@ -32,6 +32,7 @@ export const REGULAR_VISA_MAPPINGS: IndiaVisaFieldMapping[] = [
     required: true,
     page: 'application-start',
     notes: 'Indian Mission location where application will be submitted.',
+    transform: 'selectOptionMatch',
   },
   {
     id: 'reg_nationality',
