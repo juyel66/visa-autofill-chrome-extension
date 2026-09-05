@@ -21,11 +21,18 @@ export interface BangladeshFamilyDetailsSelectors {
   fatherPlaceOfBirth: IndiaFieldSelector[]
   fatherCountryOfBirth: IndiaFieldSelector[]
   fatherNationality: IndiaFieldSelector[]
+  fatherPreviousNationality: IndiaFieldSelector[]
   motherName: IndiaFieldSelector[]
   motherPlaceOfBirth: IndiaFieldSelector[]
   motherCountryOfBirth: IndiaFieldSelector[]
   motherNationality: IndiaFieldSelector[]
+  motherPreviousNationality: IndiaFieldSelector[]
   maritalStatus: IndiaFieldSelector[]
+  spouseName: IndiaFieldSelector[]
+  spousePlaceOfBirth: IndiaFieldSelector[]
+  spouseCountryOfBirth: IndiaFieldSelector[]
+  spouseNationality: IndiaFieldSelector[]
+  spousePreviousNationality: IndiaFieldSelector[]
   grandparentFlag: IndiaFieldSelector[]
   grandparentDetails: IndiaFieldSelector[]
   occupation: IndiaFieldSelector[]
@@ -125,6 +132,13 @@ export const BANGLADESH_FAMILY_DETAILS_SELECTORS: BangladeshFamilyDetailsSelecto
     { strategy: 'name', value: 'appl.father_nationality' },
     { strategy: 'css', value: 'select[name="appl.father_nationality"], select#father_nationality' },
   ],
+  fatherPreviousNationality: [
+    { strategy: 'id', value: 'father_prev_nationality' },
+    { strategy: 'id', value: 'father_previous_nationality' },
+    { strategy: 'name', value: 'appl.father_prev_nationality' },
+    { strategy: 'name', value: 'father_prev_nationality' },
+    { strategy: 'css', value: 'select[name="appl.father_prev_nationality"], select#father_prev_nationality, select#father_previous_nationality' },
+  ],
   motherName: [
     { strategy: 'id', value: 'mother_name' },
     { strategy: 'name', value: 'appl.mother_name' },
@@ -148,11 +162,53 @@ export const BANGLADESH_FAMILY_DETAILS_SELECTORS: BangladeshFamilyDetailsSelecto
     { strategy: 'name', value: 'appl.mother_nationality' },
     { strategy: 'css', value: 'select[name="appl.mother_nationality"], select#mother_nationality' },
   ],
+  motherPreviousNationality: [
+    { strategy: 'id', value: 'mother_prev_nationality' },
+    { strategy: 'id', value: 'mother_previous_nationality' },
+    { strategy: 'name', value: 'appl.mother_prev_nationality' },
+    { strategy: 'name', value: 'mother_prev_nationality' },
+    { strategy: 'css', value: 'select[name="appl.mother_prev_nationality"], select#mother_prev_nationality, select#mother_previous_nationality' },
+  ],
   maritalStatus: [
     { strategy: 'id', value: 'marital_status' },
     { strategy: 'name', value: 'appl.marital_status' },
     { strategy: 'name', value: 'marital_status' },
     { strategy: 'css', value: 'select[name="appl.marital_status"], select#marital_status' },
+  ],
+  spouseName: [
+    { strategy: 'id', value: 'spouse_name' },
+    { strategy: 'name', value: 'appl.spouse_name' },
+    { strategy: 'name', value: 'spouse_name' },
+    { strategy: 'css', value: 'input[name="appl.spouse_name"], input#spouse_name' },
+  ],
+  spousePlaceOfBirth: [
+    { strategy: 'id', value: 'spouse_birth_place' },
+    { strategy: 'id', value: 'spouse_place_of_birth' },
+    { strategy: 'name', value: 'appl.spouse_place_birth' },
+    { strategy: 'name', value: 'appl.spouse_place_of_birth' },
+    { strategy: 'name', value: 'spouse_place_birth' },
+    { strategy: 'css', value: 'input[name="appl.spouse_place_birth"], input#spouse_birth_place, input#spouse_place_of_birth' },
+  ],
+  spouseCountryOfBirth: [
+    { strategy: 'id', value: 'spouse_birth_country' },
+    { strategy: 'id', value: 'spouse_country_of_birth' },
+    { strategy: 'name', value: 'appl.spouse_country_birth' },
+    { strategy: 'name', value: 'appl.spouse_country_of_birth' },
+    { strategy: 'name', value: 'spouse_country_birth' },
+    { strategy: 'css', value: 'select[name="appl.spouse_country_birth"], select#spouse_birth_country, select#spouse_country_of_birth' },
+  ],
+  spouseNationality: [
+    { strategy: 'id', value: 'spouse_nationality' },
+    { strategy: 'name', value: 'appl.spouse_nationality' },
+    { strategy: 'name', value: 'spouse_nationality' },
+    { strategy: 'css', value: 'select[name="appl.spouse_nationality"], select#spouse_nationality' },
+  ],
+  spousePreviousNationality: [
+    { strategy: 'id', value: 'spouse_prev_nationality' },
+    { strategy: 'id', value: 'spouse_previous_nationality' },
+    { strategy: 'name', value: 'appl.spouse_prev_nationality' },
+    { strategy: 'name', value: 'spouse_prev_nationality' },
+    { strategy: 'css', value: 'select[name="appl.spouse_prev_nationality"], select#spouse_prev_nationality, select#spouse_previous_nationality' },
   ],
   grandparentFlag: [
     { strategy: 'id', value: 'grandparent_flag1' },
