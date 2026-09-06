@@ -118,6 +118,23 @@ function parseMrzNames(nameField: string): { surname: string; givenNames: string
   return { surname, givenNames }
 }
 
+function findMrzCandidateLines(allLines: string[]): [string, string] | null {
+  for (let i = 0; i < allLines.length; i++) {
+    const rawL1 = allLines[i].replace(/\s+/g, '')
+    if (rawL1.startsWith('P<') || (rawL1.startsWith('P') && rawL1.includes('<') && rawL1.length >= 30)) {
+      for (let j = i + 1; j < Math.min(i + 4, allLines.length); j++) {
+        const rawL2 = allLines[j].replace(/\s+/g, '')
+        if (rawL2.length >= 30 && /^[A-Z0-9<]+$/.test(rawL2)) {
+          const l1 = rawL1.length < TD3_LINE_LENGTH ? rawL1.padEnd(TD3_LINE_LENGTH, '<') : rawL1.slice(0, TD3_LINE_LENGTH)
+          const l2 = rawL2.length < TD3_LINE_LENGTH ? rawL2.padEnd(TD3_LINE_LENGTH, '<') : rawL2.slice(0, TD3_LINE_LENGTH)
+          return [l1, l2]
+        }
+      }
+    }
+  }
+  return null
+}
+
 /**
  * Parses raw text input into a structured PassportMrzData result.
  * Supports ICAO Doc 9303 TD3 format (2 lines x 44 characters).
@@ -143,23 +160,29 @@ export function parsePassportMrz(rawInput: string): MrzParseResult {
     .map((l) => l.trim().toUpperCase())
     .filter((l) => l.length > 0)
 
+  let line1 = lines[0] || ''
+  let line2 = lines[1] || ''
+
   if (lines.length !== TD3_LINE_COUNT) {
-    return {
-      success: false,
-      format: 'TD3',
-      rawLines: lines,
-      errors: [
-        {
-          code: 'invalid-line-count',
-          message: `Expected ${TD3_LINE_COUNT} MRZ lines, but received ${lines.length}.`,
-        },
-      ],
-      warnings: [],
+    const candidateLines = findMrzCandidateLines(lines)
+    if (candidateLines) {
+      line1 = candidateLines[0]
+      line2 = candidateLines[1]
+    } else {
+      return {
+        success: false,
+        format: 'TD3',
+        rawLines: lines,
+        errors: [
+          {
+            code: 'invalid-line-count',
+            message: `Expected ${TD3_LINE_COUNT} MRZ lines, but received ${lines.length}.`,
+          },
+        ],
+        warnings: [],
+      }
     }
   }
-
-  const line1 = lines[0]
-  const line2 = lines[1]
 
   // 2. Validate line length
   if (line1.length !== TD3_LINE_LENGTH || line2.length !== TD3_LINE_LENGTH) {
