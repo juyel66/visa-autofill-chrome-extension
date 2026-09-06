@@ -64,7 +64,10 @@ export interface ExtractedApplicantData {
     nationalIdNumber?: ExtractedField<string>
     religion?: ExtractedField<string>
     educationalQualification?: ExtractedField<string>
+    visibleIdentificationMarks?: ExtractedField<string>
     maritalStatus?: ExtractedField<string>
+    hasChangedName?: ExtractedField<boolean>
+    previousName?: ExtractedField<string>
   }
   passport?: {
     passportNumber?: ExtractedField<string>
@@ -73,6 +76,14 @@ export interface ExtractedApplicantData {
     issueDate?: ExtractedField<string> // YYYY-MM-DD
     expiryDate?: ExtractedField<string> // YYYY-MM-DD
     placeOfIssue?: ExtractedField<string>
+    holdsOtherPassport?: ExtractedField<boolean>
+    otherPassportDetails?: {
+      passportNumber?: ExtractedField<string>
+      countryOfIssue?: ExtractedField<string>
+      issueDate?: ExtractedField<string>
+      placeOfIssue?: ExtractedField<string>
+      nationalityInPassport?: ExtractedField<string>
+    }
   }
   contact?: {
     email?: ExtractedField<string>
