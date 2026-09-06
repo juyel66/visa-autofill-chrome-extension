@@ -12,6 +12,7 @@ import { runCandidateResolverTests } from '../src/countries/india/__tests__/cand
 import { runValidationTests } from '../src/countries/india/__tests__/validation.test'
 import { runAddressFamilyExtractionTests } from '../src/countries/india/__tests__/addressFamilyExtraction.test'
 import { runTravelDetailsExtractionTests } from '../src/countries/india/__tests__/travelDetailsExtraction.test'
+import { runRuntimeAutofillRegressionTests } from '../src/core/autofill/__tests__/runtimeAutofillRegression.test'
 
 async function execute() {
   console.log('--- RUNNING DOM VERIFICATION & AUTOFILL HARDENING TESTS ---')
@@ -90,6 +91,13 @@ async function execute() {
     console.error('Failures:', validationRes.failures)
   }
 
+  console.log('--- RUNNING RUNTIME AUTOFILL REGRESSION TESTS (TASK 053) ---')
+  const runtimeRegRes = await runRuntimeAutofillRegressionTests()
+  console.log(`Passed: ${runtimeRegRes.passed}, Count: ${runtimeRegRes.totalSubtests}`)
+  if (!runtimeRegRes.passed) {
+    console.error('Failures:', runtimeRegRes.failures)
+  }
+
   console.log('--- RUNNING E2E INTEGRATION TEST SUITE ---')
   const e2eRes = await runE2EIntegrationTestSuite()
   console.log(`Passed: ${e2eRes.overallPassed}, Count: ${e2eRes.passedCount}/${e2eRes.totalStages}`)
@@ -109,6 +117,7 @@ async function execute() {
     workflowRes.passed &&
     recoveryRes.passed &&
     validationRes.passed &&
+    runtimeRegRes.passed &&
     e2eRes.overallPassed
   ) {
     console.log('✅ ALL TEST SUITES PASSED SUCCESSFULLY!')
