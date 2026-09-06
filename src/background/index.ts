@@ -46,7 +46,7 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === 'START_WORKFLOW') {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
         const activeTab = tabs[0]
         const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
         activeWorkflowState = updateWorkflowState(activeWorkflowState, {
@@ -57,6 +57,17 @@ chrome.runtime.onMessage.addListener(
           operations: {},
           errors: [],
         })
+        console.log(`[Visa Autofill Background] START_WORKFLOW initialized for applicant "${message.applicantId}" on tab ${activeTab?.id}.`)
+
+        // Forward START_WORKFLOW to content script if active tab exists
+        if (activeTab?.id) {
+          try {
+            await sendMessageToTab(activeTab.id, message)
+          } catch (err) {
+            console.warn('[Visa Autofill Background] Could not forward START_WORKFLOW to content script:', err)
+          }
+        }
+
         sendResponse({
           status: 'success',
           data: {
@@ -69,7 +80,17 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === 'STOP_WORKFLOW') {
+      const tabId = activeWorkflowState.tabId
       activeWorkflowState = createInitialWorkflowState()
+      console.log('[Visa Autofill Background] STOP_WORKFLOW received. Session reset.')
+
+      // Forward STOP_WORKFLOW to content script if tab was tracked
+      if (tabId) {
+        sendMessageToTab(tabId, message).catch((err) => {
+          console.warn('[Visa Autofill Background] Could not forward STOP_WORKFLOW to content script:', err)
+        })
+      }
+
       sendResponse({
         status: 'success',
         data: {
@@ -91,6 +112,7 @@ chrome.runtime.onMessage.addListener(
       chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
         const activeTab = tabs[0]
         if (!activeTab || typeof activeTab.id === 'undefined') {
+          console.warn('[Visa Autofill Background] Active browser tab query returned no tab.')
           sendResponse({
             status: 'error',
             error: 'Active browser tab is not available.',
@@ -105,6 +127,7 @@ chrome.runtime.onMessage.addListener(
           typeof activeWorkflowState.tabId !== 'undefined' &&
           activeTab.id !== activeWorkflowState.tabId
         ) {
+          console.warn(`[Visa Autofill Background] Tab mismatch: active ${activeTab.id} vs session ${activeWorkflowState.tabId}`)
           sendResponse({
             status: 'error',
             error: 'Active tab mismatch. Please return to the correct tab or restart workflow.',
@@ -123,6 +146,8 @@ chrome.runtime.onMessage.addListener(
           }
         }
 
+        console.log(`[Visa Autofill Background] Forwarding message "${message.type}" to tab ${activeTab.id}.`)
+
         const tabResponse = await sendMessageToTab<
           | VisaPageResponsePayload
           | AutofillResponsePayload
@@ -130,6 +155,8 @@ chrome.runtime.onMessage.addListener(
           | DocumentAttachmentPayload
           | UndoResponsePayload
         >(activeTab.id, finalMessage)
+
+        console.log(`[Visa Autofill Background] Tab response for "${message.type}":`, tabResponse.status)
 
         // Store active operation on successful execute-autofill
         if (
