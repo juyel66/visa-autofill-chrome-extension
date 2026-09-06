@@ -15,7 +15,8 @@ async function storageGet<T>(key: string): Promise<T | null> {
     if (isChromeStorageAvailable()) {
       return new Promise<T | null>((resolve, reject) => {
         chrome.storage.local.get([key], (result) => {
-          if (chrome.runtime.lastError) {
+          if (chrome.runtime?.lastError) {
+            console.error(`[Visa Autofill Storage] chrome.storage.local.get error for "${key}":`, chrome.runtime.lastError)
             reject(new Error(chrome.runtime.lastError.message))
           } else {
             resolve((result[key] as T) ?? null)
@@ -32,7 +33,7 @@ async function storageGet<T>(key: string): Promise<T | null> {
 
     return null
   } catch (error) {
-    console.error(`Error reading key "${key}" from storage:`, error)
+    console.error(`[Visa Autofill Storage] Error reading key "${key}":`, error)
     throw new Error('Unable to read storage. Please try again.', { cause: error })
   }
 }
@@ -45,7 +46,8 @@ async function storageSet<T>(key: string, value: T): Promise<void> {
     if (isChromeStorageAvailable()) {
       return new Promise<void>((resolve, reject) => {
         chrome.storage.local.set({ [key]: value }, () => {
-          if (chrome.runtime.lastError) {
+          if (chrome.runtime?.lastError) {
+            console.error(`[Visa Autofill Storage] chrome.storage.local.set error for "${key}":`, chrome.runtime.lastError)
             reject(new Error(chrome.runtime.lastError.message))
           } else {
             resolve()
@@ -59,7 +61,7 @@ async function storageSet<T>(key: string, value: T): Promise<void> {
       localStorage.setItem(key, JSON.stringify(value))
     }
   } catch (error) {
-    console.error(`Error writing key "${key}" to storage:`, error)
+    console.error(`[Visa Autofill Storage] Error writing key "${key}":`, error)
     throw new Error('Unable to save applicant. Please try again.', { cause: error })
   }
 }
@@ -72,7 +74,8 @@ async function storageRemove(key: string): Promise<void> {
     if (isChromeStorageAvailable()) {
       return new Promise<void>((resolve, reject) => {
         chrome.storage.local.remove([key], () => {
-          if (chrome.runtime.lastError) {
+          if (chrome.runtime?.lastError) {
+            console.error(`[Visa Autofill Storage] chrome.storage.local.remove error for "${key}":`, chrome.runtime.lastError)
             reject(new Error(chrome.runtime.lastError.message))
           } else {
             resolve()
@@ -85,7 +88,7 @@ async function storageRemove(key: string): Promise<void> {
       localStorage.removeItem(key)
     }
   } catch (error) {
-    console.error(`Error removing key "${key}" from storage:`, error)
+    console.error(`[Visa Autofill Storage] Error removing key "${key}":`, error)
     throw new Error('Unable to remove storage item. Please try again.', { cause: error })
   }
 }
