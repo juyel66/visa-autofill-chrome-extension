@@ -75,11 +75,11 @@ export function resolveCandidateData(
       }
     }
 
-    // Check wrong document category if preferred type specified (e.g. photograph passed for passport fields)
-    if (preferredDocumentType && rawDoc.documentType !== preferredDocumentType) {
+    // Check wrong document category if preferred type explicitly specified (e.g. photograph passed for passport fields)
+    if (options.preferredDocumentType && rawDoc.documentType !== options.preferredDocumentType) {
       return {
         status: 'COMPATIBLE_DOCUMENT_REQUIRED',
-        reason: `Document type "${rawDoc.documentType}" is not compatible with preferred document type "${preferredDocumentType}".`,
+        reason: `Document type "${rawDoc.documentType}" is not compatible with preferred document type "${options.preferredDocumentType}".`,
       }
     }
 
@@ -112,7 +112,7 @@ export function resolveCandidateData(
     }
   }
 
-  // 2. No explicit documentId passed: find matching confirmed passport document
+  // 2. No explicit documentId passed: find matching confirmed document
   if (profileDocs.length === 0) {
     return {
       status: 'MANUAL_REQUIRED',
@@ -120,11 +120,12 @@ export function resolveCandidateData(
     }
   }
 
-  const confirmedPassportDoc = profileDocs.find(
+  // A. Prefer confirmed document matching preferredDocumentType (e.g., passport)
+  const confirmedPreferredDoc = profileDocs.find(
     (d) => d.documentType === preferredDocumentType && d.extractedDataConfirmed && d.extractedData
   )
 
-  if (confirmedPassportDoc) {
+  if (confirmedPreferredDoc) {
     const baseProfile: ApplicantProfile = {
       applicantId: profileId,
       createdAt: new Date().toISOString(),
@@ -132,49 +133,71 @@ export function resolveCandidateData(
       notes,
     }
 
-    const resolvedProfile = applyExtractionToApplicant(baseProfile, confirmedPassportDoc.extractedData!)
+    const resolvedProfile = applyExtractionToApplicant(baseProfile, confirmedPreferredDoc.extractedData!)
 
     return {
       status: 'READY',
       provenance: {
         profileId,
-        documentId: confirmedPassportDoc.documentId,
+        documentId: confirmedPreferredDoc.documentId,
         sourceType: 'confirmed-document',
-        documentType: confirmedPassportDoc.documentType,
-        extractedAt: confirmedPassportDoc.updatedAt,
+        documentType: confirmedPreferredDoc.documentType,
+        extractedAt: confirmedPreferredDoc.updatedAt,
       },
       applicant: resolvedProfile,
     }
   }
 
-  // Check if unconfirmed passport document exists
-  const unconfirmedPassportDoc = profileDocs.find((d) => d.documentType === preferredDocumentType)
-  if (unconfirmedPassportDoc) {
+  // B. Fallback to any other confirmed non-photo document that has confirmed extracted data
+  const confirmedOtherDoc = profileDocs.find(
+    (d) => d.documentType !== 'photograph' && d.extractedDataConfirmed && d.extractedData
+  )
+
+  if (confirmedOtherDoc) {
+    const baseProfile: ApplicantProfile = {
+      applicantId: profileId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      notes,
+    }
+
+    const resolvedProfile = applyExtractionToApplicant(baseProfile, confirmedOtherDoc.extractedData!)
+
+    return {
+      status: 'READY',
+      provenance: {
+        profileId,
+        documentId: confirmedOtherDoc.documentId,
+        sourceType: 'confirmed-document',
+        documentType: confirmedOtherDoc.documentType,
+        extractedAt: confirmedOtherDoc.updatedAt,
+      },
+      applicant: resolvedProfile,
+    }
+  }
+
+  // C. Check if unconfirmed documents with extraction exist
+  const unconfirmedDoc = profileDocs.find(
+    (d) => (d.documentType === preferredDocumentType || d.documentType !== 'photograph') && (d.extractedData || !d.extractedDataConfirmed)
+  )
+  if (unconfirmedDoc && (unconfirmedDoc.extractedData || unconfirmedDoc.documentType === preferredDocumentType)) {
     return {
       status: 'REVIEW_REQUIRED',
       reason: 'Review extracted document data first.',
     }
   }
 
-  // Check if unconfirmed or wrong category documents exist
-  const confirmedAnyDoc = profileDocs.find((d) => d.extractedDataConfirmed && d.extractedData)
-  if (!confirmedAnyDoc) {
-    const unconfirmedAnyDoc = profileDocs.find((d) => d.extractedData)
-    if (unconfirmedAnyDoc) {
-      return {
-        status: 'REVIEW_REQUIRED',
-        reason: 'Review extracted document data first.',
-      }
-    }
+  // D. Check if confirmed photograph exists without form data
+  const confirmedPhotoDoc = profileDocs.find((d) => d.extractedDataConfirmed && d.extractedData)
+  if (confirmedPhotoDoc) {
     return {
-      status: 'MANUAL_REQUIRED',
-      reason: 'No extracted document data available for this profile.',
+      status: 'COMPATIBLE_DOCUMENT_REQUIRED',
+      reason: `Found confirmed document of type "${confirmedPhotoDoc.documentType}", but compatible "${preferredDocumentType}" document is required.`,
     }
   }
 
-  // Confirmed document exists but wrong type (e.g. photograph only)
   return {
-    status: 'COMPATIBLE_DOCUMENT_REQUIRED',
-    reason: `Found confirmed document of type "${confirmedAnyDoc.documentType}", but compatible "${preferredDocumentType}" document is required.`,
+    status: 'MANUAL_REQUIRED',
+    reason: 'No extracted document data available for this profile.',
   }
 }
