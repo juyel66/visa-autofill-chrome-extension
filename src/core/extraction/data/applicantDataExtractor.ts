@@ -41,11 +41,13 @@ export function extractFromMrz(mrzData: PassportMrzData): ExtractedApplicantData
   }
 
   if (mrzData.issuingCountry) {
-    result.passport.issuingCountry = { value: mrzData.issuingCountry, source: 'mrz', confidence: 95 }
+    const normCountry = mrzData.issuingCountry === 'BGD' ? 'BANGLADESH' : mrzData.issuingCountry === 'IND' ? 'INDIA' : mrzData.issuingCountry === 'PAK' ? 'PAKISTAN' : mrzData.issuingCountry
+    result.passport.issuingCountry = { value: normCountry, source: 'mrz', confidence: 95 }
   }
 
   if (mrzData.nationality) {
-    result.personal.nationality = { value: mrzData.nationality, source: 'mrz', confidence: 95 }
+    const normNat = mrzData.nationality === 'BGD' ? 'BANGLADESH' : mrzData.nationality === 'IND' ? 'INDIA' : mrzData.nationality === 'PAK' ? 'PAKISTAN' : mrzData.nationality
+    result.personal.nationality = { value: normNat, source: 'mrz', confidence: 95 }
   }
 
   if (mrzData.dateOfBirth) {
@@ -65,6 +67,14 @@ export function extractFromMrz(mrzData: PassportMrzData): ExtractedApplicantData
       value: mrzData.passportExpiryDate,
       source: 'mrz',
       confidence: mrzData.passportExpiryCheckDigit.valid ? 98 : 70,
+    }
+  }
+
+  if (mrzData.personalNumber) {
+    result.personal.nationalIdNumber = {
+      value: mrzData.personalNumber,
+      source: 'mrz',
+      confidence: mrzData.personalNumberCheckDigit?.valid ? 98 : 85,
     }
   }
 
@@ -321,25 +331,265 @@ function extractFromRawText(
   const result: ExtractedApplicantData = {}
   if (!text) return result
 
-  // 1. Passport Number: "Passport No: XXXXXX" or "Passport Number: XXXXXX"
-  const pptMatch = text.match(/passport\s*(?:no|number)?[:\s]+([A-Z0-9]{6,12})/i)
+  // 1. Personal Identity & Name Fields
+  const surnameMatch = text.match(
+    /(?:surname(?:\s*\/\s*nom)?|last\s*name)[:\s]+([A-Za-z .'-]{2,40})/i
+  )
+  if (surnameMatch && surnameMatch[1]) {
+    result.personal = {
+      ...result.personal,
+      lastName: { value: surnameMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
+    }
+  }
+
+  const givenNameMatch = text.match(
+    /(?:given\s*name(?:\(s\))?(?:\s*\/\s*pr[ée]noms)?|given\s*names|first\s*name)[:\s]+([A-Za-z .'-]{2,60})/i
+  )
+  if (givenNameMatch && givenNameMatch[1]) {
+    result.personal = {
+      ...result.personal,
+      firstName: { value: givenNameMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
+    }
+  }
+
+  if (!result.personal?.lastName || !result.personal?.firstName) {
+    const fullNameMatch = text.match(
+      /(?:full\s*name|name\s*of\s*holder|bearer(?:'s)?\s*name|holder(?:'s)?\s*name|name)[:\s]+([A-Za-z .'-]{3,60})/i
+    )
+    if (fullNameMatch && fullNameMatch[1]) {
+      const rawName = fullNameMatch[1].trim().toUpperCase()
+      const isNotApplicantName = /(?:father|mother|spouse|husband|wife|sponsor|reference|hotel|company|employer|emergency)/i.test(fullNameMatch[0])
+      if (!isNotApplicantName && rawName.length > 2) {
+        result.personal = {
+          ...result.personal,
+          fullName: { value: rawName, source, confidence: baseConfidence },
+        }
+        const nameParts = rawName.split(/\s+/).filter(Boolean)
+        if (nameParts.length === 1 && !result.personal.lastName) {
+          result.personal.lastName = { value: nameParts[0], source, confidence: baseConfidence }
+        } else if (nameParts.length > 1) {
+          if (!result.personal.lastName) {
+            result.personal.lastName = { value: nameParts[nameParts.length - 1], source, confidence: baseConfidence }
+          }
+          if (!result.personal.firstName) {
+            result.personal.firstName = { value: nameParts.slice(0, -1).join(' '), source, confidence: baseConfidence }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Passport Number: "Passport No: XXXXXX" or "Passport Number: XXXXXX" or "Passport No. / N° du passeport"
+  const pptMatch = text.match(
+    /(?:passport\s*(?:no|number|num|\.|\/|\s*n°\s*du\s*passeport)?|doc\s*(?:no|number)|pass\s*no)[:\s]+([A-Z0-9]{6,12})/i
+  ) || text.match(/(?:passport|passeport)\s*[:\s]+([A-Z0-9]{7,10})/i)
   if (pptMatch && pptMatch[1]) {
     result.passport = {
       ...result.passport,
-      passportNumber: { value: pptMatch[1].trim(), source, confidence: baseConfidence },
+      passportNumber: { value: pptMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
     }
   }
 
-  // 2. Date of Birth: "Date of Birth: YYYY-MM-DD"
-  const dobMatch = text.match(/(?:date\s*of\s*birth|dob)[:\s]+(\d{4}-\d{2}-\d{2})/i)
+  // 3. Date of Birth: "Date of Birth: DD/MM/YYYY" or "15 MAY 1995" or "YYYY-MM-DD"
+  const dobMatch = text.match(
+    /(?:date\s*of\s*birth(?:\s*\/\s*date\s*de\s*naissance)?|dob|birth\s*date)[:\s]+([0-9A-Za-z ./-]{8,25})/i
+  )
   if (dobMatch && dobMatch[1]) {
+    const parsedDob = parseStandardIsoDate(dobMatch[1])
+    if (parsedDob) {
+      result.personal = {
+        ...result.personal,
+        dateOfBirth: { value: parsedDob, source, confidence: baseConfidence },
+      }
+    }
+  }
+
+  // 4. Sex / Gender: "Sex: M" or "Sex / Sexe: M"
+  const sexMatch = text.match(/(?:sex(?:\s*\/\s*sexe)?|gender)[:\s]+([A-Za-z]+)/i)
+  if (sexMatch && sexMatch[1]) {
+    const rawSex = sexMatch[1].trim().toUpperCase()
+    let genderVal: 'male' | 'female' | 'other' | undefined
+    if (rawSex === 'M' || rawSex === 'MALE') genderVal = 'male'
+    else if (rawSex === 'F' || rawSex === 'FEMALE') genderVal = 'female'
+    else if (rawSex === 'OTHER' || rawSex === 'TRANSGENDER') genderVal = 'other'
+    if (genderVal) {
+      result.personal = {
+        ...result.personal,
+        gender: { value: genderVal, source, confidence: baseConfidence },
+      }
+    }
+  }
+
+  // 5. Nationality & Issuing Country
+  const natMatch = text.match(
+    /(?:nationality(?:\s*\/\s*nationalit[ée])?|country\s*code(?:\s*\/\s*code\s*du\s*pays)?)[:\s]+([A-Za-z]+)/i
+  )
+  if (natMatch && natMatch[1]) {
+    const rawNat = natMatch[1].trim().toUpperCase()
+    let normNat: string | undefined
+    if (rawNat === 'BANGLADESHI' || rawNat === 'BANGLADESH' || rawNat === 'BGD') normNat = 'BANGLADESH'
+    else if (rawNat === 'INDIAN' || rawNat === 'INDIA' || rawNat === 'IND') normNat = 'INDIA'
+    else if (rawNat === 'PAKISTANI' || rawNat === 'PAKISTAN' || rawNat === 'PAK') normNat = 'PAKISTAN'
+    else if (rawNat === 'AMERICAN' || rawNat === 'USA') normNat = 'USA'
+    else if (rawNat === 'BRITISH' || rawNat === 'UK' || rawNat === 'GBR') normNat = 'UK'
+    else normNat = rawNat
+
+    if (normNat) {
+      result.personal = {
+        ...result.personal,
+        nationality: { value: normNat, source, confidence: baseConfidence },
+      }
+      result.passport = {
+        ...result.passport,
+        issuingCountry: { value: normNat, source, confidence: baseConfidence },
+      }
+    }
+  }
+
+  // 6. Place of Birth & Country of Birth
+  const pobMatch = text.match(
+    /(?:place\s*of\s*birth(?:\s*\/\s*lieu\s*de\s*naissance)?|town\s*of\s*birth|city\s*of\s*birth|birth\s*place|pob)[:\s]+([A-Za-z0-9 .,'-]{2,50})/i
+  )
+  if (pobMatch && pobMatch[1]) {
+    const rawPob = pobMatch[1].trim().toUpperCase()
+    const parts = rawPob.split(/[,/]/).map((p) => p.trim())
     result.personal = {
       ...result.personal,
-      dateOfBirth: { value: dobMatch[1].trim(), source, confidence: baseConfidence },
+      townCityOfBirth: { value: parts[0], source, confidence: baseConfidence },
+    }
+    if (parts.length > 1 && !result.personal?.countryOfBirth) {
+      let cob = parts[1]
+      if (cob === 'BGD' || cob === 'BANGLADESHI') cob = 'BANGLADESH'
+      result.personal.countryOfBirth = { value: cob, source, confidence: baseConfidence }
     }
   }
 
-  // 3. Email: "Email: test@example.com"
+  const cobMatch = text.match(
+    /(?:country\s*of\s*birth(?:\s*\/\s*pays\s*de\s*naissance)?)[:\s]+([A-Za-z .,'-]{2,40})/i
+  )
+  if (cobMatch && cobMatch[1]) {
+    let cob = cobMatch[1].trim().toUpperCase()
+    if (cob === 'BGD' || cob === 'BANGLADESHI') cob = 'BANGLADESH'
+    result.personal = {
+      ...result.personal,
+      countryOfBirth: { value: cob, source, confidence: baseConfidence },
+    }
+  }
+
+  // 7. National ID / Personal Number
+  const nidMatch = text.match(
+    /(?:personal\s*no(?:\.|\/|\s*n°\s*personnel)?|national\s*id(?:\s*no)?(?:\.)?|nid(?:\s*no)?(?:\.)?|nic(?:\s*no)?(?:\.)?)[:\s]+([0-9A-Z]{8,25})/i
+  )
+  if (nidMatch && nidMatch[1]) {
+    result.personal = {
+      ...result.personal,
+      nationalIdNumber: { value: nidMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
+    }
+  }
+
+  // 8. Passport Dates (Issue & Expiry) & Place of Issue
+  const issueDateMatch = text.match(
+    /(?:date\s*of\s*issue(?:\s*\/\s*date\s*de\s*d[ée]livrance)?|passport\s*issue\s*date|issue\s*date|issued\s*on)[:\s]+([0-9A-Za-z ./-]{8,25})/i
+  )
+  if (issueDateMatch && issueDateMatch[1]) {
+    const parsedIssue = parseStandardIsoDate(issueDateMatch[1])
+    if (parsedIssue) {
+      result.passport = {
+        ...result.passport,
+        issueDate: { value: parsedIssue, source, confidence: baseConfidence },
+      }
+    }
+  }
+
+  const expiryDateMatch = text.match(
+    /(?:date\s*of\s*expiry(?:\s*\/\s*date\s*d['’]expiration)?|passport\s*expiry\s*date|expiry\s*date|expiration\s*date|expires\s*on)[:\s]+([0-9A-Za-z ./-]{8,25})/i
+  )
+  if (expiryDateMatch && expiryDateMatch[1]) {
+    const parsedExpiry = parseStandardIsoDate(expiryDateMatch[1])
+    if (parsedExpiry) {
+      result.passport = {
+        ...result.passport,
+        expiryDate: { value: parsedExpiry, source, confidence: baseConfidence },
+      }
+    }
+  }
+
+  const issuePlaceMatch = text.match(
+    /(?:place\s*of\s*issue(?:\s*\/\s*lieu\s*de\s*d[ée]livrance)?|issuing\s*authority(?:\s*\/\s*autorit[ée])?|\bauthority(?:\s*\/\s*autorit[ée])?|issued\s*by|issued\s*at)[:\s]+([A-Za-z0-9 .,/'-]{2,50})/i
+  )
+  if (issuePlaceMatch && issuePlaceMatch[1]) {
+    const rawPlace = issuePlaceMatch[1].replace(/^[:\s/]+/, '').trim().toUpperCase()
+    if (rawPlace.length >= 2 && !rawPlace.startsWith('AUTORIT')) {
+      result.passport = {
+        ...result.passport,
+        placeOfIssue: { value: rawPlace, source, confidence: baseConfidence },
+      }
+    }
+  }
+
+  // 9. Previous Passport Details
+  const prevPptMatch = text.match(
+    /(?:previous\s*passport\s*(?:no|number|\.|\/|\s*n°\s*de\s*l['’]ancien\s*passeport)?|prev\s*passport\s*no)[:\s]+([A-Z0-9]{6,12})/i
+  )
+  if (prevPptMatch && prevPptMatch[1]) {
+    result.passport = {
+      ...result.passport,
+      holdsOtherPassport: { value: true, source, confidence: baseConfidence },
+      otherPassportDetails: {
+        passportNumber: { value: prevPptMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
+        countryOfIssue: { value: 'BANGLADESH', source, confidence: baseConfidence },
+      },
+    }
+  }
+
+  // 10. Religion, Education, Visible Identification Marks
+  const religionMatch = text.match(/(?:religion)[:\s]+([A-Za-z]+)/i)
+  if (religionMatch && religionMatch[1]) {
+    const rawRel = religionMatch[1].trim().toUpperCase()
+    let normRel: string | undefined
+    if (rawRel.includes('ISLAM') || rawRel.includes('MUSLIM')) normRel = 'ISLAM'
+    else if (rawRel.includes('HINDU')) normRel = 'HINDU'
+    else if (rawRel.includes('BUDDH')) normRel = 'BUDDHISM'
+    else if (rawRel.includes('CHRIST')) normRel = 'CHRISTIAN'
+    else if (rawRel.includes('SIKH')) normRel = 'SIKH'
+    else normRel = 'OTHERS'
+
+    result.personal = {
+      ...result.personal,
+      religion: { value: normRel, source, confidence: baseConfidence },
+    }
+  }
+
+  const eduMatch = text.match(/(?:educational\s*qualification|education|qualification)[:\s]+([A-Za-z ]+)/i)
+  if (eduMatch && eduMatch[1]) {
+    const rawEdu = eduMatch[1].trim().toUpperCase()
+    let normEdu: string | undefined
+    if (rawEdu.includes('POST GRAD') || rawEdu.includes('MASTER')) normEdu = 'POST GRADUATE'
+    else if (rawEdu.includes('GRAD') || rawEdu.includes('BACHELOR') || rawEdu.includes('DEGREE') || rawEdu.includes('B.SC') || rawEdu.includes('B.A')) normEdu = 'GRADUATE'
+    else if (rawEdu.includes('HIGHER') || rawEdu.includes('HSC') || rawEdu.includes('12TH')) normEdu = 'HIGHER SECONDARY'
+    else if (rawEdu.includes('MATRIC') || rawEdu.includes('SSC') || rawEdu.includes('10TH')) normEdu = 'MATRICULATION'
+    else if (rawEdu.includes('BELOW')) normEdu = 'BELOW MATRICULATION'
+    else if (rawEdu.includes('PROFESSIONAL')) normEdu = 'PROFESSIONAL'
+    else if (rawEdu.includes('ILLITERATE')) normEdu = 'ILLITERATE'
+    else normEdu = 'OTHERS'
+
+    result.personal = {
+      ...result.personal,
+      educationalQualification: { value: normEdu, source, confidence: baseConfidence },
+    }
+  }
+
+  const markMatch = text.match(
+    /(?:visible\s*identification\s*mark(?:\(s\))?|identification\s*marks?|identity\s*marks?|visual\s*mark)[:\s]+([A-Za-z0-9 .,'-]{2,50})/i
+  )
+  if (markMatch && markMatch[1]) {
+    result.personal = {
+      ...result.personal,
+      visibleIdentificationMarks: { value: markMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
+    }
+  }
+
+  // 11. Email: "Email: test@example.com"
   const emailMatch = text.match(/(?:email|e-mail)[:\s]+([^\s@]+@[^\s@]+\.[^\s@]+)/i)
   if (emailMatch && emailMatch[1]) {
     result.contact = {
@@ -348,7 +598,7 @@ function extractFromRawText(
     }
   }
 
-  // 4. Mobile / Phone: "Mobile: +123456789"
+  // 12. Mobile / Phone: "Mobile: +123456789"
   const mobileMatch = text.match(/(?:mobile|cell(?:\s*phone)?)[:\s]+(\+?[\d\s-]{7,15})/i)
   if (mobileMatch && mobileMatch[1]) {
     result.contact = {
@@ -441,11 +691,14 @@ function extractFromRawText(
     }
   }
 
-  const presCountryMatch = text.match(/(?:present\s*)?(?:address\s*)?country[:\s]+([A-Za-z .'-]{2,50})/i)
+  const presCountryMatch = text.match(/(?:present\s*(?:address\s*)?country|residential\s*country|home\s*country|\bcountry(?!\s*(?:code|of\s*birth|of\s*issue)))[:\s]+([A-Za-z .'-]{2,50})/i)
   if (presCountryMatch && presCountryMatch[1]) {
-    result.presentAddress = {
-      ...result.presentAddress,
-      country: { value: presCountryMatch[1].trim(), source, confidence: baseConfidence },
+    const rawCountry = presCountryMatch[1].trim()
+    if (!/^(code|du\s*pays|of\s*birth|of\s*issue)/i.test(rawCountry)) {
+      result.presentAddress = {
+        ...result.presentAddress,
+        country: { value: rawCountry, source, confidence: baseConfidence },
+      }
     }
   }
 
@@ -1148,19 +1401,37 @@ function extractFromRawText(
 }
 
 /**
- * Extracts candidate fields from PDF raw text using conservative regex pattern matching.
+ * Extracts candidate fields from PDF raw text using conservative regex pattern matching & MRZ detection.
  */
 export function extractFromPdfText(fullText: string): ExtractedApplicantData {
-  return extractFromRawText(fullText, 'pdf-text', 85)
+  const candidateList: ExtractedApplicantData[] = []
+  if (fullText) {
+    const mrzRes = parsePassportMrz(fullText)
+    if (mrzRes.success && mrzRes.data) {
+      candidateList.push(extractFromMrz(mrzRes.data))
+    }
+    candidateList.push(extractFromRawText(fullText, 'pdf-text', 85))
+  }
+  if (candidateList.length === 0) return {}
+  if (candidateList.length === 1) return candidateList[0]
+  return mergeExtractedCandidateData(candidateList).merged
 }
 
 /**
- * Extracts candidate fields from OCR text using conservative regex pattern matching.
+ * Extracts candidate fields from OCR text using conservative regex pattern matching & MRZ detection.
  */
 export function extractFromOcrText(ocrResult: OcrResult): ExtractedApplicantData {
   if (!ocrResult || !ocrResult.text) return {}
+  const candidateList: ExtractedApplicantData[] = []
+  const mrzRes = parsePassportMrz(ocrResult.text)
+  if (mrzRes.success && mrzRes.data) {
+    candidateList.push(extractFromMrz(mrzRes.data))
+  }
   const baseConfidence = Math.round((ocrResult.confidence || 70) * 0.9)
-  return extractFromRawText(ocrResult.text, 'ocr', baseConfidence)
+  candidateList.push(extractFromRawText(ocrResult.text, 'ocr', baseConfidence))
+  if (candidateList.length === 0) return {}
+  if (candidateList.length === 1) return candidateList[0]
+  return mergeExtractedCandidateData(candidateList).merged
 }
 
 export interface ExtractedDocumentInput {
@@ -1286,15 +1557,49 @@ export function mergeExtractedCandidateData(
   // Personal Fields
   mergeField('personal.lastName', 'Surname', (c) => c.personal?.lastName, (val) => { merged.personal!.lastName = val })
   mergeField('personal.firstName', 'Given Names', (c) => c.personal?.firstName, (val) => { merged.personal!.firstName = val })
+  mergeField('personal.fullName', 'Full Name', (c) => c.personal?.fullName, (val) => { merged.personal!.fullName = val })
   mergeField('personal.dateOfBirth', 'Date of Birth', (c) => c.personal?.dateOfBirth, (val) => { merged.personal!.dateOfBirth = val })
   mergeField('personal.gender', 'Gender', (c) => c.personal?.gender, (val) => { merged.personal!.gender = val })
   mergeField('personal.nationality', 'Nationality', (c) => c.personal?.nationality, (val) => { merged.personal!.nationality = val })
+  mergeField('personal.townCityOfBirth', 'Town/City of Birth', (c) => c.personal?.townCityOfBirth, (val) => { merged.personal!.townCityOfBirth = val })
+  mergeField('personal.countryOfBirth', 'Country of Birth', (c) => c.personal?.countryOfBirth, (val) => { merged.personal!.countryOfBirth = val })
+  mergeField('personal.nationalIdNumber', 'National ID Number', (c) => c.personal?.nationalIdNumber, (val) => { merged.personal!.nationalIdNumber = val })
+  mergeField('personal.religion', 'Religion', (c) => c.personal?.religion, (val) => { merged.personal!.religion = val })
+  mergeField('personal.educationalQualification', 'Educational Qualification', (c) => c.personal?.educationalQualification, (val) => { merged.personal!.educationalQualification = val })
+  mergeField('personal.visibleIdentificationMarks', 'Visible Identification Marks', (c) => c.personal?.visibleIdentificationMarks, (val) => { merged.personal!.visibleIdentificationMarks = val })
+  mergeField('personal.previousNationality', 'Previous Nationality', (c) => c.personal?.previousNationality, (val) => { merged.personal!.previousNationality = val })
   mergeField('personal.maritalStatus', 'Marital Status', (c) => c.personal?.maritalStatus, (val) => { merged.personal!.maritalStatus = val })
+  mergeField('personal.hasChangedName', 'Has Changed Name', (c) => c.personal?.hasChangedName, (val) => { merged.personal!.hasChangedName = val })
+  mergeField('personal.previousName', 'Previous Name', (c) => c.personal?.previousName, (val) => { merged.personal!.previousName = val })
 
   // Passport Fields
   mergeField('passport.passportNumber', 'Passport Number', (c) => c.passport?.passportNumber, (val) => { merged.passport!.passportNumber = val })
+  mergeField('passport.passportType', 'Passport Type', (c) => c.passport?.passportType, (val) => { merged.passport!.passportType = val })
   mergeField('passport.issuingCountry', 'Issuing Country', (c) => c.passport?.issuingCountry, (val) => { merged.passport!.issuingCountry = val })
+  mergeField('passport.issueDate', 'Passport Issue Date', (c) => c.passport?.issueDate, (val) => { merged.passport!.issueDate = val })
   mergeField('passport.expiryDate', 'Passport Expiry Date', (c) => c.passport?.expiryDate, (val) => { merged.passport!.expiryDate = val })
+  mergeField('passport.placeOfIssue', 'Passport Place of Issue', (c) => c.passport?.placeOfIssue, (val) => { merged.passport!.placeOfIssue = val })
+  mergeField('passport.holdsOtherPassport', 'Holds Other Passport', (c) => c.passport?.holdsOtherPassport, (val) => { merged.passport!.holdsOtherPassport = val })
+  mergeField('passport.otherPassportDetails.passportNumber', 'Other Passport Number', (c) => c.passport?.otherPassportDetails?.passportNumber, (val) => {
+    if (!merged.passport!.otherPassportDetails) merged.passport!.otherPassportDetails = {}
+    merged.passport!.otherPassportDetails.passportNumber = val
+  })
+  mergeField('passport.otherPassportDetails.placeOfIssue', 'Other Passport Place of Issue', (c) => c.passport?.otherPassportDetails?.placeOfIssue, (val) => {
+    if (!merged.passport!.otherPassportDetails) merged.passport!.otherPassportDetails = {}
+    merged.passport!.otherPassportDetails.placeOfIssue = val
+  })
+  mergeField('passport.otherPassportDetails.countryOfIssue', 'Other Passport Country of Issue', (c) => c.passport?.otherPassportDetails?.countryOfIssue, (val) => {
+    if (!merged.passport!.otherPassportDetails) merged.passport!.otherPassportDetails = {}
+    merged.passport!.otherPassportDetails.countryOfIssue = val
+  })
+  mergeField('passport.otherPassportDetails.nationalityInPassport', 'Other Passport Nationality', (c) => c.passport?.otherPassportDetails?.nationalityInPassport, (val) => {
+    if (!merged.passport!.otherPassportDetails) merged.passport!.otherPassportDetails = {}
+    merged.passport!.otherPassportDetails.nationalityInPassport = val
+  })
+  mergeField('passport.otherPassportDetails.issueDate', 'Other Passport Issue Date', (c) => c.passport?.otherPassportDetails?.issueDate, (val) => {
+    if (!merged.passport!.otherPassportDetails) merged.passport!.otherPassportDetails = {}
+    merged.passport!.otherPassportDetails.issueDate = val
+  })
 
   // Contact Fields
   mergeField('contact.email', 'Email Address', (c) => c.contact?.email, (val) => { merged.contact!.email = val })
