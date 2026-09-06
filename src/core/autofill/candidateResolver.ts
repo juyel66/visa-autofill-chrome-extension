@@ -1,5 +1,7 @@
 import type { ApplicantProfile } from '../applicant/types'
 import type { DocumentRecord } from '../document/types'
+import type { SavedApplication } from '../application/types'
+import { convertSavedApplicationToApplicantProfile } from '../application/applicationMerger'
 import { applyExtractionToApplicant } from '../extraction/data/extractionMapper'
 
 export type CandidateDataResolutionStatus =
@@ -29,30 +31,54 @@ export interface CandidateDataResolverOptions {
   requestedDocumentId?: string
   preferredDocumentType?: string
   documents: DocumentRecord[]
+  savedApplication?: SavedApplication | null
   notes?: string
 }
 
 /**
- * Resolves PDF-extracted candidate data for autofill execution.
+ * Resolves candidate data for autofill execution from SavedApplication or confirmed documents.
  * 
  * Rules:
  * 1. Applicant Profile is ONLY an identifier container (`profileId`).
- * 2. Confirmed PDF candidate data is the sole source of truth for personal identity fields.
- * 3. NO fallback to pre-existing profile personal data.
- * 4. Strictly validates document-to-profile association (rejects cross-profile data).
- * 5. Requires `extractedDataConfirmed === true` (CONFIRMED status gate).
- * 6. Prefers confirmed 'passport' documents for passport/personal autofill fields.
- * 7. Attaches internal provenance metadata (`profileId`, `documentId`, `sourceType: 'confirmed-document'`).
+ * 2. SavedApplication (with user manual edits and document provenance) takes highest priority.
+ * 3. Confirmed PDF candidate data is the base source of truth for personal identity fields.
+ * 4. NO fallback to pre-existing profile personal data.
+ * 5. Strictly validates document-to-profile association (rejects cross-profile data).
+ * 6. Requires `extractedDataConfirmed === true` (CONFIRMED status gate).
+ * 7. Prefers confirmed 'passport' documents for passport/personal autofill fields.
+ * 8. Attaches internal provenance metadata (`profileId`, `documentId`, `sourceType: 'confirmed-document'`).
  */
 export function resolveCandidateData(
   options: CandidateDataResolverOptions
 ): CandidateDataResolutionResult {
-  const { profileId, requestedDocumentId, preferredDocumentType = 'passport', documents, notes } = options
+  const { profileId, requestedDocumentId, preferredDocumentType = 'passport', documents, savedApplication, notes } = options
 
   if (!profileId) {
     return {
       status: 'NOT_READY',
       reason: 'Applicant profileId is required for candidate data resolution.',
+    }
+  }
+
+  // 1. Highest Priority: SavedApplication for this profile (contains confirmed extractions + user edits)
+  if (savedApplication && savedApplication.applicantId === profileId) {
+    const baseProfile: ApplicantProfile = {
+      applicantId: profileId,
+      createdAt: savedApplication.createdAt || new Date().toISOString(),
+      updatedAt: savedApplication.updatedAt || new Date().toISOString(),
+      notes,
+    }
+    const profile = convertSavedApplicationToApplicantProfile(savedApplication, baseProfile)
+    return {
+      status: 'READY',
+      provenance: {
+        profileId,
+        documentId: savedApplication.provenance?.passportDocumentId || savedApplication.applicationId,
+        sourceType: 'confirmed-document',
+        documentType: 'saved-application',
+        extractedAt: savedApplication.updatedAt,
+      },
+      applicant: profile,
     }
   }
 
