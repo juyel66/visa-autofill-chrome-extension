@@ -35,7 +35,8 @@ export async function recognizeText(
       options.onProgress(0.3, 'Reading document image...')
     }
 
-    const { data } = await worker.recognize(input)
+    const imageInput = input instanceof ArrayBuffer ? new Blob([input]) : input
+    const { data } = await worker.recognize(imageInput as Parameters<typeof worker.recognize>[0])
 
     if (options?.onProgress) {
       options.onProgress(1.0, 'OCR Complete')
