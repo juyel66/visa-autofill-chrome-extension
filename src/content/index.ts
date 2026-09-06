@@ -2,6 +2,7 @@ import { executeAutofill, resolveCandidateData, resolveElement } from '../core/a
 import { attachDocumentToField, getDocumentsByApplicantId } from '../core/document'
 import type { DocumentRecord } from '../core/document/types'
 import type { ApplicantProfile } from '../core/applicant/types'
+import type { SavedApplication } from '../core/application/types'
 import { getSettings } from '../core/settings'
 import type {
   AutofillResponsePayload,
@@ -234,13 +235,19 @@ chrome.runtime.onMessage.addListener(
 
       const applicantId = message.applicant.applicantId
 
-      readExtensionStorage<{ visa_autofill_documents?: DocumentRecord[] }>(['visa_autofill_documents'])
+      readExtensionStorage<{
+        visa_autofill_documents?: DocumentRecord[]
+        visa_autofill_saved_applications?: SavedApplication[]
+      }>(['visa_autofill_documents', 'visa_autofill_saved_applications'])
         .then((res) => {
           const documents = (res.visa_autofill_documents || []) as DocumentRecord[]
+          const savedApplications = (res.visa_autofill_saved_applications || []) as SavedApplication[]
+          const savedApp = savedApplications.find((a) => a.applicantId === applicantId)
 
           const candRes = resolveCandidateData({
             profileId: applicantId,
             documents,
+            savedApplication: savedApp,
             notes: message.applicant.notes,
           })
 
@@ -249,7 +256,7 @@ chrome.runtime.onMessage.addListener(
           if (candRes.status !== 'READY' || !candRes.applicant) {
             sendResponse({
               status: 'error',
-              error: candRes.reason || 'Review extracted document data first.',
+              error: candRes.reason || 'Review extracted document data or save application first.',
             })
             return
           }
@@ -487,7 +494,8 @@ async function attemptAutomaticAutofill() {
       visa_autofill_selected_applicant_id?: string
       visa_autofill_applicants?: ApplicantProfile[]
       visa_autofill_documents?: DocumentRecord[]
-    }>(['visa_autofill_selected_applicant_id', 'visa_autofill_applicants', 'visa_autofill_documents'])
+      visa_autofill_saved_applications?: SavedApplication[]
+    }>(['visa_autofill_selected_applicant_id', 'visa_autofill_applicants', 'visa_autofill_documents', 'visa_autofill_saved_applications'])
 
     const selectedApplicantId = result.visa_autofill_selected_applicant_id
     if (!selectedApplicantId) {
@@ -503,9 +511,13 @@ async function attemptAutomaticAutofill() {
     }
 
     const documents = result.visa_autofill_documents || []
+    const savedApplications = result.visa_autofill_saved_applications || []
+    const savedApp = savedApplications.find((a) => a.applicantId === selectedApplicantId)
+
     const candRes = resolveCandidateData({
       profileId: selectedApplicantId,
       documents,
+      savedApplication: savedApp,
       notes: activeApplicant.notes,
     })
 
