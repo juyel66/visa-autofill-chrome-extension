@@ -3,22 +3,29 @@ import { Button } from '../../components/ui'
 import type { ApplicantProfile } from '../../core/applicant'
 import {
   getDocumentsByApplicantId,
-  matchDocumentsForRequirement,
+  saveDocument,
 } from '../../core/document'
-import type { DocumentRecord, DocumentRequirement } from '../../core/document'
+import type { DocumentRecord } from '../../core/document'
 import type {
   AutofillResponsePayload,
-  DocumentAttachmentPayload,
   UndoResponsePayload,
   VisaPageResponsePayload,
-  WorkflowStatePayload,
-  AttachmentsStatusPayload,
 } from '../../core/messaging'
 import { sendToBackground } from '../../core/messaging'
-import type { WorkflowState } from '../../core/workflow'
-import { getIndiaDocumentRequirements } from '../../countries/india'
 import type { CountryPageDetectionResult } from '../../countries/india/types'
-import { DocumentPreviewModal } from '../../components/document'
+import {
+  extractFromPdfText,
+  extractPdfText,
+  type ExtractedApplicantData,
+  type ExtractedFieldConflict,
+} from '../../core/extraction'
+import { ExtractionReviewModal } from './ExtractionReviewModal'
+import {
+  getSavedApplicationByApplicantId,
+  saveApplication,
+} from '../../core/application/applicationStorage'
+import { populateApplicationFromDocuments } from '../../core/application/applicationMerger'
+import type { SavedApplication } from '../../core/application/types'
 
 export interface DashboardProps {
   selectedApplicant: ApplicantProfile | null
@@ -34,28 +41,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onAddApplicant,
 }) => {
   const [detection, setDetection] = useState<CountryPageDetectionResult | null>(null)
-  const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null)
-  const [docRequirements, setDocRequirements] = useState<DocumentRequirement[]>([])
   const [applicantDocs, setApplicantDocs] = useState<DocumentRecord[]>([])
-  const [selectedDocMap, setSelectedDocMap] = useState<Record<string, string>>({})
-  const [confirmAttachmentReq, setConfirmAttachmentReq] = useState<DocumentRequirement | null>(null)
-  const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null)
-  const [attachmentStates, setAttachmentStates] = useState<
-    Record<
-      string,
-      {
-        state: 'not-started' | 'awaiting-user' | 'attaching' | 'attached' | 'failed' | 'manual-required' | 'cancelled' | 'manual-verification-required'
-        verifiedName?: string
-        verifiedSize?: number
-        error?: string
-        retryCount?: number
-      }
-    >
-  >({})
-  const [retryCountMap, setRetryCountMap] = useState<Record<string, number>>({})
-  const [failedFieldsMap, setFailedFieldsMap] = useState<Record<string, string[]>>({})
+  const [savedApplication, setSavedApplication] = useState<SavedApplication | null>(null)
+  const [activeTab, setActiveTab] = useState<'passport' | 'ogd'>('passport')
 
-  const [isCheckingPage, setIsCheckingPage] = useState<boolean>(true)
+  const [isExtracting, setIsExtracting] = useState<boolean>(false)
   const [isAutofilling, setIsAutofilling] = useState<boolean>(false)
   const [isUndoing, setIsUndoing] = useState<boolean>(false)
   const [canUndo, setCanUndo] = useState<boolean>(false)
@@ -63,1089 +53,563 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  // Extraction Review Modal State
+  const [reviewState, setReviewState] = useState<{
+    candidateData: ExtractedApplicantData
+    conflicts: ExtractedFieldConflict<unknown>[]
+  } | null>(null)
+  const [reviewDoc, setReviewDoc] = useState<DocumentRecord | null>(null)
+
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg)
     setTimeout(() => {
       setToastMessage(null)
     }, 4000)
-  }, [setToastMessage])
+  }, [])
 
-  const getAutofillStatusMessage = (): { text: string; type: 'success' | 'warning' | 'error' | 'info' } => {
-    if (!detection || !detection.matched || detection.page === 'unknown' || !detection.page) {
-      return { text: 'Unsupported visa page.', type: 'info' }
-    }
-    
-    if (!selectedApplicant) {
-      return { text: 'No active profile selected.', type: 'warning' }
-    }
-
-    const list = applicantDocs || []
-    const hasPassport = list.some(d => d.documentType === 'passport')
-    if (!hasPassport) {
-      return { text: 'Confirmed document required.', type: 'warning' }
-    }
-
-    const hasConfirmedPassport = list.some(d => d.documentType === 'passport' && d.extractedDataConfirmed)
-    if (!hasConfirmedPassport) {
-      return { text: 'Review extracted document data first.', type: 'warning' }
-    }
-
-    return { text: 'Automatic Autofill Ready / Active.', type: 'success' }
-  }
-
+  // 1. Check current active browser page
   useEffect(() => {
     let isMounted = true
 
     async function checkCurrentTab() {
       try {
-        const [pageRes, wfRes] = await Promise.all([
-          sendToBackground<VisaPageResponsePayload>({ type: 'GET_CURRENT_VISA_PAGE' }),
-          sendToBackground<WorkflowStatePayload>({ type: 'GET_WORKFLOW_STATE' }),
-        ])
+        const pageRes = await sendToBackground<VisaPageResponsePayload>({ type: 'GET_CURRENT_VISA_PAGE' })
 
         if (isMounted && pageRes.status === 'success' && pageRes.data?.detection) {
           const det = pageRes.data.detection as CountryPageDetectionResult
           setDetection(det)
-          if (det.matched) {
-            const reqs = getIndiaDocumentRequirements(det.flow, det.page)
-            setDocRequirements(reqs)
-          }
-        }
-
-        if (isMounted && wfRes.status === 'success' && wfRes.data?.state) {
-          setWorkflowState(wfRes.data.state)
         }
       } catch {
         if (isMounted) {
           setDetection(null)
-          setWorkflowState(null)
-        }
-      } finally {
-        if (isMounted) {
-          setIsCheckingPage(false)
         }
       }
     }
 
     checkCurrentTab()
-
     return () => {
       isMounted = false
     }
   }, [])
 
+  // 2. Load Documents & SavedApplication for selected applicant
+  const refreshApplicantData = useCallback(async () => {
+    if (!selectedApplicant) {
+      setApplicantDocs([])
+      setSavedApplication(null)
+      return
+    }
+
+    try {
+      const [docs, app] = await Promise.all([
+        getDocumentsByApplicantId(selectedApplicant.applicantId),
+        getSavedApplicationByApplicantId(selectedApplicant.applicantId),
+      ])
+      setApplicantDocs(docs)
+      setSavedApplication(app)
+    } catch (err) {
+      console.error('Error loading applicant data in Dashboard:', err)
+    }
+  }, [selectedApplicant])
+
   useEffect(() => {
     let isMounted = true
-    if (selectedApplicant) {
-      getDocumentsByApplicantId(selectedApplicant.applicantId)
-        .then((docs) => {
+
+    const load = async () => {
+      if (selectedApplicant) {
+        try {
+          const [docs, app] = await Promise.all([
+            getDocumentsByApplicantId(selectedApplicant.applicantId),
+            getSavedApplicationByApplicantId(selectedApplicant.applicantId),
+          ])
           if (isMounted) {
             setApplicantDocs(docs)
+            setSavedApplication(app)
           }
-        })
-        .catch((err) => {
-          console.error('Failed to load applicant documents for requirements:', err)
-        })
+        } catch (err) {
+          console.error('Error loading applicant data in Dashboard:', err)
+        }
+      } else {
+        if (isMounted) {
+          setApplicantDocs([])
+          setSavedApplication(null)
+        }
+      }
     }
+
+    load()
+
     return () => {
       isMounted = false
     }
   }, [selectedApplicant])
 
-  const handleStopWorkflow = useCallback(async () => {
-    setErrorMessage(null)
-    try {
-      const response = await sendToBackground<WorkflowStatePayload>({
-        type: 'STOP_WORKFLOW',
-      })
+  const passportDoc = applicantDocs.find((d) => d.documentType === 'passport')
+  const ogdDoc = applicantDocs.find((d) => d.documentType === 'ogd')
+  const currentTabDoc = activeTab === 'passport' ? passportDoc : ogdDoc
 
-      if (response.status === 'success' && response.data?.state) {
-        setWorkflowState(response.data.state)
-        setCanUndo(false)
-        showToast('Workflow session stopped.')
-      }
-    } catch {
-      setErrorMessage('Unable to stop workflow.')
-    }
-  }, [setWorkflowState, setCanUndo, showToast, setErrorMessage])
-
-  const verifyCurrentAttachments = async (requirementsList: DocumentRequirement[]) => {
-    if (requirementsList.length === 0) return
-    try {
-      const response = await sendToBackground<AttachmentsStatusPayload>({
-        type: 'CHECK_ATTACHMENTS',
-        requirements: requirementsList.map((r) => ({ id: r.id, targetSelector: r.targetSelector })),
-      })
-      if (response.status === 'success' && response.data?.statuses) {
-        const statuses = response.data.statuses
-        setAttachmentStates((prev) => {
-          const next = { ...prev }
-          let changed = false
-          for (const reqId of Object.keys(statuses)) {
-            const s = statuses[reqId]
-            if (s.attached) {
-              if (prev[reqId]?.state !== 'attached' || prev[reqId]?.verifiedName !== s.fileName) {
-                next[reqId] = {
-                  ...prev[reqId],
-                  state: 'attached',
-                  verifiedName: s.fileName,
-                  verifiedSize: s.fileSize,
-                }
-                changed = true
-              }
-            } else if (prev[reqId]?.state === 'attached') {
-              next[reqId] = { ...prev[reqId], state: 'not-started' }
-              changed = true
-            }
-          }
-          return changed ? next : prev
-        })
-      }
-    } catch (err) {
-      console.error('Failed to verify attachments:', err)
-    }
-  }
-
-  useEffect(() => {
-    if (!detection?.matched || docRequirements.length === 0) return
-
-    const timeout = setTimeout(() => {
-      verifyCurrentAttachments(docRequirements)
-    }, 0)
-
-    const interval = setInterval(() => {
-      verifyCurrentAttachments(docRequirements)
-    }, 1500)
-
-    return () => {
-      clearTimeout(timeout)
-      clearInterval(interval)
-    }
-  }, [detection, docRequirements])
-
-  useEffect(() => {
-    if (workflowState && workflowState.status !== 'idle') {
-      if (!selectedApplicant) {
-        setTimeout(() => {
-          handleStopWorkflow()
-          setErrorMessage('Selected applicant is unavailable.')
-        }, 0)
-      } else if (workflowState.applicantId && selectedApplicant.applicantId !== workflowState.applicantId) {
-        setTimeout(() => {
-          handleStopWorkflow()
-          setErrorMessage('Applicant consistency violation. Workflow stopped.')
-        }, 0)
-      }
-    }
-  }, [selectedApplicant, workflowState, handleStopWorkflow])
-
-  const handleStartWorkflow = async () => {
-    if (!selectedApplicant) {
-      setErrorMessage('Please select an active applicant before starting workflow.')
-      return
-    }
+  // 3. Document Upload & Extraction Handler
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetType: string) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedApplicant) return
 
     setErrorMessage(null)
-    try {
-      const response = await sendToBackground<WorkflowStatePayload>({
-        type: 'START_WORKFLOW',
-        applicantId: selectedApplicant.applicantId,
-      })
+    setIsExtracting(true)
 
-      if (response.status === 'success' && response.data?.state) {
-        setWorkflowState(response.data.state)
-        showToast('Workflow session started. Select Autofill This Page to begin.')
-      } else if (response.status === 'error') {
-        setErrorMessage(response.error || 'Failed to start workflow.')
-      }
-    } catch {
-      setErrorMessage('Unable to start workflow.')
-    }
-  }
-
-  const handleRetryDetection = async () => {
-    setIsCheckingPage(true)
-    setErrorMessage(null)
     try {
-      const response = await sendToBackground<VisaPageResponsePayload>({ type: 'GET_CURRENT_VISA_PAGE' })
-      if (response.status === 'success' && response.data?.detection) {
-        setDetection(response.data.detection as CountryPageDetectionResult)
-        if (!response.data.detection.matched || response.data.detection.page === 'unknown') {
-          setErrorMessage('Visa Autofill could not identify this page.')
+      const reader = new FileReader()
+      reader.onload = async () => {
+        const dataUrl = reader.result as string
+        const newDoc: DocumentRecord = {
+          documentId: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          applicantId: selectedApplicant.applicantId,
+          documentType: targetType,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type || 'application/pdf',
+          fileDataUrl: dataUrl,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          status: 'processed',
+          source: 'user-upload',
+          extractedDataConfirmed: false,
         }
+
+        // Run PDF extraction if PDF
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          try {
+            const pdfExtract = await extractPdfText(dataUrl)
+            if (pdfExtract.fullText) {
+              const extractedApplicant = extractFromPdfText(pdfExtract.fullText)
+              if (extractedApplicant) {
+                newDoc.extractedData = extractedApplicant
+                newDoc.extractedDataConfirmed = true
+              }
+            }
+          } catch (extErr) {
+            console.warn('PDF extraction warning:', extErr)
+          }
+        }
+
+        await saveDocument(newDoc)
+
+        // Populate or update SavedApplication directly
+        const docs = await getDocumentsByApplicantId(selectedApplicant.applicantId)
+        const pDoc =
+          docs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed) ||
+          docs.find((d) => d.documentType === 'passport')
+        const oDoc =
+          docs.find((d) => d.documentType === 'ogd' && d.extractedDataConfirmed) ||
+          docs.find((d) => d.documentType === 'ogd')
+        const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
+        const mergedApp = populateApplicationFromDocuments({
+          applicantId: selectedApplicant.applicantId,
+          passportDoc: pDoc,
+          ogdDoc: oDoc,
+          existingApp,
+          notes: selectedApplicant.notes,
+        })
+
+        await saveApplication(mergedApp)
+        setSavedApplication(mergedApp)
+        await refreshApplicantData()
+        setIsExtracting(false)
+
+        // AUTOMATICALLY OPEN WORKSPACE IN A NEW TAB
+        const workspaceUrl = chrome?.runtime?.getURL
+          ? chrome.runtime.getURL(
+              `application.html?applicantId=${encodeURIComponent(
+                selectedApplicant.applicantId
+              )}&documentType=${encodeURIComponent(targetType)}`
+            )
+          : `application.html?applicantId=${encodeURIComponent(
+              selectedApplicant.applicantId
+            )}&documentType=${encodeURIComponent(targetType)}`
+
+        if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+          chrome.tabs.create({ url: workspaceUrl })
+        } else {
+          window.open(workspaceUrl, '_blank')
+        }
+
+        showToast(`Document uploaded & workspace opened.`)
       }
-    } catch {
-      setErrorMessage('Unable to query browser tab.')
-    } finally {
-      setIsCheckingPage(false)
+
+      reader.readAsDataURL(file)
+    } catch (err) {
+      console.error('File upload error:', err)
+      setErrorMessage('Failed to upload document.')
+      setIsExtracting(false)
     }
   }
 
+  // 4. Extraction Confirmation Handler
+  const handleConfirmExtraction = async (confirmedData: ExtractedApplicantData) => {
+    if (!selectedApplicant || !reviewDoc) return
 
+    try {
+      const updatedDoc: DocumentRecord = {
+        ...reviewDoc,
+        extractedData: confirmedData,
+        extractedDataConfirmed: true,
+        updatedAt: new Date().toISOString(),
+      }
+      await saveDocument(updatedDoc)
 
-  const handleTriggerAutofill = async () => {
+      // Refresh docs list
+      const docs = await getDocumentsByApplicantId(selectedApplicant.applicantId)
+      const pDoc = docs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed) || docs.find((d) => d.documentType === 'passport')
+      const oDoc = docs.find((d) => d.documentType === 'ogd' && d.extractedDataConfirmed) || docs.find((d) => d.documentType === 'ogd')
+
+      // Populate or update SavedApplication
+      const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
+      const mergedApp = populateApplicationFromDocuments({
+        applicantId: selectedApplicant.applicantId,
+        passportDoc: pDoc,
+        ogdDoc: oDoc,
+        existingApp,
+        notes: selectedApplicant.notes,
+      })
+
+      await saveApplication(mergedApp)
+      setSavedApplication(mergedApp)
+      setReviewState(null)
+      setReviewDoc(null)
+      await refreshApplicantData()
+
+      showToast('✓ Document data confirmed! Ready for Application Workspace.')
+    } catch (err) {
+      console.error('Error confirming extraction:', err)
+      setErrorMessage('Failed to confirm document data.')
+    }
+  }
+
+  // 5. Open Full-Page Application Workspace
+  const handleOpenApplicationWorkspace = () => {
+    if (!selectedApplicant) return
+    const workspaceUrl = chrome?.runtime?.getURL
+      ? chrome.runtime.getURL(`application.html?applicantId=${encodeURIComponent(selectedApplicant.applicantId)}`)
+      : `application.html?applicantId=${encodeURIComponent(selectedApplicant.applicantId)}`
+
+    if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+      chrome.tabs.create({ url: workspaceUrl })
+    } else {
+      window.open(workspaceUrl, '_blank')
+    }
+  }
+
+  // 6. Execute Autofill on Current Page
+  const handleAutofillCurrentPage = async () => {
     if (!selectedApplicant) {
-      setErrorMessage('Please select an applicant first.')
-      return
-    }
-
-    if (!detection?.matched || detection.page === 'unknown') {
-      setErrorMessage('Visa Autofill could not identify this page.')
-      return
-    }
-
-    const pageId = detection.page || 'unknown'
-    const retryCount = retryCountMap[pageId] || 0
-    if (retryCount >= 2) {
-      setErrorMessage('Max retries reached. Please complete manually.')
+      setErrorMessage('Please select an applicant profile first.')
       return
     }
 
     setIsAutofilling(true)
     setErrorMessage(null)
 
-    const failedIds = failedFieldsMap[pageId] || []
-
     try {
       const response = await sendToBackground<AutofillResponsePayload>({
         type: 'EXECUTE_AUTOFILL',
         applicant: selectedApplicant,
-        failedMappingIds: failedIds,
       })
 
       if (response.status === 'success' && response.data?.result) {
-        const r = response.data.result
-        setCanUndo(r.filledFields > 0)
-
-        // Track failed fields
-        const newFailedIds = r.results
-          .filter((res) => res.status === 'failed' || res.status === 'not-found')
-          .map((res) => res.fieldId)
-
-        setFailedFieldsMap((prev) => ({ ...prev, [pageId]: newFailedIds }))
-
-        // Increment retry count if errors exist
-        if (newFailedIds.length > 0) {
-          setRetryCountMap((prev) => ({ ...prev, [pageId]: (prev[pageId] || 0) + 1 }))
-        }
-
-        if (r.failedFields > 0 && r.filledFields > 0) {
-          showToast(`⚡ Partially completed. (${r.filledFields} filled, ${r.failedFields} failed)`)
-        } else if (r.failedFields > 0 && r.filledFields === 0) {
-          setErrorMessage('Autofill execution failed.')
-        } else {
-          showToast(`⚡ Autofill finished: ${r.filledFields} filled, ${r.skippedFields} skipped.`)
-        }
-      } else if (response.status === 'error') {
-        setErrorMessage(response.error || 'Autofill execution failed.')
+        const res = response.data.result
+        showToast(`✓ Autofilled ${res.filledFields} fields (${res.skippedFields} skipped).`)
+        setCanUndo(true)
       } else {
-        setErrorMessage('Autofill execution failed.')
+        const err = response.status === 'error' ? response.error : 'Autofill could not be completed on this page.'
+        setErrorMessage(err || 'Autofill could not be completed on this page.')
       }
     } catch (err) {
-      console.error('Autofill request error:', err)
-      setErrorMessage('Unable to execute autofill on active page.')
+      console.error('Autofill error:', err)
+      setErrorMessage(err instanceof Error ? err.message : 'Autofill request failed.')
     } finally {
       setIsAutofilling(false)
     }
   }
 
-  const handleTriggerUndo = async () => {
+  // 7. Undo Autofill
+  const handleUndoAutofill = async () => {
     setIsUndoing(true)
     setErrorMessage(null)
-
     try {
       const response = await sendToBackground<UndoResponsePayload>({
         type: 'EXECUTE_UNDO',
       })
-
-      if (response.status === 'success' && response.data?.result) {
-        const r = response.data.result
+      if (response.status === 'success') {
+        showToast('✓ Autofill changes undone.')
         setCanUndo(false)
-        const pageId = detection?.page || 'unknown'
-        setFailedFieldsMap((prev) => {
-          const next = { ...prev }
-          delete next[pageId]
-          return next
-        })
-        setRetryCountMap((prev) => {
-          const next = { ...prev }
-          delete next[pageId]
-          return next
-        })
-        showToast(`↩ Undo finished: ${r.restored} restored, ${r.skipped} user-modified skipped, ${r.notFound} not found.`)
-      } else if (response.status === 'error') {
-        setErrorMessage(response.error || 'Undo operation failed.')
       } else {
-        setErrorMessage('Undo operation failed.')
+        setErrorMessage(response.error || 'Unable to undo autofill.')
       }
     } catch (err) {
-      console.error('Undo request error:', err)
-      setErrorMessage('Unable to execute undo on active page.')
+      console.error('Undo error:', err)
+      setErrorMessage('Undo operation failed.')
     } finally {
       setIsUndoing(false)
     }
   }
 
-  const executeAttach = async (requirement: DocumentRequirement, documentId: string) => {
-    setConfirmAttachmentReq(null)
-    setAttachmentStates((prev) => ({
-      ...prev,
-      [requirement.id]: { state: 'attaching', retryCount: prev[requirement.id]?.retryCount || 0 },
-    }))
-
-    // 1. Verify current page matching
-    const pageRes = await sendToBackground<VisaPageResponsePayload>({ type: 'GET_CURRENT_VISA_PAGE' })
-    if (pageRes.status !== 'success' || !pageRes.data?.detection?.matched) {
-      setAttachmentStates((prev) => ({
-        ...prev,
-        [requirement.id]: { state: 'failed', error: 'Page changed. Invalidation occurred.' },
-      }))
-      return
-    }
-
-    try {
-      const response = await sendToBackground<DocumentAttachmentPayload>({
-        type: 'ATTACH_DOCUMENT',
-        requirementId: requirement.id,
-        documentId,
-      })
-
-      if (response.status === 'success' && response.data?.result) {
-        const res = response.data.result
-        if (res.success) {
-          // Verification check
-          await verifyCurrentAttachments(docRequirements)
-          setAttachmentStates((prev) => {
-            const isVerified = prev[requirement.id]?.state === 'attached'
-            return {
-              ...prev,
-              [requirement.id]: {
-                ...prev[requirement.id],
-                state: isVerified ? 'attached' : 'manual-verification-required',
-              },
-            }
-          })
-          showToast(`✓ Document "${requirement.label}" attachment initiated.`)
-        } else {
-          if (res.status === 'unsupported') {
-            setAttachmentStates((prev) => ({
-              ...prev,
-              [requirement.id]: {
-                ...prev[requirement.id],
-                state: 'manual-required',
-                error: res.reason,
-              },
-            }))
-          } else {
-            setAttachmentStates((prev) => ({
-              ...prev,
-              [requirement.id]: {
-                ...prev[requirement.id],
-                state: 'failed',
-                error: res.reason,
-              },
-            }))
-          }
-        }
-      } else if (response.status === 'error') {
-        setAttachmentStates((prev) => ({
-          ...prev,
-          [requirement.id]: {
-            ...prev[requirement.id],
-            state: 'failed',
-            error: response.error || 'Attachment failed.',
-          },
-        }))
-      }
-    } catch (err) {
-      console.error('Document attachment error:', err)
-      setAttachmentStates((prev) => ({
-        ...prev,
-        [requirement.id]: {
-          ...prev[requirement.id],
-          state: 'failed',
-          error: 'Unable to attach document.',
-        },
-      }))
-    }
-  }
-
-  const handleRetryAttachment = async (requirement: DocumentRequirement, documentId: string) => {
-    const currentState = attachmentStates[requirement.id]
-    const currentRetry = currentState?.retryCount || 0
-    if (currentRetry >= 3) {
-      setAttachmentStates((prev) => ({
-        ...prev,
-        [requirement.id]: {
-          ...prev[requirement.id],
-          state: 'manual-required',
-          error: 'Max retries reached. Please select manually.',
-        },
-      }))
-      return
-    }
-
-    setAttachmentStates((prev) => ({
-      ...prev,
-      [requirement.id]: {
-        ...prev[requirement.id],
-        state: 'attaching',
-        retryCount: currentRetry + 1,
-      },
-    }))
-
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    await executeAttach(requirement, documentId)
-  }
-
-  const formatFlowName = (flow?: string | null): string => {
-    if (flow === 'regular') return 'Regular / Paper Visa'
-    if (flow === 'evisa') return 'e-Visa Application'
-    return 'Unknown Flow'
-  }
-
-  const formatPageName = (page?: string | null): string => {
-    if (page === 'landing') return 'Portal Homepage'
-    if (page === 'application-start') return 'Application Registration'
-    if (page === 'application-form') return 'Application Form'
-    if (page === 'partial-application') return 'Partially Saved Form'
-    if (page === 'print-application') return 'Print Application'
-    if (page === 'status') return 'Status Inquiry'
-    if (page === 'document-reupload') return 'Document Re-upload'
-    return 'Visa Page'
-  }
-
-  const isWorkflowActive = workflowState && workflowState.status !== 'idle'
-
   return (
-    <div
-      className="rounded-xl p-5 shadow-lg space-y-4 transition-colors duration-300 relative"
-      style={{
-        backgroundColor: 'var(--color-surface)',
-        borderColor: 'var(--color-border)',
-        borderWidth: '1px',
-        borderStyle: 'solid',
-      }}
-    >
-      {/* Toast Banner */}
-      {toastMessage && (
-        <div className="absolute top-2 left-4 right-4 z-50 p-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold text-center shadow-lg">
-          {toastMessage}
-        </div>
-      )}
-
-      {/* Extension Title Header */}
-      <div className="flex items-center gap-3">
-        <div
-          className="inline-flex items-center justify-center w-10 h-10 rounded-xl font-bold text-xl text-white shadow-sm"
-          style={{ backgroundColor: 'var(--color-primary)' }}
-        >
-          V
-        </div>
-        <div>
-          <h1 className="text-xl font-extrabold tracking-tight" style={{ color: 'var(--color-text)' }}>
-            Visa Autofill
-          </h1>
-          <p className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>
-            Assisted Visa Application Entry
-          </p>
-        </div>
-      </div>
-
-      {/* Error Banner */}
-      {errorMessage && (
-        <div className="p-2 rounded bg-red-100 border border-red-300 text-red-700 text-xs font-semibold text-left">
-          {errorMessage}
-        </div>
-      )}
-
-      {/* Website Detection & Workflow Status Banner */}
-      <div
-        className="pt-3 text-left space-y-1.5"
-        style={{
-          borderTopWidth: '1px',
-          borderTopStyle: 'solid',
-          borderTopColor: 'var(--color-border)',
-        }}
-      >
-        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          <span>Target Visa Portal Status</span>
-          {isWorkflowActive && (
-            <span className="text-indigo-600">
-              Completed: {workflowState.completedPages.length} pages
-            </span>
-          )}
-        </div>
-
-        {isCheckingPage ? (
-          <div className="text-xs text-slate-500 flex items-center gap-1.5 py-1">
-            <span className="animate-spin text-xs">⏳</span>
-            <span>Checking browser tab...</span>
+    <div className="flex flex-col h-full bg-slate-900 text-slate-100 font-sans text-sm">
+      {/* Top Header */}
+      <header className="px-4 py-3 bg-slate-800/90 border-b border-slate-700/80 flex items-center justify-between shadow-sm flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center font-bold text-white shadow">
+            🇮🇳
           </div>
-        ) : (
-          (() => {
-            const status = getAutofillStatusMessage()
-            let bgColor = 'bg-slate-50 border-slate-200 text-slate-700'
-            let badge = 'text-slate-600 bg-slate-100 border border-slate-300'
-            
-            if (status.type === 'success') {
-              bgColor = 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              badge = 'bg-emerald-600 text-white'
-            } else if (status.type === 'warning') {
-              bgColor = 'bg-amber-50 border-amber-200 text-amber-800'
-              badge = 'bg-amber-600 text-white'
-            } else if (status.type === 'error') {
-              bgColor = 'bg-red-50 border-red-200 text-red-800'
-              badge = 'bg-red-600 text-white'
-            }
+          <div>
+            <h1 className="text-sm font-bold text-slate-100 leading-tight">Visa Autofill</h1>
+            <p className="text-[11px] text-slate-400">Application Workspace Mode</p>
+          </div>
+        </div>
 
-            return (
-              <div className={`p-2.5 rounded-lg border text-left space-y-1 ${bgColor}`}>
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs flex items-center gap-1">
-                    <span>{status.type === 'success' ? '✓' : 'ℹ'}</span>
-                    <span>{status.text}</span>
-                  </span>
-                  {detection?.matched && detection.page !== 'unknown' ? (
-                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badge}`}>
-                      Supported
-                    </span>
-                  ) : (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-200 text-slate-700 border border-slate-300">
-                      Unsupported
-                    </span>
-                  )}
-                </div>
-                {detection?.matched && detection.page !== 'unknown' && (
-                  <div className="text-[11px] grid grid-cols-2 gap-1 pt-0.5 opacity-90">
-                    <div>
-                      <span className="text-[9px] block opacity-70">Flow:</span>
-                      <span className="font-semibold">{formatFlowName(detection.flow)}</span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] block opacity-70">Current Stage:</span>
-                      <span className="font-semibold">{formatPageName(detection.page)}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })()
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onNavigate('applicants')}
+            className="px-2.5 py-1 text-xs rounded bg-slate-700/80 hover:bg-slate-700 text-slate-200 border border-slate-600 transition-colors"
+          >
+            Profiles ({applicantCount})
+          </button>
+          <button
+            onClick={() => onNavigate('settings')}
+            className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 transition-colors"
+            title="Settings"
+          >
+            ⚙️
+          </button>
+        </div>
+      </header>
+
+      {/* Main Body Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Toast / Error alerts */}
+        {toastMessage && (
+          <div className="p-2.5 bg-emerald-950/80 border border-emerald-700/80 rounded-lg text-emerald-200 text-xs flex items-center gap-2">
+            <span>{toastMessage}</span>
+          </div>
         )}
-      </div>
 
-      {/* Document Upload Requirements Card */}
-      {detection?.matched && docRequirements.length > 0 && selectedApplicant && (
-        <div className="p-2.5 rounded-lg border border-indigo-200 bg-indigo-50 text-left space-y-2">
-          <div className="flex items-center justify-between border-b border-indigo-100 pb-1.5">
-            <span className="font-extrabold text-xs text-indigo-900 uppercase tracking-wider">
-              📄 India Visa Documents
-            </span>
-            <span className="text-[9px] font-bold bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded">
-              {docRequirements.length} Required
-            </span>
+        {errorMessage && (
+          <div className="p-2.5 bg-rose-950/80 border border-rose-700/80 rounded-lg text-rose-200 text-xs flex items-center gap-2">
+            <span>⚠️ {errorMessage}</span>
           </div>
+        )}
 
-          <div className="space-y-2 text-xs">
-            {docRequirements.map((req) => {
-              const candidates = matchDocumentsForRequirement(req, applicantDocs)
-              const selectedDocId = selectedDocMap[req.id] || candidates[0]?.documentId || ''
-              const isStale = selectedDocId && !candidates.some((c) => c.documentId === selectedDocId)
-              const activeCandidate = candidates.find((c) => c.documentId === selectedDocId)
-              const isExpired = activeCandidate?.expiryDate && new Date(activeCandidate.expiryDate) < new Date()
-              const stateObj = attachmentStates[req.id] || { state: 'not-started' }
+        {/* Profile Container Card */}
+        {selectedApplicant ? (
+          <div className="bg-slate-800/80 rounded-xl border border-slate-700 p-3.5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-700/70 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Profile:</span>
+                <span className="text-sm font-bold text-blue-400">{selectedApplicant.applicantId}</span>
+              </div>
+              <button
+                onClick={() => onNavigate('applicants')}
+                className="text-xs text-slate-400 hover:text-slate-200 underline"
+              >
+                Switch
+              </button>
+            </div>
 
-              return (
-                <div
-                  key={req.id}
-                  className="p-2 rounded-lg bg-white border border-indigo-100 space-y-2 shadow-sm"
+            {/* Document Workflow Tabs: PASSPORT / OGD */}
+            <div>
+              <div className="flex rounded-lg bg-slate-900/80 p-1 border border-slate-700/60 mb-3">
+                <button
+                  onClick={() => setActiveTab('passport')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
+                    activeTab === 'passport'
+                      ? 'bg-blue-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
                 >
-                  {/* Header & Status Indicator */}
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-[11px]">{req.label}</span>
+                  PASSPORT {passportDoc?.extractedDataConfirmed && '✓'}
+                </button>
+                <button
+                  onClick={() => setActiveTab('ogd')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
+                    activeTab === 'ogd'
+                      ? 'bg-blue-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  OGD {ogdDoc?.extractedDataConfirmed && '✓'}
+                </button>
+              </div>
+
+              {/* Tab Content */}
+              <div className="bg-slate-900/60 rounded-lg p-3 border border-slate-700/50 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    {activeTab === 'passport' ? 'Passport Document' : 'OGD Document (Previous India History)'}
+                  </span>
+                  {currentTabDoc ? (
                     <span
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                        candidates.length > 0
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                        currentTabDoc.extractedDataConfirmed
+                          ? 'bg-emerald-950 text-emerald-400 border-emerald-700/60'
+                          : 'bg-amber-950 text-amber-400 border-amber-700/60'
                       }`}
                     >
-                      {candidates.length > 0
-                        ? `${req.documentType.charAt(0).toUpperCase() + req.documentType.slice(1)} ✓ Available`
-                        : '⚠ Missing'}
+                      {currentTabDoc.extractedDataConfirmed ? 'Confirmed' : 'Review required'}
                     </span>
-                  </div>
-
-                  {candidates.length === 0 ? (
-                    /* Missing Document Flow */
-                    <div className="space-y-1.5 text-center p-2 rounded bg-slate-50 border border-dashed border-slate-200">
-                      <div className="text-[10px] text-slate-600 font-semibold text-center w-full">Document missing</div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        fullWidth
-                        onClick={() => onNavigate('documents')}
-                      >
-                        [ Add Document ]
-                      </Button>
-                    </div>
-                  ) : isStale ? (
-                    /* Deleted / Stale Document Reference */
-                    <div className="space-y-1.5">
-                      <div className="text-[10px] text-red-600 font-semibold bg-red-50 p-1.5 rounded border border-red-200">
-                        Selected document is no longer available.
-                      </div>
-                      {candidates.length > 1 && (
-                        <select
-                          className="w-full p-1 rounded border text-[10px] bg-slate-50"
-                          value={selectedDocId}
-                          onChange={(e) => {
-                            setSelectedDocMap((prev) => ({ ...prev, [req.id]: e.target.value }))
-                            setAttachmentStates((prev) => ({ ...prev, [req.id]: { state: 'not-started' } }))
-                          }}
-                        >
-                          <option value="">Choose another document...</option>
-                          {candidates.map((c) => (
-                            <option key={c.documentId} value={c.documentId}>
-                              {c.fileName} ({(c.fileSize / 1024 / 1024).toFixed(2)} MB)
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
                   ) : (
-                    /* Matched Candidates Available */
-                    <div className="space-y-2">
-                      {/* Candidate selector if multiple matches exist */}
-                      {candidates.length > 1 && (
-                        <div className="space-y-0.5">
-                          <label className="text-[9px] text-slate-400 font-bold uppercase block">
-                            [ Choose Document ]
-                          </label>
-                          <select
-                            className="w-full p-1 rounded border text-[10px] bg-slate-50"
-                            value={selectedDocId}
-                            onChange={(e) => {
-                              setSelectedDocMap((prev) => ({ ...prev, [req.id]: e.target.value }))
-                              setAttachmentStates((prev) => ({ ...prev, [req.id]: { state: 'not-started' } }))
-                            }}
-                          >
-                            {candidates.map((c) => (
-                              <option key={c.documentId} value={c.documentId}>
-                                {c.fileName} ({(c.fileSize / 1024 / 1024).toFixed(2)} MB)
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Selected Candidate Metadata Display */}
-                      {activeCandidate && (
-                        <div className="p-1.5 rounded bg-slate-50 border border-slate-100 flex items-center justify-between text-[10px]">
-                          <div className="space-y-0.5 truncate max-w-[160px]">
-                            <div className="font-bold text-slate-700 truncate">
-                              {activeCandidate.fileName}
-                            </div>
-                            <div className="text-[9px] text-slate-400">
-                              {activeCandidate.mimeType.split('/')[1].toUpperCase()} ·{' '}
-                              {(activeCandidate.fileSize / 1024 / 1024).toFixed(2)} MB
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            {activeCandidate.expiryDate ? (
-                              isExpired ? (
-                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-800 uppercase animate-pulse">
-                                  Expired
-                                </span>
-                              ) : (
-                                <span className="text-[8px] text-slate-400 block font-semibold text-right">
-                                  Exp: {activeCandidate.expiryDate}
-                                </span>
-                              )
-                            ) : null}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Expiry warnings */}
-                      {isExpired && (
-                        <div className="text-[9px] font-medium text-red-600 bg-red-50 p-1.5 rounded border border-red-100">
-                          ⚠️ This document has expired. Do NOT automatically attach expired documents unless confirmed.
-                        </div>
-                      )}
-
-                      {/* Attachment Workflow Control Buttons */}
-                      {stateObj.state === 'attached' ? (
-                        /* Case 1: Successfully Attached */
-                        <div className="space-y-1">
-                          <div className="p-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold text-center">
-                            ✓ Attached ({stateObj.verifiedName || 'Verified'})
-                          </div>
-                          <div className="text-[10px] text-slate-500 italic text-center">
-                            Document requirement completed.
-                          </div>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            fullWidth
-                            onClick={() =>
-                              setAttachmentStates((prev) => ({
-                                ...prev,
-                                [req.id]: { state: 'not-started' },
-                              }))
-                            }
-                          >
-                            Re-attach
-                          </Button>
-                        </div>
-                      ) : stateObj.state === 'manual-verification-required' ? (
-                        /* Case 2: Verification Awaiting */
-                        <div className="space-y-1">
-                          <div className="p-1 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold text-center">
-                            ⚠ Manual verification required
-                          </div>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            fullWidth
-                            onClick={() => verifyCurrentAttachments(docRequirements)}
-                          >
-                            Verify Status
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            fullWidth
-                            onClick={() =>
-                              setAttachmentStates((prev) => ({
-                                ...prev,
-                                [req.id]: { state: 'not-started' },
-                              }))
-                            }
-                          >
-                            Re-attach
-                          </Button>
-                        </div>
-                      ) : stateObj.state === 'manual-required' ? (
-                        /* Case 3: Programmatic Selection Blocked */
-                        <div className="space-y-1.5">
-                          <div className="p-1 rounded bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-bold text-center">
-                            ⚠ Manual Action Required
-                          </div>
-                          <p className="text-[10px] text-slate-600 leading-normal">
-                            Please select the matching document in the website's file picker.
-                          </p>
-                          <div className="bg-slate-50 p-1.5 rounded border text-[9px] text-slate-500 font-medium">
-                            <strong>Instructions:</strong> Click the upload button on the form page, and pick: <strong>{activeCandidate?.fileName}</strong>
-                          </div>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            fullWidth
-                            onClick={() => verifyCurrentAttachments(docRequirements)}
-                          >
-                            Verify Selected File
-                          </Button>
-                        </div>
-                      ) : stateObj.state === 'failed' ? (
-                        /* Case 4: Process Failure */
-                        <div className="space-y-1.5">
-                          <div className="p-1 rounded bg-red-100 border border-red-300 text-red-900 text-[10px] font-bold text-center">
-                            Document could not be attached.
-                          </div>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              fullWidth
-                              onClick={() => handleRetryAttachment(req, selectedDocId)}
-                            >
-                              Retry
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              fullWidth
-                              onClick={() =>
-                                setAttachmentStates((prev) => ({
-                                  ...prev,
-                                  [req.id]: { ...prev[req.id], state: 'manual-required' },
-                                }))
-                              }
-                            >
-                              Manual Upload
-                            </Button>
-                          </div>
-                        </div>
-                      ) : stateObj.state === 'attaching' ? (
-                        /* Case 5: Loading State */
-                        <div className="text-center text-[10px] text-indigo-700 font-bold py-1.5">
-                          ⏳ Attaching document...
-                        </div>
-                      ) : confirmAttachmentReq === req ? (
-                        /* Case 6: User Confirmation Overlay */
-                        <div className="space-y-1.5 p-2 rounded bg-indigo-50 border border-indigo-100">
-                          <div className="text-[10px] text-indigo-900 font-bold text-center">
-                            Use {activeCandidate?.fileName} for this requirement?
-                          </div>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              fullWidth
-                              onClick={() => executeAttach(req, selectedDocId)}
-                            >
-                              Confirm
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              fullWidth
-                              onClick={() => setConfirmAttachmentReq(null)}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Default: Selection and Confirm Triggers */
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            fullWidth
-                            onClick={() => setPreviewDoc(activeCandidate || null)}
-                          >
-                            Preview
-                          </Button>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            fullWidth
-                            onClick={() => {
-                              if (activeCandidate && activeCandidate.documentType !== req.documentType) {
-                                setErrorMessage('Document type does not match this requirement.')
-                              } else {
-                                setConfirmAttachmentReq(req)
-                              }
-                            }}
-                          >
-                            Use Document
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                    <span className="text-[11px] text-slate-500 italic">No document</span>
                   )}
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
-      {/* Manual Action Safety Notice */}
-      {detection?.matched &&
-        (detection.page === 'status' ||
-          detection.page === 'print-application' ||
-          detection.page === 'document-reupload') && (
-          <div className="p-2 rounded bg-amber-50 border border-amber-200 text-amber-900 text-[11px] text-left font-medium">
-            ⚠️ <strong>Manual Action Required:</strong> Document uploads, CAPTCHAs, and final submission must be completed manually.
-          </div>
-        )}
+                {currentTabDoc ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-300">
+                      <span className="font-medium truncate max-w-[180px]">{currentTabDoc.fileName}</span>
+                      <span className="text-slate-500">
+                        {currentTabDoc.fileSize ? `${(currentTabDoc.fileSize / 1024).toFixed(0)} KB` : ''}
+                      </span>
+                    </div>
 
-      {/* Selected Applicant Summary Banner */}
-      {selectedApplicant ? (
-        <div
-          className="p-3 rounded-lg text-left text-xs space-y-1"
-          style={{
-            backgroundColor: 'var(--color-bg-middle)',
-            borderColor: 'var(--color-accent)',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
-              Active Selected Profile
-            </span>
-            <span
-              className="px-1.5 py-0.5 rounded text-[9px] font-semibold text-white"
-              style={{ backgroundColor: 'var(--color-primary)' }}
-            >
-              Selected
-            </span>
-          </div>
-          <div className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
-            PROFILE {selectedApplicant.applicantId}
-          </div>
-          <div className="text-[11px] space-y-1 mt-1.5" style={{ color: 'var(--color-muted)' }}>
-            <div>Documents: {applicantDocs.length}</div>
-            <div>
-              Passport:{' '}
-              {applicantDocs.some(
-                (d) => d.documentType === 'passport' && d.extractedDataConfirmed
-              ) ? (
-                <span className="text-emerald-600 font-bold">Available</span>
-              ) : (
-                <span className="text-amber-600 font-bold">Not Available</span>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div
-          className="p-2.5 rounded-lg text-left text-xs italic"
-          style={{
-            backgroundColor: 'var(--color-bg-middle)',
-            color: 'var(--color-muted)',
-            borderColor: 'var(--color-border)',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-          }}
-        >
-          No active applicant selected. Go to Applicants list to select one.
-        </div>
-      )}
+                    <div className="flex items-center gap-2 pt-1">
+                      {!currentTabDoc.extractedDataConfirmed && currentTabDoc.extractedData && (
+                        <button
+                          onClick={() => {
+                            setReviewDoc(currentTabDoc)
+                            setReviewState({
+                              candidateData: currentTabDoc.extractedData!,
+                              conflicts: [],
+                            })
+                          }}
+                          className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-semibold py-1.5 px-3 rounded text-xs transition-colors"
+                        >
+                          Review Extracted Data
+                        </button>
+                      )}
 
-      {/* Primary Dashboard Actions */}
-      <div className="space-y-2 pt-1">
-        {detection?.matched && selectedApplicant && (
-          <div className="space-y-1.5">
-            {isWorkflowActive ? (
-              <div className="space-y-1.5">
-                {(!detection?.matched || detection.page === 'unknown') ? (
-                  <div className="p-2 rounded bg-amber-50 border border-amber-200 text-xs space-y-1.5 text-left">
-                    <p className="text-amber-800 font-semibold">Visa Autofill could not identify this page.</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant="primary" size="sm" fullWidth onClick={handleRetryDetection}>
-                        Retry Detection
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        fullWidth
-                        onClick={() => {
-                          setErrorMessage('Manual action is required.')
-                        }}
-                      >
-                        Continue Manually
-                      </Button>
+                      <label className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 font-medium py-1.5 px-3 rounded text-xs cursor-pointer text-center transition-colors">
+                        Replace
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => handleFileUpload(e, activeTab)}
+                          className="hidden"
+                          disabled={isExtracting}
+                        />
+                      </label>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-1.5">
-                    {/* Retry controls if there are failed fields */}
-                    {(() => {
-                      const pageId = detection.page || 'unknown'
-                      const failedIds = failedFieldsMap[pageId] || []
-                      const retryCount = retryCountMap[pageId] || 0
-                      if (failedIds.length > 0) {
-                        return (
-                          <div className="p-2 rounded bg-red-50 border border-red-200 text-xs text-left space-y-1.5">
-                            <p className="text-red-800 font-semibold">
-                              Failed to fill {failedIds.length} field(s) (Attempt {retryCount}/2)
-                            </p>
-                            <div className="grid grid-cols-2 gap-2">
-                              {retryCount < 2 ? (
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  fullWidth
-                                  onClick={handleTriggerAutofill}
-                                  disabled={isAutofilling}
-                                >
-                                  {isAutofilling ? '⚡ Retrying...' : 'Retry Failed Fields'}
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  fullWidth
-                                  onClick={() => {
-                                    setErrorMessage('Manual action is required.')
-                                  }}
-                                >
-                                  Continue Manually
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                fullWidth
-                                onClick={() => {
-                                  setFailedFieldsMap((prev) => ({ ...prev, [pageId]: [] }))
-                                }}
-                              >
-                                Skip Failures
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      }
-                      return null
-                    })()}
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        fullWidth
-                        onClick={handleTriggerAutofill}
-                        disabled={isAutofilling}
-                      >
-                        {isAutofilling ? '⚡ Filling...' : '⚡ Autofill Page'}
-                      </Button>
-                      <Button variant="ghost" size="sm" fullWidth onClick={handleStopWorkflow}>
-                        ⏹ Stop Workflow
-                      </Button>
-                    </div>
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      {activeTab === 'passport'
+                        ? 'Upload primary passport PDF to extract personal identity data.'
+                        : 'Upload previous India visa/visit/history document (optional).'}
+                    </p>
+                    <label className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded-md text-xs text-center cursor-pointer transition-colors shadow">
+                      {isExtracting ? 'Extracting...' : '📄 Upload Document'}
+                      <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={(e) => handleFileUpload(e, activeTab)}
+                        className="hidden"
+                        disabled={isExtracting}
+                      />
+                    </label>
                   </div>
                 )}
-
-                {canUndo && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    fullWidth
-                    onClick={handleTriggerUndo}
-                    disabled={isUndoing}
-                  >
-                    {isUndoing ? '↩ Undoing...' : '↩ Undo Autofill'}
-                  </Button>
-                )}
               </div>
-            ) : (
-              <Button variant="primary" fullWidth size="md" onClick={handleStartWorkflow}>
-                ▶ Start Autofill Workflow
-              </Button>
-            )}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-slate-800/60 rounded-xl border border-dashed border-slate-700 p-6 text-center space-y-3">
+            <p className="text-xs text-slate-400">No applicant profile selected.</p>
+            <Button size="sm" onClick={onAddApplicant}>
+              + Create Profile
+            </Button>
           </div>
         )}
 
-        <Button variant="secondary" fullWidth size="md" onClick={onAddApplicant}>
-          + Add Applicant
-        </Button>
+        {/* Application Workspace Status Card */}
+        {selectedApplicant && (
+          <div className="bg-slate-800/80 rounded-xl border border-slate-700 p-3.5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Application Data</span>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                  savedApplication?.status === 'ready_for_autofill'
+                    ? 'bg-emerald-950 text-emerald-400 border-emerald-700/60'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}
+              >
+                {savedApplication?.status === 'ready_for_autofill' ? '✓ Ready for Autofill' : 'Draft / Not Saved'}
+              </span>
+            </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" size="sm" fullWidth onClick={() => onNavigate('applicants')}>
-            Applicants ({applicantCount})
-          </Button>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Open the full-page workspace to review, edit, and save all Bangladesh application fields across 6 pages.
+            </p>
 
-          <Button variant="secondary" size="sm" fullWidth onClick={() => onNavigate('documents')}>
-            Documents
-          </Button>
+            <button
+              onClick={handleOpenApplicationWorkspace}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-2 border border-slate-600 shadow transition-colors cursor-pointer"
+            >
+              <span>🖥️</span> Open Application Workspace (New Tab)
+            </button>
+          </div>
+        )}
+
+        {/* Portal Detection & Autofill Card */}
+        <div className="bg-slate-800/80 rounded-xl border border-slate-700 p-3.5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-300 uppercase tracking-wider">Portal Detection</span>
+            {detection?.matched ? (
+              <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                {detection.page}
+              </span>
+            ) : (
+              <span className="text-slate-500 italic">Indian Visa Portal not detected</span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 pt-1">
+            <button
+              onClick={handleAutofillCurrentPage}
+              disabled={isAutofilling || !selectedApplicant}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2 px-3 rounded-lg text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isAutofilling ? 'Autofilling Page...' : '⚡ Autofill Current Page'}
+            </button>
+
+            {canUndo && (
+              <button
+                onClick={handleUndoAutofill}
+                disabled={isUndoing}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-1.5 px-3 rounded-lg text-xs border border-slate-700 transition-colors"
+              >
+                {isUndoing ? 'Undoing...' : '↩ Undo Last Autofill'}
+              </button>
+            )}
+          </div>
         </div>
-
-        <Button variant="ghost" size="sm" fullWidth onClick={() => onNavigate('settings')}>
-          Settings
-        </Button>
       </div>
-      {previewDoc && (
-        <DocumentPreviewModal
-          document={previewDoc}
-          onClose={() => setPreviewDoc(null)}
+
+      {/* Extraction Review Modal */}
+      {reviewState && selectedApplicant && reviewDoc && (
+        <ExtractionReviewModal
+          targetApplicant={selectedApplicant}
+          initialData={reviewState.candidateData}
+          conflicts={reviewState.conflicts}
+          onConfirm={handleConfirmExtraction}
+          onClose={() => {
+            setReviewState(null)
+            setReviewDoc(null)
+          }}
         />
       )}
     </div>
   )
 }
+
+export default Dashboard
