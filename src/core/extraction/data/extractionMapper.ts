@@ -45,8 +45,11 @@ export function applyExtractionToApplicant(
     p.nationalIdNumber?.value ||
     p.religion?.value ||
     p.educationalQualification?.value ||
+    p.visibleIdentificationMarks?.value ||
     p.previousNationality?.value ||
-    p.maritalStatus?.value
+    p.maritalStatus?.value ||
+    p.hasChangedName?.value !== undefined ||
+    p.previousName?.value
   )
 
   const hasPassport = Boolean(
@@ -55,7 +58,9 @@ export function applyExtractionToApplicant(
     pass.issuingCountry?.value ||
     pass.expiryDate?.value ||
     pass.issueDate?.value ||
-    pass.placeOfIssue?.value
+    pass.placeOfIssue?.value ||
+    pass.holdsOtherPassport?.value !== undefined ||
+    pass.otherPassportDetails?.passportNumber?.value
   )
 
   const hasPresent = Boolean(
@@ -163,8 +168,11 @@ export function applyExtractionToApplicant(
           nationalIdNumber: p.nationalIdNumber?.value ? p.nationalIdNumber.value : undefined,
           religion: p.religion?.value ? p.religion.value : undefined,
           educationalQualification: p.educationalQualification?.value ? p.educationalQualification.value : undefined,
+          visibleIdentificationMarks: p.visibleIdentificationMarks?.value ? p.visibleIdentificationMarks.value : undefined,
           previousNationality: p.previousNationality?.value ? p.previousNationality.value : undefined,
           maritalStatus: p.maritalStatus?.value ? p.maritalStatus.value : undefined,
+          hasChangedName: p.hasChangedName?.value !== undefined ? p.hasChangedName.value : undefined,
+          previousName: p.previousName?.value ? p.previousName.value : undefined,
         }
       : undefined,
     passport: hasPassport
@@ -175,6 +183,16 @@ export function applyExtractionToApplicant(
           expiryDate: pass.expiryDate?.value ? pass.expiryDate.value : undefined,
           issueDate: pass.issueDate?.value ? pass.issueDate.value : undefined,
           placeOfIssue: pass.placeOfIssue?.value ? pass.placeOfIssue.value : undefined,
+          holdsOtherPassport: pass.holdsOtherPassport?.value !== undefined ? pass.holdsOtherPassport.value : undefined,
+          otherPassportDetails: pass.otherPassportDetails
+            ? {
+                passportNumber: pass.otherPassportDetails.passportNumber?.value,
+                placeOfIssue: pass.otherPassportDetails.placeOfIssue?.value,
+                countryOfIssue: pass.otherPassportDetails.countryOfIssue?.value,
+                nationalityInPassport: pass.otherPassportDetails.nationalityInPassport?.value,
+                issueDate: pass.otherPassportDetails.issueDate?.value,
+              }
+            : undefined,
         }
       : undefined,
     presentAddress: hasPresent
