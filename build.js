@@ -17,6 +17,7 @@ async function runBuild() {
       rollupOptions: {
         input: {
           popup: resolve(__dirname, 'index.html'),
+          application: resolve(__dirname, 'application.html'),
           background: resolve(__dirname, 'src/background/index.ts'),
         },
         output: {
