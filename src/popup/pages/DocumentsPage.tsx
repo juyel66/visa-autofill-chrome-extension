@@ -312,6 +312,26 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
       await saveDocument(updatedDoc)
       await loadApplicantDocuments(activeId)
 
+      // Sync with SavedApplication
+      try {
+        const { getSavedApplicationByApplicantId, saveApplication } = await import('../../core/application/applicationStorage')
+        const { populateApplicationFromDocuments } = await import('../../core/application/applicationMerger')
+        const allDocs = await getDocumentsByApplicantId(activeId)
+        const pDoc = allDocs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed) || allDocs.find((d) => d.documentType === 'passport')
+        const oDoc = allDocs.find((d) => d.documentType === 'ogd' && d.extractedDataConfirmed) || allDocs.find((d) => d.documentType === 'ogd')
+        const existingApp = await getSavedApplicationByApplicantId(activeId)
+        const mergedApp = populateApplicationFromDocuments({
+          applicantId: activeId,
+          passportDoc: pDoc,
+          ogdDoc: oDoc,
+          existingApp,
+          notes: reviewTargetApplicant?.notes,
+        })
+        await saveApplication(mergedApp)
+      } catch (appErr) {
+        console.warn('Could not auto-sync SavedApplication in DocumentsPage:', appErr)
+      }
+
       setReviewState(null)
       setReviewTargetApplicant(null)
       setReviewTargetDoc(null)
