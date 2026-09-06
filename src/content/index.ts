@@ -2,6 +2,7 @@ import { executeAutofill, resolveCandidateData, resolveElement } from '../core/a
 import { attachDocumentToField, getDocumentsByApplicantId } from '../core/document'
 import type { DocumentRecord } from '../core/document/types'
 import type { ApplicantProfile } from '../core/applicant/types'
+import { getSettings } from '../core/settings'
 import type {
   AutofillResponsePayload,
   ContentPongPayload,
@@ -38,6 +39,27 @@ let activeState: WorkflowState = createInitialWorkflowState()
 let observerCleanup: (() => void) | null = null
 let latestOperation: AutofillOperation | null = null
 
+/**
+ * Production-safe storage reader for content script with error logging.
+ */
+async function readExtensionStorage<T extends Record<string, unknown>>(keys: string[]): Promise<T> {
+  return new Promise<T>((resolve) => {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.get(keys, (data) => {
+        if (chrome.runtime?.lastError) {
+          console.error('[VISA AUTOFILL Content] Error reading storage keys:', keys, chrome.runtime.lastError)
+          resolve({} as T)
+        } else {
+          resolve((data || {}) as T)
+        }
+      })
+    } else {
+      console.warn('[VISA AUTOFILL Content] chrome.storage.local is not available.')
+      resolve({} as T)
+    }
+  })
+}
+
 function syncCurrentPageState(): WorkflowState {
   const detection = detectIndiaVisaPage()
 
@@ -51,7 +73,6 @@ function syncCurrentPageState(): WorkflowState {
     latestOperation = null
     return activeState
   }
-// mapping functions
 
   const mappings = getIndiaVisaMappings(detection.flow, detection.page)
   const ready = isFormReady(mappings)
@@ -113,6 +134,7 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === 'START_WORKFLOW') {
+      console.log('[VISA AUTOFILL Content] START_WORKFLOW message received for applicant:', message.applicantId)
       if (observerCleanup) observerCleanup()
 
       const state = syncCurrentPageState()
@@ -137,6 +159,7 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === 'STOP_WORKFLOW') {
+      console.log('[VISA AUTOFILL Content] STOP_WORKFLOW message received.')
       if (observerCleanup) {
         observerCleanup()
         observerCleanup = null
@@ -155,6 +178,8 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === 'EXECUTE_AUTOFILL') {
       const detection = detectIndiaVisaPage()
+      console.log('[VISA AUTOFILL Content] Received EXECUTE_AUTOFILL request on page:', detection.page, 'flow:', detection.flow)
+
       if (!detection.matched || detection.page === 'unknown' || !detection.page) {
         activeState = updateWorkflowState(activeState, {
           status: 'manual-required',
@@ -199,6 +224,7 @@ chrome.runtime.onMessage.addListener(
 
       // Applicant Consistency Check
       if (activeState.status !== 'idle' && activeState.applicantId && message.applicant.applicantId !== activeState.applicantId) {
+        console.warn(`[VISA AUTOFILL Content] Applicant consistency violation: message=${message.applicant.applicantId} vs state=${activeState.applicantId}`)
         sendResponse({
           status: 'error',
           error: 'Applicant consistency violation. Workflow stopped.',
@@ -208,77 +234,93 @@ chrome.runtime.onMessage.addListener(
 
       const applicantId = message.applicant.applicantId
 
-      chrome.storage.local.get(['visa_autofill_documents'], (res) => {
-        const documents = (res.visa_autofill_documents || []) as DocumentRecord[]
+      readExtensionStorage<{ visa_autofill_documents?: DocumentRecord[] }>(['visa_autofill_documents'])
+        .then((res) => {
+          const documents = (res.visa_autofill_documents || []) as DocumentRecord[]
 
-        const candRes = resolveCandidateData({
-          profileId: applicantId,
-          documents,
-          notes: message.applicant.notes,
-        })
-
-        if (candRes.status !== 'READY' || !candRes.applicant) {
-          sendResponse({
-            status: 'error',
-            error: candRes.reason || 'Review extracted document data first.',
+          const candRes = resolveCandidateData({
+            profileId: applicantId,
+            documents,
+            notes: message.applicant.notes,
           })
-          return
-        }
 
-        const tempProfile = candRes.applicant
+          console.log(`[VISA AUTOFILL Content] Candidate resolution status: ${candRes.status}, reason: ${candRes.reason || 'None'}`)
 
-        const validation = validateApplicant(tempProfile)
-        if (!validation.valid) {
-          const firstErr = validation.errors[0]?.message || 'Validation failed'
-          sendResponse({
-            status: 'error',
-            error: `Applicant profile validation error: ${firstErr}`,
-          })
-          return
-        }
-
-        let mappings = getIndiaVisaMappings(detection.flow, detection.page)
-        if (message.failedMappingIds && message.failedMappingIds.length > 0) {
-          mappings = mappings.filter((m) => message.failedMappingIds!.includes(m.id))
-        }
-
-        executeAutofill({
-          mappings,
-          applicant: tempProfile,
-          options: {
-            policy: 'fill-empty',
-            validatePageConsistency: () => {
-              const currentDet = detectIndiaVisaPage()
-              return currentDet.matched && currentDet.page === detection.page
-            },
-          },
-        })
-          .then((result) => {
-            if (detection.page && !activeState.completedPages.includes(detection.page)) {
-              activeState = updateWorkflowState(activeState, {
-                completedPages: [...activeState.completedPages, detection.page],
-              })
-            }
-
-            if (result.operation) {
-              latestOperation = result.operation
-            }
-
-            sendResponse({
-              status: 'success',
-              data: {
-                type: 'AUTOFILL_COMPLETED',
-                result,
-              },
-            })
-          })
-          .catch((err) => {
+          if (candRes.status !== 'READY' || !candRes.applicant) {
             sendResponse({
               status: 'error',
-              error: err instanceof Error ? err.message : 'Autofill execution failed.',
+              error: candRes.reason || 'Review extracted document data first.',
             })
+            return
+          }
+
+          const tempProfile = candRes.applicant
+
+          const validation = validateApplicant(tempProfile)
+          if (!validation.valid) {
+            const firstErr = validation.errors[0]?.message || 'Validation failed'
+            console.warn(`[VISA AUTOFILL Content] Applicant validation failed: ${firstErr}`)
+            sendResponse({
+              status: 'error',
+              error: `Applicant profile validation error: ${firstErr}`,
+            })
+            return
+          }
+
+          let mappings = getIndiaVisaMappings(detection.flow, detection.page)
+          if (message.failedMappingIds && message.failedMappingIds.length > 0) {
+            mappings = mappings.filter((m) => message.failedMappingIds!.includes(m.id))
+          }
+
+          console.log(`[VISA AUTOFILL Content] Executing autofill with ${mappings.length} mappings on page "${detection.page}"`)
+
+          executeAutofill({
+            mappings,
+            applicant: tempProfile,
+            options: {
+              policy: 'fill-empty',
+              validatePageConsistency: () => {
+                const currentDet = detectIndiaVisaPage()
+                return currentDet.matched && currentDet.page === detection.page
+              },
+            },
           })
-      })
+            .then((result) => {
+              console.log(`[VISA AUTOFILL Content] Autofill execution completed: ${result.filledFields} filled, ${result.skippedFields} skipped, ${result.failedFields} failed.`)
+
+              if (detection.page && !activeState.completedPages.includes(detection.page)) {
+                activeState = updateWorkflowState(activeState, {
+                  completedPages: [...activeState.completedPages, detection.page],
+                })
+              }
+
+              if (result.operation) {
+                latestOperation = result.operation
+              }
+
+              sendResponse({
+                status: 'success',
+                data: {
+                  type: 'AUTOFILL_COMPLETED',
+                  result,
+                },
+              })
+            })
+            .catch((err) => {
+              console.error('[VISA AUTOFILL Content] Autofill execution error:', err)
+              sendResponse({
+                status: 'error',
+                error: err instanceof Error ? err.message : 'Autofill execution failed.',
+              })
+            })
+        })
+        .catch((err) => {
+          console.error('[VISA AUTOFILL Content] Storage read error during EXECUTE_AUTOFILL:', err)
+          sendResponse({
+            status: 'error',
+            error: 'Storage read failed in content script.',
+          })
+        })
 
       return true
     }
@@ -417,6 +459,13 @@ chrome.runtime.onMessage.addListener(
 
 async function attemptAutomaticAutofill() {
   try {
+    // 1. Check user settings
+    const settings = await getSettings()
+    if (settings.autofill?.requirePageConfirmation) {
+      console.log('[VISA AUTOFILL] Auto-trigger skipped: User setting requires manual click before filling new pages (requirePageConfirmation is enabled).')
+      return
+    }
+
     const detection = detectIndiaVisaPage()
     if (!detection.matched || detection.page === 'unknown' || !detection.page) {
       console.log('[VISA AUTOFILL] Page is not matched/supported for auto-autofill.')
@@ -434,31 +483,26 @@ async function attemptAutomaticAutofill() {
       return
     }
 
-    const storageKeys = ['visa_autofill_selected_applicant_id', 'visa_autofill_applicants', 'visa_autofill_documents']
-    const result = await new Promise<Record<string, unknown>>((resolve) => {
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        chrome.storage.local.get(storageKeys, (data) => {
-          resolve(data || {})
-        })
-      } else {
-        resolve({})
-      }
-    })
+    const result = await readExtensionStorage<{
+      visa_autofill_selected_applicant_id?: string
+      visa_autofill_applicants?: ApplicantProfile[]
+      visa_autofill_documents?: DocumentRecord[]
+    }>(['visa_autofill_selected_applicant_id', 'visa_autofill_applicants', 'visa_autofill_documents'])
 
-    const selectedApplicantId = result.visa_autofill_selected_applicant_id as string | undefined
+    const selectedApplicantId = result.visa_autofill_selected_applicant_id
     if (!selectedApplicantId) {
       console.log('[VISA AUTOFILL] Auto-trigger skipped: No active profile is selected.')
       return
     }
 
-    const applicants = (result.visa_autofill_applicants || []) as ApplicantProfile[]
+    const applicants = result.visa_autofill_applicants || []
     const activeApplicant = applicants.find((a) => a.applicantId === selectedApplicantId)
     if (!activeApplicant) {
       console.log('[VISA AUTOFILL] Auto-trigger skipped: Selected profile details could not be found.')
       return
     }
 
-    const documents = (result.visa_autofill_documents || []) as DocumentRecord[]
+    const documents = result.visa_autofill_documents || []
     const candRes = resolveCandidateData({
       profileId: selectedApplicantId,
       documents,
@@ -478,6 +522,21 @@ async function attemptAutomaticAutofill() {
     })
 
     const mappings = getIndiaVisaMappings(detection.flow, detection.page)
+
+    // Controlled bounded retry for DOM readiness (up to 5 attempts, 300ms apart = max 1.5s)
+    let ready = isFormReady(mappings)
+    let readinessAttempts = 0
+    while (!ready && readinessAttempts < 5) {
+      readinessAttempts++
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      ready = isFormReady(mappings)
+    }
+
+    if (!ready) {
+      console.log(`[VISA AUTOFILL] Auto-trigger skipped: Target form elements not detected after ${readinessAttempts} readiness checks.`)
+      return
+    }
+
     console.log(
       `[VISA AUTOFILL] Automatically triggering autofill on "${detection.page}" using confirmed data from document "${candRes.provenance.documentId}".`
     )
