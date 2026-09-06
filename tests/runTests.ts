@@ -13,8 +13,15 @@ import { runValidationTests } from '../src/countries/india/__tests__/validation.
 import { runAddressFamilyExtractionTests } from '../src/countries/india/__tests__/addressFamilyExtraction.test'
 import { runTravelDetailsExtractionTests } from '../src/countries/india/__tests__/travelDetailsExtraction.test'
 import { runRuntimeAutofillRegressionTests } from '../src/core/autofill/__tests__/runtimeAutofillRegression.test'
+import { runApplicationWorkspaceTests } from '../src/core/application/__tests__/applicationWorkspace.test'
 
 async function execute() {
+  console.log('--- RUNNING APPLICATION WORKSPACE & SAVED APPLICATION TESTS (TASK 054) ---')
+  const appWorkspaceRes = await runApplicationWorkspaceTests()
+  console.log(`Passed: ${appWorkspaceRes.passed}, Count: ${appWorkspaceRes.totalSubtests}`)
+  if (!appWorkspaceRes.passed) {
+    console.error('Failures:', appWorkspaceRes.failures)
+  }
   console.log('--- RUNNING DOM VERIFICATION & AUTOFILL HARDENING TESTS ---')
   const domVerifyRes = await runDomVerificationAutofillTests()
   console.log(`Passed: ${domVerifyRes.passed}, Count: ${domVerifyRes.totalSubtests}`)
@@ -106,6 +113,7 @@ async function execute() {
   }
   
   if (
+    appWorkspaceRes.passed &&
     domVerifyRes.passed &&
     candResolverRes.passed &&
     compatRes.passed &&
