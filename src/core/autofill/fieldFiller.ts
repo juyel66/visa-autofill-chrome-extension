@@ -85,10 +85,13 @@ export function fillField(
     if (policy === 'fill-empty' && element.checked) {
       return { fieldId, status: 'skipped-existing', failureType: 'skipped-existing', reason: 'Checkbox is already checked' }
     }
-  } else if (element instanceof HTMLInputElement && element.type.toLowerCase() === 'radio') {
+  } else if (
+    (element instanceof HTMLInputElement || element.tagName === 'INPUT') &&
+    ((element as HTMLInputElement).type || '').toLowerCase() === 'radio'
+  ) {
     const radioGroup = Array.from(
       document.querySelectorAll<HTMLInputElement>(
-        `input[type="radio"][name="${CSS.escape(element.name)}"]`
+        `input[type="radio"][name="${CSS.escape((element as HTMLInputElement).name)}"]`
       )
     )
     const isTrue = strValue.toLowerCase() === 'true' || strValue.toLowerCase() === 'yes' || strValue === '1' || strValue.toLowerCase() === 'y'
@@ -97,8 +100,16 @@ export function fillField(
       const rVal = r.value.toLowerCase()
       const rId = r.id.toLowerCase()
       if (rVal === strValue.toLowerCase() || rId === strValue.toLowerCase()) return true
-      if (isTrue && (rVal === 'y' || rVal === 'yes' || rVal === '1' || rVal === 'true' || rId.endsWith('1') || rId.includes('yes'))) return true
-      if (isFalse && (rVal === 'n' || rVal === 'no' || rVal === '0' || rVal === 'false' || rId.endsWith('2') || rId.includes('no'))) return true
+      if (isTrue) {
+        if (rVal === 'y' || rVal === 'yes' || rVal === '1' || rVal === 'true') return true
+        if (rId.includes('yes') || rId.endsWith('_yes')) return true
+        if (!rId.includes('no') && (rId.endsWith('flag1') || rId.endsWith('_1') || /(?:flag|org|ppt|visa)1$/.test(rId))) return true
+      }
+      if (isFalse) {
+        if (rVal === 'n' || rVal === 'no' || rVal === '0' || rVal === 'false') return true
+        if (rId.includes('no') || rId.endsWith('_no')) return true
+        if (!rId.includes('yes') && (rId.endsWith('flag2') || rId.endsWith('_2') || /(?:flag|org|ppt|visa)2$/.test(rId))) return true
+      }
       return false
     })
     if (targetRadio?.checked) {
@@ -232,10 +243,13 @@ export function fillField(
     }
 
     // B. Radio buttons
-    if (element instanceof HTMLInputElement && element.type.toLowerCase() === 'radio') {
+    if (
+      (element instanceof HTMLInputElement || element.tagName === 'INPUT') &&
+      ((element as HTMLInputElement).type || '').toLowerCase() === 'radio'
+    ) {
       const radioGroup = Array.from(
         document.querySelectorAll<HTMLInputElement>(
-          `input[type="radio"][name="${CSS.escape(element.name)}"]`
+          `input[type="radio"][name="${CSS.escape((element as HTMLInputElement).name)}"]`
         )
       )
       const isTrue = strValue.toLowerCase() === 'true' || strValue.toLowerCase() === 'yes' || strValue === '1' || strValue.toLowerCase() === 'y'
@@ -244,8 +258,16 @@ export function fillField(
         const rVal = r.value.toLowerCase()
         const rId = r.id.toLowerCase()
         if (rVal === strValue.toLowerCase() || rId === strValue.toLowerCase()) return true
-        if (isTrue && (rVal === 'y' || rVal === 'yes' || rVal === '1' || rVal === 'true' || rId.endsWith('1') || rId.includes('yes'))) return true
-        if (isFalse && (rVal === 'n' || rVal === 'no' || rVal === '0' || rVal === 'false' || rId.endsWith('2') || rId.includes('no'))) return true
+        if (isTrue) {
+          if (rVal === 'y' || rVal === 'yes' || rVal === '1' || rVal === 'true') return true
+          if (rId.includes('yes') || rId.endsWith('_yes')) return true
+          if (!rId.includes('no') && (rId.endsWith('flag1') || rId.endsWith('_1') || /(?:flag|org|ppt|visa)1$/.test(rId))) return true
+        }
+        if (isFalse) {
+          if (rVal === 'n' || rVal === 'no' || rVal === '0' || rVal === 'false') return true
+          if (rId.includes('no') || rId.endsWith('_no')) return true
+          if (!rId.includes('yes') && (rId.endsWith('flag2') || rId.endsWith('_2') || /(?:flag|org|ppt|visa)2$/.test(rId))) return true
+        }
         return false
       })
 
