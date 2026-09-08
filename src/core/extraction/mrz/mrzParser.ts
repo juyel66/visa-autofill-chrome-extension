@@ -118,15 +118,65 @@ function parseMrzNames(nameField: string): { surname: string; givenNames: string
   return { surname, givenNames }
 }
 
+function normalizeMrzLine(line: string): string {
+  // Replace common OCR misreads of '<' in filler sequences
+  let cleaned = line.replace(/[\s\r\n]+/g, '').toUpperCase()
+  // Replace characters like (|{})[] with <
+  cleaned = cleaned.replace(/[|()[\]{}]/g, '<')
+  return cleaned
+}
+
+function cleanMrzLine1(raw: string): string {
+  let l1 = normalizeMrzLine(raw)
+  // Find start of P< or P followed by 3-letter country code
+  const pMatch = l1.match(/P[<A-Z0-9]{2}[A-Z<]{3,}/)
+  if (pMatch && pMatch.index !== undefined && pMatch.index > 0) {
+    l1 = l1.slice(pMatch.index)
+  }
+  // In TD3 Line 1, surname and given names are separated by '<<'.
+  // Trailing filler characters (<) often get misread by OCR as 'L', '1', '|', '(', ')', '{', '}', etc.
+  // We locate the end of the given names and strip all trailing filler noise.
+  const nameMatch = l1.match(/^(P[<A-Z0-9]{4,}[A-Z0-9]+<{2}[A-Z0-9]+(?:<[A-Z0-9]+)*?)(?:<{2,}|<[L1|(){}[\]]+|[L1|(){}[\]]{3,}.*)$/)
+  if (nameMatch) {
+    l1 = nameMatch[1]
+  } else {
+    const fillerIdx = l1.search(/(?:<{2,}[L1|(){}[\]]+|<<{2,}|[L1|(){}[\]]{4,})/)
+    if (fillerIdx > 10) {
+      l1 = l1.slice(0, fillerIdx)
+    }
+  }
+  return l1.padEnd(TD3_LINE_LENGTH, '<').slice(0, TD3_LINE_LENGTH)
+}
+
+function cleanMrzLine2(raw: string): string {
+  let l2 = normalizeMrzLine(raw)
+  // TD3 line 2 starts with passport number (9 chars) + check digit (1 digit) + country code (3 chars) + DOB (6 digits)
+  // Look for the [A-Z0-9]{9}\d[A-Z]{3}\d{6} pattern to strip leading OCR noise (e.g. 'p ')
+  const match = l2.match(/([A-Z0-9]{9}\d[A-Z]{3}\d{6}.*)/)
+  if (match) {
+    l2 = match[1]
+  }
+  // Normalize trailing filler noise
+  if (l2.length < TD3_LINE_LENGTH) {
+    l2 = l2.padEnd(TD3_LINE_LENGTH, '<')
+  } else if (l2.length > TD3_LINE_LENGTH) {
+    l2 = l2.slice(0, TD3_LINE_LENGTH)
+  }
+  return l2
+}
+
 function findMrzCandidateLines(allLines: string[]): [string, string] | null {
   for (let i = 0; i < allLines.length; i++) {
-    const rawL1 = allLines[i].replace(/\s+/g, '')
-    if (rawL1.startsWith('P<') || (rawL1.startsWith('P') && rawL1.includes('<') && rawL1.length >= 30)) {
-      for (let j = i + 1; j < Math.min(i + 4, allLines.length); j++) {
-        const rawL2 = allLines[j].replace(/\s+/g, '')
-        if (rawL2.length >= 30 && /^[A-Z0-9<]+$/.test(rawL2)) {
-          const l1 = rawL1.length < TD3_LINE_LENGTH ? rawL1.padEnd(TD3_LINE_LENGTH, '<') : rawL1.slice(0, TD3_LINE_LENGTH)
-          const l2 = rawL2.length < TD3_LINE_LENGTH ? rawL2.padEnd(TD3_LINE_LENGTH, '<') : rawL2.slice(0, TD3_LINE_LENGTH)
+    const rawL1 = allLines[i].replace(/\s+/g, '').toUpperCase()
+    if (rawL1.startsWith('P<') || (rawL1.startsWith('P') && rawL1.includes('<') && rawL1.length >= 25)) {
+      for (let j = i + 1; j < Math.min(i + 5, allLines.length); j++) {
+        const rawL2 = allLines[j].replace(/\s+/g, '').toUpperCase()
+        if (
+          rawL2.length >= 25 &&
+          (/[A-Z0-9]{9}\d[A-Z]{3}\d{6}/.test(rawL2) || /^[A-Z0-9<|()[\]{}pP]+$/.test(rawL2))
+        ) {
+          const l1 = cleanMrzLine1(allLines[i])
+          const l2 = cleanMrzLine2(allLines[j])
           return [l1, l2]
         }
       }
