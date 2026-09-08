@@ -13,6 +13,11 @@ import {
   saveDocument,
 } from '../../core/document'
 import type { DocumentRecord } from '../../core/document'
+import {
+  getSavedApplicationByApplicantId,
+  saveApplication,
+} from '../../core/application/applicationStorage'
+import { populateApplicationFromDocuments } from '../../core/application/applicationMerger'
 import type {
   ExtractedApplicantData,
   ExtractedFieldConflict,
@@ -20,7 +25,9 @@ import type {
   OcrResult,
   PdfExtractionResult,
 } from '../../core/extraction'
+
 import {
+  extractEmbeddedJpegFromPdf,
   extractFromMrz,
   extractFromOcrText,
   extractFromPdfText,
@@ -28,6 +35,9 @@ import {
   mergeExtractedCandidateData,
   parsePassportMrz,
   recognizeText,
+  renderPdfPageToImage,
+  toUint8Array,
+  uint8ArrayToDataUrl,
 } from '../../core/extraction'
 import { ExtractionReviewModal } from './ExtractionReviewModal'
 
@@ -140,9 +150,29 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
 
   const handleSaveDocumentRecord = async (docRecord: DocumentRecord) => {
     await saveDocument(docRecord)
+    if (currentApplicantId) {
+      try {
+        const docs = await getDocumentsByApplicantId(currentApplicantId)
+        const pDoc = docs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed) || docs.find((d) => d.documentType === 'passport')
+        const oDoc = docs.find((d) => d.documentType === 'ogd' && d.extractedDataConfirmed) || docs.find((d) => d.documentType === 'ogd')
+        const existingApp = await getSavedApplicationByApplicantId(currentApplicantId)
+        const activeApp = applicants.find((a) => a.applicantId === currentApplicantId)
+        const mergedApp = populateApplicationFromDocuments({
+          applicantId: currentApplicantId,
+          passportDoc: pDoc,
+          ogdDoc: oDoc,
+          existingApp,
+          notes: activeApp?.notes,
+        })
+        await saveApplication(mergedApp)
+      } catch (err) {
+        console.warn('Failed to auto-update saved application on document save:', err)
+      }
+    }
     await loadApplicantDocuments(currentApplicantId)
     showToast('Document saved successfully.')
   }
+
 
   const handleDeleteConfirm = async (docId: string) => {
     setErrorMessage(null)
@@ -208,7 +238,20 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
     setOcrProgress({ percent: 10, text: 'Initializing OCR engine...' })
 
     try {
-      const result = await recognizeText(doc.fileDataUrl, {
+      let targetPayload = doc.fileDataUrl
+      const isPdf = doc.mimeType === 'application/pdf' || doc.fileName.toLowerCase().endsWith('.pdf')
+      if (isPdf) {
+        const rawBytes = await toUint8Array(doc.fileDataUrl)
+        const embeddedJpeg = extractEmbeddedJpegFromPdf(rawBytes)
+        if (embeddedJpeg) {
+          targetPayload = uint8ArrayToDataUrl(embeddedJpeg, 'image/jpeg')
+        } else {
+          const rendered = await renderPdfPageToImage(rawBytes, 1)
+          if (rendered) targetPayload = rendered
+        }
+      }
+
+      const result = await recognizeText(targetPayload, {
         language: 'eng',
         onProgress: (prog, statusText) => {
           setOcrProgress({
@@ -220,7 +263,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
       setOcrModal({ doc, result })
     } catch (err) {
       console.error('Failed to run OCR:', err)
-      setErrorMessage('Unable to run OCR on document.')
+      setErrorMessage(`Unable to run OCR: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setOcrProgress(null)
     }
