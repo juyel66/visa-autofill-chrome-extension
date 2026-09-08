@@ -246,7 +246,7 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
     candRes.status === 'READY' &&
       candRes.applicant !== undefined &&
       candRes.applicant.personalInfo?.surname === 'RAHMAN' &&
-      candRes.applicant.personalInfo?.dateOfBirth === '16/05/1990' &&
+      candRes.applicant.personalInfo?.dateOfBirth === '1990-05-16' &&
       candRes.applicant.family?.father?.name === 'MUSTAFIZUR RAHMAN' &&
       candRes.applicant.previousVisa?.visaNumber === 'V987654321',
     'Subtest 13: Candidate resolver resolves complete profile from SavedApplication'
