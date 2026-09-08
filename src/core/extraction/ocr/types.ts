@@ -16,6 +16,20 @@ export interface OcrTextBlock {
   height: number
 }
 
+export interface OcrDiagnosticsInfo {
+  workerUrl?: string
+  coreUrl?: string
+  langUrl?: string
+  workerInitialized?: boolean
+  languageLoaded?: boolean
+  ocrExecuted?: boolean
+  errorName?: string
+  errorMessage?: string
+  errorStack?: string
+  inputMime?: string
+  inputBytes?: number
+}
+
 export interface OcrOptions {
   language?: OcrLanguage
   onProgress?: (progress: number, statusText?: string) => void
@@ -31,4 +45,6 @@ export interface OcrResult {
   processingTimeMs?: number
   blocks?: OcrTextBlock[]
   error?: string
+  diagnostics?: OcrDiagnosticsInfo
 }
+
