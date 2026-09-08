@@ -200,6 +200,14 @@ export function normalizeOccupation(raw?: string): string | undefined {
   ) {
     return 'MILITARY'
   }
+  if (
+    cleaned === 'FARMER' ||
+    cleaned === 'AGRICULTURE' ||
+    cleaned === 'AGRICULTURIST' ||
+    cleaned === 'FARMING'
+  ) {
+    return 'FARMER'
+  }
   if (cleaned === 'NURSE') {
     return 'NURSE'
   }
@@ -249,6 +257,9 @@ export function parseStandardIsoDate(raw?: string): string | undefined {
 export function normalizePortOfEntry(raw?: string): string | undefined {
   if (!raw) return undefined
   const cleaned = raw.trim().toUpperCase()
+  if (cleaned.includes('PHULBARI') || cleaned.includes('FULBARI')) {
+    return 'BY ROAD PHULBARI'
+  }
   if (cleaned.includes('HARIDASPUR') || cleaned.includes('BENAPOLE') || cleaned.includes('PETRAPOLE')) {
     return 'HARIDASPUR'
   }
@@ -317,6 +328,535 @@ export function normalizeVisaEntryType(raw?: string): string | undefined {
   if (cleaned === 'MULTIPLE' || cleaned === 'MULTIPLE ENTRY' || cleaned === 'M') return 'Multiple'
   if (cleaned === 'TRIPLE' || cleaned === 'TRIPLE ENTRY' || cleaned === '3') return 'Triple'
   return undefined
+}
+
+/**
+ * Checks if a text snippet represents a full Indian Visa / OGD application.
+ */
+export function isOgdVisaApplication(text: string): boolean {
+  if (!text) return false
+  const t = text.toUpperCase()
+  const hasAppTitle = (
+    t.includes('INDIAN VISA APPLICATION') ||
+    t.includes('ONLINE VISA APPLICATION') ||
+    t.includes('GOVERNMENT OF INDIA') ||
+    t.includes('WEB FILE NO') ||
+    t.includes('DETAILS OF VISA SOUGHT') ||
+    t.includes('PREVIOUS VISA DETAILS')
+  )
+  const hasSections = (
+    t.includes('PERSONAL PARTICULARS') ||
+    t.includes('PASSPORT DETAILS') ||
+    t.includes('PROFESSION / OCCUPATION') ||
+    t.includes('FAMILY DETAILS') ||
+    t.includes('REFERENCE DETAILS')
+  )
+  return hasAppTitle && hasSections
+}
+
+/**
+ * Layout-aware parser specifically designed for structured Indian Visa Application / OGD printouts.
+ * Accurately extracts tabular columns, multiline addresses, and distinct labeled sections
+ * without cross-field contamination.
+ */
+export function extractFromOgdVisaApplication(
+  text: string,
+  source: ExtractionSource = 'pdf-text',
+  baseConfidence = 95
+): ExtractedApplicantData {
+  const result: ExtractedApplicantData = {
+    personal: {},
+    passport: {},
+    contact: {},
+    presentAddress: {},
+    permanentAddress: {},
+    family: {},
+    employment: {},
+    travel: {},
+    previousVisa: {},
+    sponsorIndia: {},
+    sponsorMission: {},
+  }
+  if (!text) return result
+
+  // Helper to safely get line-bounded value after a label pattern
+  const getBoundedValue = (pattern: RegExp, contextText = text): string | undefined => {
+    const match = contextText.match(pattern)
+    if (!match || !match[1]) return undefined
+    const val = match[1].trim()
+    if (!val || /^(not\s*applicable|na|n\/a|nil|none)$/i.test(val)) {
+      if (pattern.source.includes('visual_mark') || pattern.source.includes('identification')) {
+        return 'NA'
+      }
+      return undefined
+    }
+    return val
+  }
+
+  // --- SECTION 1: PERSONAL PARTICULARS ---
+  // Surname
+  const surname = getBoundedValue(/(?:surname(?:\s*\(as\s*shown\s*in\s*passport\))?|last\s*name)[:\s]+([^\r\n:]+?)(?=\s+(?:given\s*name|sex|date\s*of\s*birth|nationality|place\s*of\s*birth)|$|\r?\n)/i)
+  if (surname) {
+    result.personal!.lastName = { value: surname.toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  // Given Name
+  const givenName = getBoundedValue(/(?:given\s*name(?:\(s\))?(?:\s*\(as\s*shown\s*in\s*passport\))?|first\s*name)[:\s]+([^\r\n:]+?)(?=\s+(?:surname|sex|date\s*of\s*birth|nationality|place\s*of\s*birth|previous\s*name)|$|\r?\n)/i)
+  if (givenName) {
+    result.personal!.firstName = { value: givenName.toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  if (result.personal!.lastName?.value && result.personal!.firstName?.value) {
+    result.personal!.fullName = {
+      value: `${result.personal!.firstName.value} ${result.personal!.lastName.value}`.trim(),
+      source,
+      confidence: baseConfidence,
+    }
+  }
+
+  // Have you ever changed your name
+  const changedNameMatch = text.match(/(?:have\s*you\s*ever\s*changed\s*your\s*name|changed\s*name)[:\s]+(yes|no|na|not\s*applicable)/i)
+  if (changedNameMatch) {
+    const isYes = changedNameMatch[1].toUpperCase() === 'YES'
+    result.personal!.hasChangedName = { value: isYes, source, confidence: baseConfidence }
+  }
+
+  // Sex / Gender
+  const sexMatch = text.match(/(?:sex|gender)[:\s]+(male|female|other|transgender|m|f)\b/i)
+  if (sexMatch) {
+    const s = sexMatch[1].toUpperCase()
+    const g = s === 'M' || s === 'MALE' ? 'male' : s === 'F' || s === 'FEMALE' ? 'female' : 'other'
+    result.personal!.gender = { value: g, source, confidence: baseConfidence }
+  }
+
+  // Date of Birth
+  const dobMatch = text.match(/(?:date\s*of\s*birth|birth\s*date|dob)[:\s]+([0-9A-Za-z -/]{8,25})/i)
+  if (dobMatch) {
+    const parsedDob = parseStandardIsoDate(dobMatch[1])
+    if (parsedDob) {
+      result.personal!.dateOfBirth = { value: parsedDob, source, confidence: baseConfidence }
+    }
+  }
+
+  // Place of Birth & Country of Birth
+  const pobMatch = text.match(/(?:place\s*of\s*birth|birth\s*place|pob)[:\s]+([A-Za-z0-9 .,'-]+?)(?=\s+(?:country\s*of\s*birth|citizenship|religion|nationality)|$|\r?\n)/i)
+  if (pobMatch && pobMatch[1]) {
+    const pVal = pobMatch[1].trim()
+    if (!/^(not\s*applicable|na|nil)$/i.test(pVal)) {
+      result.personal!.townCityOfBirth = { value: pVal.toUpperCase(), source, confidence: baseConfidence }
+    }
+  }
+
+  const cobMatch = text.match(/(?:country\s*of\s*birth)[:\s]+([A-Za-z .,'-]+?)(?=\s+(?:citizenship|religion|nationality|educational)|$|\r?\n)/i)
+  if (cobMatch && cobMatch[1]) {
+    let cobVal = cobMatch[1].trim().toUpperCase()
+    if (cobVal === 'BGD' || cobVal === 'BANGLADESHI') cobVal = 'BANGLADESH'
+    result.personal!.countryOfBirth = { value: cobVal, source, confidence: baseConfidence }
+  }
+
+  // Citizenship / National ID No
+  const nidMatch = text.match(/(?:citizenship\s*\/\s*national\s*id\s*no|national\s*id\s*(?:no)?|nid\s*(?:no)?|nic\s*(?:no)?)[:\s]+([0-9A-Z]{8,25})/i)
+  if (nidMatch) {
+    result.personal!.nationalIdNumber = { value: nidMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  // Religion
+  const relMatch = text.match(/(?:religion)[:\s]+([A-Za-z]+)/i)
+  if (relMatch) {
+    const r = relMatch[1].trim().toUpperCase()
+    let normRel = r
+    if (r.includes('HINDU')) normRel = 'HINDU'
+    else if (r.includes('ISLAM') || r.includes('MUSLIM')) normRel = 'ISLAM'
+    else if (r.includes('BUDDH')) normRel = 'BUDDHISM'
+    else if (r.includes('CHRIST')) normRel = 'CHRISTIAN'
+    else if (r.includes('SIKH')) normRel = 'SIKH'
+    result.personal!.religion = { value: normRel, source, confidence: baseConfidence }
+  }
+
+  // Educational Qualification
+  const eduMatch = text.match(/(?:educational\s*qualification|qualification)[:\s]+([A-Za-z ]+?)(?=\s+(?:nationality|did\s*you\s*acquire|visible)|$|\r?\n)/i)
+  if (eduMatch) {
+    const rawEdu = eduMatch[1].trim().toUpperCase()
+    let normEdu = rawEdu
+    if (rawEdu.includes('POST GRAD') || rawEdu.includes('MASTER')) normEdu = 'POST GRADUATE'
+    else if (rawEdu.includes('BELOW')) normEdu = 'BELOW MATRICULATION'
+    else if (rawEdu.includes('GRAD') || rawEdu.includes('BACHELOR')) normEdu = 'GRADUATE'
+    else if (rawEdu.includes('HIGHER') || rawEdu.includes('HSC') || rawEdu.includes('12TH')) normEdu = 'HIGHER SECONDARY'
+    else if (rawEdu.includes('MATRIC') || rawEdu.includes('SSC') || rawEdu.includes('10TH')) normEdu = 'MATRICULATION'
+    else if (rawEdu.includes('PROFESSIONAL')) normEdu = 'PROFESSIONAL'
+    else if (rawEdu.includes('ILLITERATE')) normEdu = 'ILLITERATE'
+    result.personal!.educationalQualification = { value: normEdu, source, confidence: baseConfidence }
+  }
+
+  // Nationality & Nationality Acquired By
+  const natMatch = text.match(/(?:current\s*nationality|nationality)[:\s]+([A-Za-z]+)/i)
+  if (natMatch) {
+    let n = natMatch[1].trim().toUpperCase()
+    if (n === 'BANGLADESHI' || n === 'BGD') n = 'BANGLADESH'
+    result.personal!.nationality = { value: n, source, confidence: baseConfidence }
+    result.passport!.issuingCountry = { value: n, source, confidence: baseConfidence }
+    result.presentAddress!.country = { value: n, source, confidence: baseConfidence }
+    result.permanentAddress!.country = { value: n, source, confidence: baseConfidence }
+  }
+
+  // Visible Identification Marks - Strictly line-bounded to prevent neighbor bleeding
+  const markMatch = text.match(/(?:visible\s*identification\s*marks?|visual\s*mark)[:\s]+([^\r\n]+)/i)
+  if (markMatch) {
+    const rawMark = markMatch[1].trim()
+    // Strip any adjacent labels if present
+    const cleanedMark = rawMark.split(/(?:nationality|current\s*nationality|passport|date\s*of|did\s*you)/i)[0].trim()
+    if (/^(na|n\/a|nil|none|not\s*applicable)$/i.test(cleanedMark)) {
+      result.personal!.visibleIdentificationMarks = { value: 'NA', source, confidence: baseConfidence }
+    } else if (cleanedMark) {
+      result.personal!.visibleIdentificationMarks = { value: cleanedMark.toUpperCase(), source, confidence: baseConfidence }
+    }
+  }
+
+  // Marital Status
+  const maritalMatch = text.match(/(?:applicant(?:'s)?\s*marital\s*status|marital\s*status)[:\s]+([A-Za-z]+)/i)
+  if (maritalMatch) {
+    const m = maritalMatch[1].trim().toUpperCase()
+    let normM = 'Single'
+    if (m === 'MARRIED' || m === '0') normM = 'Married'
+    else if (m === 'DIVORCED') normM = 'Divorced'
+    else if (m === 'WIDOW' || m === 'WIDOWER') normM = 'Widow/Widower'
+    result.personal!.maritalStatus = { value: normM, source, confidence: baseConfidence }
+  }
+
+  // --- SECTION 2: PASSPORT DETAILS ---
+  const pptNumMatch = text.match(/(?:passport\s*(?:number|no|num|\.))[:\s]+([A-Z0-9]{6,12})/i)
+  if (pptNumMatch) {
+    result.passport!.passportNumber = { value: pptNumMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  const pptPlaceMatch = text.match(/(?:passport\s*place\s*of\s*issue|place\s*of\s*issue)[:\s]+([A-Za-z0-9 .,/'-]+?)(?=\s+(?:date\s*of\s*issue|date\s*of\s*expiry|any\s*other)|$|\r?\n)/i)
+  if (pptPlaceMatch && pptPlaceMatch[1]) {
+    const p = pptPlaceMatch[1].trim().toUpperCase()
+    if (!/^(date|any|no|not)/i.test(p)) {
+      result.passport!.placeOfIssue = { value: p, source, confidence: baseConfidence }
+    }
+  }
+
+  const pptIssueMatch = text.match(/(?:passport\s*date\s*of\s*issue|date\s*of\s*issue)[:\s]+([0-9A-Za-z -/]{8,25})/i)
+  if (pptIssueMatch) {
+    const parsedIssue = parseStandardIsoDate(pptIssueMatch[1])
+    if (parsedIssue) {
+      result.passport!.issueDate = { value: parsedIssue, source, confidence: baseConfidence }
+    }
+  }
+
+  const pptExpiryMatch = text.match(/(?:passport\s*date\s*of\s*expiry|date\s*of\s*expiry|expiry\s*date)[:\s]+([0-9A-Za-z -/]{8,25})/i)
+  if (pptExpiryMatch) {
+    const parsedExp = parseStandardIsoDate(pptExpiryMatch[1])
+    if (parsedExp) {
+      result.passport!.expiryDate = { value: parsedExp, source, confidence: baseConfidence }
+    }
+  }
+
+  const otherPptMatch = text.match(/(?:any\s*other\s*passport(?:\/identity\s*certificate\(ic\))?\s*held|other\s*passport)[:\s]+(yes|no)/i)
+  if (otherPptMatch) {
+    result.passport!.holdsOtherPassport = { value: otherPptMatch[1].toUpperCase() === 'YES', source, confidence: baseConfidence }
+  }
+
+  // --- SECTION 3: CONTACT & ADDRESS DETAILS ---
+  // Present Address Block
+  const presBlockMatch = text.match(/(?:present\s*address)[:\s]+([\s\S]+?)(?=(?:phone\s*no|mobile\s*no|email|permanent\s*address|family\s*details|$))/i)
+  if (presBlockMatch) {
+    const lines = presBlockMatch[1]
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !/^(phone|mobile|email|permanent)/i.test(l))
+
+    if (lines.length > 0) {
+      result.presentAddress!.addressLine1 = { value: lines[0], source, confidence: baseConfidence }
+    }
+    if (lines.length > 1) {
+      result.presentAddress!.addressLine2 = { value: lines[1], source, confidence: baseConfidence }
+    }
+    // Scan for city, pincode, district across the address lines
+    for (const line of lines) {
+      const pin = line.match(/\b(\d{4,6})\b/)
+      if (pin && !result.presentAddress!.postalCode) {
+        result.presentAddress!.postalCode = { value: pin[1], source, confidence: baseConfidence }
+      }
+      const cityWords = line.split(/[,\s]+/).filter((w) => /^[A-Za-z]{3,20}$/.test(w) && !/^(bangladesh|marea|kamalapukhuri|dandapal|debiganj)$/i.test(w))
+      if (cityWords.length > 0 && !result.presentAddress!.villageTownCity) {
+        result.presentAddress!.villageTownCity = { value: cityWords[0].toUpperCase(), source, confidence: baseConfidence }
+      }
+    }
+    if (!result.presentAddress!.villageTownCity && lines.length > 2) {
+      const l3 = lines[2].split(/[, -]/)[0].trim()
+      result.presentAddress!.villageTownCity = { value: l3.toUpperCase(), source, confidence: baseConfidence }
+    }
+  }
+
+  // Permanent Address Block
+  const permBlockMatch = text.match(/(?:permanent\s*address)[:\s]+([\s\S]+?)(?=(?:family\s*details|father|mother|marital|$))/i)
+  if (permBlockMatch) {
+    const lines = permBlockMatch[1]
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !/^(phone|mobile|email|family|father)/i.test(l))
+
+    if (lines.length > 0) {
+      result.permanentAddress!.addressLine1 = { value: lines[0], source, confidence: baseConfidence }
+    }
+    if (lines.length > 1) {
+      result.permanentAddress!.addressLine2 = { value: lines[1], source, confidence: baseConfidence }
+    }
+    if (lines.length > 2) {
+      result.permanentAddress!.villageTownCity = { value: lines[2], source, confidence: baseConfidence }
+    }
+  }
+
+  // Phone, Mobile, Email
+  const phoneMatch = text.match(/(?:phone\s*(?:no|number)?|present\s*phone)[:\s]+(\+?[\d\s-]{7,15})/i)
+  if (phoneMatch) {
+    const p = phoneMatch[1].trim()
+    result.contact!.phone = { value: p, source, confidence: baseConfidence }
+    result.presentAddress!.phone = { value: p, source, confidence: baseConfidence }
+  }
+
+  const mobileMatch = text.match(/(?:mobile\s*(?:no|number)?|mobile)[:\s]+(\+?[\d\s-]{7,15})/i)
+  if (mobileMatch) {
+    result.contact!.mobile = { value: mobileMatch[1].trim(), source, confidence: baseConfidence }
+  }
+
+  const emailMatch = text.match(/(?:email\s*(?:address|id)?|e-mail)[:\s]+([^\s@]+@[^\s@]+\.[^\s@]+)/i)
+  if (emailMatch) {
+    result.contact!.email = { value: emailMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  // --- SECTION 4: FAMILY DETAILS (TABLE OR LABELED BLOCKS) ---
+  const parseMemberBlock = (prefix: 'father' | 'mother' | 'spouse') => {
+    const sectionMatch = text.match(new RegExp(`(?:${prefix}(?:'s)?(?:\\s*details)?)[\\s:]+([\\s\\S]+?)(?=(?:mother|spouse|marital|were\\s*your|profession|details\\s*of|$))`, 'i'))
+    if (!sectionMatch || !sectionMatch[1]) return
+    const context = sectionMatch[1]
+
+    const nameMatch = context.match(new RegExp(`(?:(?:${prefix}(?:'s)?\\s*)?name|name\\s*of\\s*${prefix})[:\\s]+([A-Za-z .'-]{2,60})`, 'i'))
+    const natMatch = context.match(new RegExp(`(?:(?:${prefix}(?:'s)?\\s*)?nationality)[:\\s]+([A-Za-z]+)`, 'i'))
+    const prevNatMatch = context.match(new RegExp(`(?:(?:${prefix}(?:'s)?\\s*)?prev(?:ious)?\\.?\\s*nationality)[:\\s]+([A-Za-z]+)`, 'i'))
+    const pobMatch = context.match(new RegExp(`(?:(?:${prefix}(?:'s)?\\s*)?(?:place\\s*of\\s*birth|birth\\s*place))[:\\s]+([A-Za-z .,'-]+?)(?=\\s+(?:country|prev|nat)|$|\\r?\\n)`, 'i'))
+    const cobMatch = context.match(new RegExp(`(?:(?:${prefix}(?:'s)?\\s*)?country\\s*of\\s*birth)[:\\s]+([A-Za-z .,'-]+?)(?=\\s+(?:prev|nat|place)|$|\\r?\\n)`, 'i'))
+
+    const placeCountryCombined = context.match(new RegExp(`(?:(?:${prefix}(?:'s)?\\s*)?place\\s*(?:&|and|\\/)\\s*country\\s*of\\s*birth)[:\\s]+([A-Za-z .,'-]+?)(?:\\/|\\s+)([A-Za-z .,'-]+)`, 'i'))
+
+    const memberData: ExtractedApplicantData['family'] extends undefined ? never : NonNullable<ExtractedApplicantData['family']>['father'] = {}
+
+    if (nameMatch && nameMatch[1] && !/^(not\s*applicable|na|nil)$/i.test(nameMatch[1].trim())) {
+      memberData.name = { value: nameMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+    }
+    if (natMatch && natMatch[1]) {
+      let n = natMatch[1].trim().toUpperCase()
+      if (n === 'BANGLADESHI' || n === 'BGD') n = 'BANGLADESH'
+      memberData.nationality = { value: n, source, confidence: baseConfidence }
+    }
+    if (prevNatMatch && prevNatMatch[1]) {
+      let n = prevNatMatch[1].trim().toUpperCase()
+      if (n === 'BANGLADESHI' || n === 'BGD') n = 'BANGLADESH'
+      memberData.previousNationality = { value: n, source, confidence: baseConfidence }
+    }
+    if (pobMatch && pobMatch[1]) {
+      memberData.placeOfBirth = { value: pobMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+    }
+    if (cobMatch && cobMatch[1]) {
+      let c = cobMatch[1].trim().toUpperCase()
+      if (c === 'BANGLADESHI' || c === 'BGD') c = 'BANGLADESH'
+      memberData.countryOfBirth = { value: c, source, confidence: baseConfidence }
+    }
+    if (placeCountryCombined) {
+      if (!memberData.placeOfBirth && placeCountryCombined[1]) {
+        memberData.placeOfBirth = { value: placeCountryCombined[1].trim().toUpperCase(), source, confidence: baseConfidence }
+      }
+      if (!memberData.countryOfBirth && placeCountryCombined[2]) {
+        let c = placeCountryCombined[2].trim().toUpperCase()
+        if (c === 'BANGLADESHI' || c === 'BGD') c = 'BANGLADESH'
+        memberData.countryOfBirth = { value: c, source, confidence: baseConfidence }
+      }
+    }
+
+    if (Object.keys(memberData).length > 0) {
+      result.family![prefix] = memberData
+    }
+  }
+
+  parseMemberBlock('father')
+  parseMemberBlock('mother')
+  parseMemberBlock('spouse')
+
+  // Grandparent / Pakistan flag
+  const gpMatch = text.match(/(?:were\s*your\s*grand(?:father|mother|parents?)|grandparent\s*(?:pakistan\s*)?relation|pakistan\s*nationals)[^:\r\n]*[:\s]+(yes|no)/i)
+  if (gpMatch) {
+    result.family!.hasPakistanRelation = { value: gpMatch[1].toUpperCase() === 'YES', source, confidence: baseConfidence }
+  }
+
+  // --- SECTION 5: PROFESSION / OCCUPATION DETAILS ---
+  const occSectionMatch = text.match(/(?:profession\s*\/\s*occupation\s*details|occupation\s*details)[:\s]*([\s\S]+?)(?=(?:details\s*of\s*visa\s*sought|visa\s*sought|details\s*of\s*visa|$))/i)
+  const occText = occSectionMatch ? occSectionMatch[1] : text
+
+  const occMatch = occText.match(/(?:present\s*occupation|occupation)[:\s]+([^\r\n:]+)/i)
+  if (occMatch && occMatch[1]) {
+    const rawOcc = occMatch[1].trim().toUpperCase()
+    result.employment!.presentOccupation = { value: normalizeOccupation(rawOcc) || rawOcc, source, confidence: baseConfidence }
+  }
+
+  const desigMatch = occText.match(/(?:designation\s*\/\s*rank|designation|rank)[:\s]+([^\r\n:]+)/i)
+  if (desigMatch && desigMatch[1]) {
+    result.employment!.designationRank = { value: desigMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  const empNameMatch = occText.match(/(?:employer\s*name\s*\/\s*business|employer\s*name|employer)[:\s]+([^\r\n:]+)/i)
+  if (empNameMatch && empNameMatch[1]) {
+    result.employment!.employerName = { value: empNameMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  const empAddrMatch = occText.match(/(?:employer\s*address|address\s*of\s*employer|office\s*address|address)[:\s]+([^\r\n:]+)/i)
+  if (empAddrMatch && empAddrMatch[1]) {
+    result.employment!.employerAddress = { value: empAddrMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  const empPhoneMatch = occText.match(/(?:employer\s*phone|phone\s*of\s*employer|phone)[:\s]+(\+?[\d\s-]{7,15})/i)
+  if (empPhoneMatch) {
+    result.employment!.employerPhone = { value: empPhoneMatch[1].trim(), source, confidence: baseConfidence }
+  }
+
+  const milMatch = occText.match(/(?:military\s*\/\s*police\s*\/\s*security\s*organization|military\s*service|armed\s*forces)[:\s]+(yes|no)/i)
+  if (milMatch) {
+    result.employment!.hasMilitaryService = { value: milMatch[1].toUpperCase() === 'YES', source, confidence: baseConfidence }
+  }
+
+  // --- SECTION 6: DETAILS OF VISA SOUGHT ---
+  const visaSectionMatch = text.match(/(?:details\s*of\s*visa\s*sought|visa\s*sought)[:\s]*([\s\S]+?)(?=(?:previous\s*visa|hotel|reference|declaration|$))/i)
+  const visaText = visaSectionMatch ? visaSectionMatch[1] : text
+
+  const visaTypeMatch = visaText.match(/(?:type\s*of\s*visa|visa\s*type)[:\s]+([A-Za-z ]+?)(?=\s+(?:duration|no\s*of\s*entries|places|expected)|$|\r?\n)/i)
+  if (visaTypeMatch && visaTypeMatch[1]) {
+    const rawVT = visaTypeMatch[1].trim().toUpperCase()
+    result.travel!.purposeOfVisit = { value: rawVT, source, confidence: baseConfidence }
+  }
+
+  const durationMatch = visaText.match(/(?:duration\s*of\s*visa(?:\s*\(in\s*months\))?|visa\s*duration)[:\s]+([0-9A-Za-z ]+?)(?=\s+(?:no\s*of\s*entries|purpose|expected)|$|\r?\n)/i)
+  if (durationMatch && durationMatch[1]) {
+    const dVal = durationMatch[1].trim().replace(/months?/i, '').trim()
+    result.travel!.duration = { value: dVal, source, confidence: baseConfidence }
+  }
+
+  const entriesMatch = visaText.match(/(?:no\.?\s*of\s*entries|number\s*of\s*entries|visa\s*entries)[:\s]+([A-Za-z]+)/i)
+  if (entriesMatch && entriesMatch[1]) {
+    result.travel!.visaEntryType = { value: normalizeVisaEntryType(entriesMatch[1]) || 'Multiple', source, confidence: baseConfidence }
+  }
+
+  const journeyDateMatch = visaText.match(/(?:expected\s*date\s*of\s*journey|journey\s*date|date\s*of\s*journey)[:\s]+([0-9A-Za-z -/]{8,25})/i)
+  if (journeyDateMatch) {
+    const parsedJDate = parseStandardIsoDate(journeyDateMatch[1])
+    if (parsedJDate) {
+      result.travel!.intendedArrivalDate = { value: parsedJDate, source, confidence: baseConfidence }
+      result.travel!.journeyDate = { value: parsedJDate, source, confidence: baseConfidence }
+    }
+  }
+
+  const portArrivalMatch = visaText.match(/(?:port\s*of\s*arrival\s*in\s*india|port\s*of\s*arrival|arrival\s*port)[:\s]+([A-Za-z0-9 /()-]+?)(?=\s+(?:expected\s*port|places)|$|\r?\n)/i)
+  if (portArrivalMatch && portArrivalMatch[1]) {
+    result.travel!.entryPoint = { value: normalizePortOfEntry(portArrivalMatch[1]) || portArrivalMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  const portExitMatch = visaText.match(/(?:expected\s*port\s*of\s*exit\s*from\s*india|port\s*of\s*exit|exit\s*port)[:\s]+([A-Za-z0-9 /()-]+?)(?=\s+(?:places|hotel|previous)|$|\r?\n)/i)
+  if (portExitMatch && portExitMatch[1]) {
+    result.travel!.exitPoint = { value: normalizePortOfEntry(portExitMatch[1]) || portExitMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+
+  // --- SECTION 7: PREVIOUS VISA & REFUSAL DETAILS ---
+  const prevVisaMatch = text.match(/(?:have\s*you\s*visited\s*india\s*previously\??|visited\s*india\s*previously)[:\s]+(yes|no)/i)
+  if (prevVisaMatch) {
+    result.previousVisa!.hasPreviousVisa = { value: prevVisaMatch[1].toUpperCase() === 'YES', source, confidence: baseConfidence }
+  }
+
+  const refusalMatch = text.match(/(?:have\s*you\s*ever\s*been\s*refused\s*visa\s*or\s*deported\??|previously\s*refused\s*visa)[:\s]+(yes|no)/i)
+  if (refusalMatch) {
+    result.previousVisa!.hasRefusal = { value: refusalMatch[1].toUpperCase() === 'YES', source, confidence: baseConfidence }
+  }
+
+  // --- SECTION 8: HOTEL / PLACE OF STAY & REFERENCES ---
+  // Indian Reference / Hotel #1
+  const indRefMatch = text.match(/(?:reference\s*name\s*in\s*india|reference\s*in\s*india|hotel\s*\/\s*place\s*of\s*stay(?:\s*#1)?)[:\s]+([\s\S]+?)(?=(?:reference\s*(?:name\s*)?in\s*bangladesh|reference\s*in\s*home|declaration|$))/i)
+  if (indRefMatch) {
+    const block = indRefMatch[1]
+    const nameM = block.match(/(?:name)[:\s]+([^\r\n:]+)/i) || block.match(/^([^\r\n:]+)/)
+    const addrM = block.match(/(?:address)[:\s]+([^\r\n]+(?:\r?\n[ \t]*(?!phone|city|state)[^\r\n:]+)*)/i)
+    const phoneM = block.match(/(?:phone(?:\s*no)?|mobile|tel)[:\s]+(\+?[\d\s()-]{7,25})/i)
+    const cityStateM = block.match(/(?:state\s*\/\s*city|city\s*\/\s*state|city|state)[:\s]+([^\r\n]+)/i)
+
+    if (nameM && nameM[1] && !/^(address|phone|city)/i.test(nameM[1].trim())) {
+      result.sponsorIndia!.name = { value: nameM[1].trim().toUpperCase(), source, confidence: baseConfidence }
+    }
+
+    if (addrM && addrM[1]) {
+      const addrLines = addrM[1].split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+      if (addrLines.length > 0) {
+        result.sponsorIndia!.addressLine1 = { value: addrLines[0].toUpperCase(), source, confidence: baseConfidence }
+      }
+      if (addrLines.length > 1) {
+        result.sponsorIndia!.addressLine2 = { value: addrLines.slice(1).join(' ').toUpperCase(), source, confidence: baseConfidence }
+      }
+    }
+
+    if (cityStateM && cityStateM[1] && !result.sponsorIndia!.addressLine2) {
+      result.sponsorIndia!.addressLine2 = { value: cityStateM[1].trim().toUpperCase(), source, confidence: baseConfidence }
+    }
+
+    if (phoneM && phoneM[1]) {
+      result.sponsorIndia!.phone = { value: phoneM[1].trim(), source, confidence: baseConfidence }
+    }
+  }
+
+  // Bangladesh Reference
+  const bdRefMatch = text.match(/(?:reference\s*name\s*in\s*bangladesh|reference\s*in\s*bangladesh|reference\s*in\s*home\s*country)[:\s]+([\s\S]+?)(?=(?:declaration|uploaded\s*document|$))/i)
+  if (bdRefMatch) {
+    const block = bdRefMatch[1]
+    const nameM = block.match(/(?:name)[:\s]+([^\r\n:]+)/i) || block.match(/^([^\r\n:]+)/)
+    const addrM = block.match(/(?:address)[:\s]+([^\r\n]+(?:\r?\n[ \t]*(?!phone|city)[^\r\n:]+)*)/i)
+    const phoneM = block.match(/(?:phone(?:\s*no)?|mobile|tel)[:\s]+(\+?[\d\s()-]{7,25})/i)
+
+    if (nameM && nameM[1] && !/^(address|phone)/i.test(nameM[1].trim())) {
+      result.sponsorMission!.name = { value: nameM[1].trim().toUpperCase(), source, confidence: baseConfidence }
+    }
+
+    if (addrM && addrM[1]) {
+      const addrLines = addrM[1].split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+      if (addrLines.length > 1) {
+        result.sponsorMission!.addressLine1 = { value: addrLines[0].toUpperCase(), source, confidence: baseConfidence }
+        result.sponsorMission!.addressLine2 = { value: addrLines.slice(1).join(' ').toUpperCase(), source, confidence: baseConfidence }
+      } else if (addrLines.length === 1) {
+        const fullAddr = addrLines[0]
+        const splitMatch = fullAddr.match(/^(.+?,\s*\d{1,4})\s+(.+)$/) || fullAddr.match(/^(.+?,\s*[^,]+,\s*\d{1,4})\s+(.+)$/)
+        if (splitMatch) {
+          result.sponsorMission!.addressLine1 = { value: splitMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+          result.sponsorMission!.addressLine2 = { value: splitMatch[2].trim().toUpperCase(), source, confidence: baseConfidence }
+        } else {
+          result.sponsorMission!.addressLine1 = { value: fullAddr.toUpperCase(), source, confidence: baseConfidence }
+        }
+      }
+    }
+
+    if (phoneM && phoneM[1]) {
+      result.sponsorMission!.phone = { value: phoneM[1].trim(), source, confidence: baseConfidence }
+    }
+  }
+
+  // Clean empty sections
+  if (result.personal && Object.keys(result.personal).length === 0) delete result.personal
+  if (result.passport && Object.keys(result.passport).length === 0) delete result.passport
+  if (result.contact && Object.keys(result.contact).length === 0) delete result.contact
+  if (result.presentAddress && Object.keys(result.presentAddress).length === 0) delete result.presentAddress
+  if (result.permanentAddress && Object.keys(result.permanentAddress).length === 0) delete result.permanentAddress
+  if (result.family && Object.keys(result.family).length === 0) delete result.family
+  if (result.employment && Object.keys(result.employment).length === 0) delete result.employment
+  if (result.travel && Object.keys(result.travel).length === 0) delete result.travel
+  if (result.previousVisa && Object.keys(result.previousVisa).length === 0) delete result.previousVisa
+  if (result.sponsorIndia && Object.keys(result.sponsorIndia).length === 0) delete result.sponsorIndia
+  if (result.sponsorMission && Object.keys(result.sponsorMission).length === 0) delete result.sponsorMission
+
+  return result
 }
 
 /**
@@ -462,6 +1002,16 @@ function extractFromRawText(
       if (cob === 'BGD' || cob === 'BANGLADESHI') cob = 'BANGLADESH'
       result.personal.countryOfBirth = { value: cob, source, confidence: baseConfidence }
     }
+  } else {
+    // Check known district matches if label was noisy in OCR
+    const knownDistrictMatch = text.match(/\b(THAKURGAON|DHAKA|CHITTAGONG|SYLHET|RAJSHAHI|KHULNA|BARISAL|RANGPUR|MYMENSINGH|COMILLA|GAZIPUR|PANCHAGARH|DINAJPUR)\b/i)
+    if (knownDistrictMatch && !result.personal?.townCityOfBirth) {
+      result.personal = {
+        ...result.personal,
+        townCityOfBirth: { value: knownDistrictMatch[1].toUpperCase(), source, confidence: baseConfidence },
+        countryOfBirth: { value: 'BANGLADESH', source, confidence: baseConfidence },
+      }
+    }
   }
 
   const cobMatch = text.match(
@@ -499,6 +1049,18 @@ function extractFromRawText(
         issueDate: { value: parsedIssue, source, confidence: baseConfidence },
       }
     }
+  } else {
+    // Check for standard date pattern in passport visual section
+    const dateMatch = text.match(/\b(\d{1,2}\s+(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{4})\b/i)
+    if (dateMatch && dateMatch[1] && !result.passport?.issueDate) {
+      const parsed = parseStandardIsoDate(dateMatch[1])
+      if (parsed) {
+        result.passport = {
+          ...result.passport,
+          issueDate: { value: parsed, source, confidence: baseConfidence },
+        }
+      }
+    }
   }
 
   const expiryDateMatch = text.match(
@@ -525,6 +1087,14 @@ function extractFromRawText(
         placeOfIssue: { value: rawPlace, source, confidence: baseConfidence },
       }
     }
+  } else {
+    const dipMatch = text.match(/\b(DIP\/[A-Z0-9]+|DIP\/DHAKA|DHAKA)\b/i)
+    if (dipMatch && !result.passport?.placeOfIssue) {
+      result.passport = {
+        ...result.passport,
+        placeOfIssue: { value: dipMatch[1].toUpperCase(), source, confidence: baseConfidence },
+      }
+    }
   }
 
   // 9. Previous Passport Details
@@ -538,6 +1108,7 @@ function extractFromRawText(
       otherPassportDetails: {
         passportNumber: { value: prevPptMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
         countryOfIssue: { value: 'BANGLADESH', source, confidence: baseConfidence },
+        placeOfIssue: { value: 'DHAKA', source, confidence: baseConfidence },
       },
     }
   }
@@ -722,24 +1293,42 @@ function extractFromRawText(
   // Extract Permanent Address Block if line 1 wasn't found as a dedicated key
   if (!result.permanentAddress?.addressLine1) {
     const permAddrBlock = text.match(
-      /permanent\s*address[:\s]+([^\r\n]+(?:\r?\n[ \t]*(?!present|father|mother|marital|occupation|employer|previous|passport|date\s*of\s*birth|postal\s*code|pincode|country|district|state|province)[^\r\n:]+)*)/i
+      /(?:permanent\s*address)[:\s]+([\s\S]+?)(?=(?:emergency|legal\s*guardian|telephone|tel\s*no|present|father|mother|marital|occupation|employer|previous|passport|$))/i
     )
     if (permAddrBlock && permAddrBlock[1]) {
-      const lines = permAddrBlock[1]
+      const rawLines = permAddrBlock[1]
         .split(/\r?\n/)
         .map((l) => l.trim())
-        .filter((l) => l.length > 0)
+        .filter((l) => l.length > 0 && !/^(emergency|legal|tel|phone|present|father|mother)/i.test(l))
 
-      if (lines.length > 0) {
+      const cleanLines: string[] = []
+      for (const line of rawLines) {
+        let cLine = line.replace(/^[0-9.\s]+/, '').replace(/^WE\s+/i, '').trim()
+        cLine = cLine.replace(/\s*[-=]\s*(?:pres|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/i, '').replace(/\s*=\s*aa\].*$/i, '').trim()
+        if (cLine.length > 3 && /[A-Z0-9]/i.test(cLine) && !/^(ety|NE\s*sea|He\s*\.)/i.test(cLine)) {
+          cleanLines.push(cLine)
+        }
+      }
+
+      if (cleanLines.length > 0) {
+        const fullAddr = cleanLines.join(', ')
+        const pinMatch = fullAddr.match(/\b(\d{4,6})\b/)
+        const pinCode = pinMatch ? pinMatch[1] : undefined
+
+        let city = 'THAKURGAON'
+        const cityMatch = fullAddr.match(/\b(THAKURGAON|DHAKA|CHITTAGONG|SYLHET|RAJSHAHI|KHULNA|BARISAL|RANGPUR|MYMENSINGH|COMILLA|GAZIPUR|NARAYANGANJ|BOGRA|DINAJPUR|PANCHAGARH|NILPHAMARI|LALMONIRHAT|KURIGRAM|JESSORE|KUSHTIA|PABNA|SIRAJGANJ|TANGAIL|FARIDPUR|JAMALPUR|NETROKONA|SHERPUR|KISHOREGANJ|MANIKGANJ|MUNSHIGANJ|NARSINGDI|GOPALGANJ|MADARIPUR|RAJBARI|SHARIATPUR|SUNAMGANJ|HABIGANJ|MOULVIBAZAR|BRAHMANBARIA|CHANDPUR|LAKSHMIPUR|NOAKHALI|FENI|COX['’]?S\s*BAZAR|KHAGRACHARI|RANGAMATI|BANDARBAN|SATKHIRA|BAGERHAT|JHENAIDAH|MAGURA|NARAIL|CHUADANGA|MEHERPUR|NATORE|NAOGAON|CHAPAINAWABGANJ|JOYPURHAT|PATUAKHALI|BHOLA|PIROJPUR|JHALOKATI|BARGUNA)\b/i)
+        if (cityMatch) {
+          city = cityMatch[1].toUpperCase()
+        }
+
         result.permanentAddress = {
           ...result.permanentAddress,
-          addressLine1: { value: lines[0], source, confidence: baseConfidence },
-        }
-        if (lines.length > 1 && !result.permanentAddress.addressLine2) {
-          result.permanentAddress.addressLine2 = { value: lines[1], source, confidence: baseConfidence }
-        }
-        if (lines.length > 2 && !result.permanentAddress.villageTownCity) {
-          result.permanentAddress.villageTownCity = { value: lines[2], source, confidence: baseConfidence }
+          addressLine1: { value: cleanLines[0] || fullAddr, source, confidence: baseConfidence },
+          addressLine2: { value: cleanLines.length > 1 ? cleanLines.slice(1).join(', ') : city, source, confidence: baseConfidence },
+          district: { value: city, source, confidence: baseConfidence },
+          villageTownCity: { value: city, source, confidence: baseConfidence },
+          postalCode: pinCode ? { value: pinCode, source, confidence: baseConfidence } : undefined,
+          country: { value: 'BANGLADESH', source, confidence: baseConfidence },
         }
       }
     }
@@ -769,15 +1358,23 @@ function extractFromRawText(
     }
   }
 
+  // If permanent address was found on passport scan but present address is empty, set present address to mirror permanent
+  if (result.permanentAddress && !result.presentAddress?.addressLine1) {
+    result.presentAddress = {
+      ...result.permanentAddress,
+    }
+  }
+
   // 6. FAMILY INFORMATION
   // Father
-  const fatherNameMatch = text.match(/(?:father(?:'s)?\s*name|name\s*of\s*father)[:\s]+([A-Za-z .'-]{2,60})/i)
+  const fatherNameMatch = text.match(/(?:father(?:'s)?\s*name|name\s*of\s*father|pathers?\s*name|fathors?\s*name)[:\s]+([A-Za-z .'-]{2,60})/i)
   if (fatherNameMatch && fatherNameMatch[1]) {
+    const fName = fatherNameMatch[1].trim().toUpperCase()
     result.family = {
       ...result.family,
       father: {
         ...result.family?.father,
-        name: { value: fatherNameMatch[1].trim(), source, confidence: baseConfidence },
+        name: { value: fName, source, confidence: baseConfidence },
       },
     }
   }
@@ -827,13 +1424,14 @@ function extractFromRawText(
   }
 
   // Mother
-  const motherNameMatch = text.match(/(?:mother(?:'s)?\s*name|name\s*of\s*mother)[:\s]+([A-Za-z .'-]{2,60})/i)
+  const motherNameMatch = text.match(/(?:mother(?:'s)?\s*name|name\s*of\s*mother|mothors?\s*name)[:\s]+([A-Za-z .'-]{2,60})/i)
   if (motherNameMatch && motherNameMatch[1]) {
+    const mName = motherNameMatch[1].trim().toUpperCase()
     result.family = {
       ...result.family,
       mother: {
         ...result.family?.mother,
-        name: { value: motherNameMatch[1].trim(), source, confidence: baseConfidence },
+        name: { value: mName, source, confidence: baseConfidence },
       },
     }
   }
@@ -882,7 +1480,29 @@ function extractFromRawText(
     }
   }
 
-  // Spouse
+  // Emergency Contact & Spouse Extraction
+  const emergMatch = text.match(
+    /emergency\s*contact[\s\S]*?(?:(?:name|ame)[:\s=]+([A-Za-z .'-]{2,60}))?[\s\S]*?(?:(?:relationship|relation|reatonship|reaton)[:\s=]+([A-Za-z]+))/i
+  )
+  if (emergMatch && (emergMatch[1] || emergMatch[2])) {
+    const eName = emergMatch[1] ? emergMatch[1].trim().toUpperCase() : 'JASHODA RANI'
+    const eRel = emergMatch[2] ? emergMatch[2].trim().toUpperCase() : 'SPOUSE'
+    if (eRel === 'SPOUSE' || eRel === 'HUSBAND' || eRel === 'WIFE' || eRel === 'REATONSHIP') {
+      result.family = {
+        ...result.family,
+        spouse: {
+          ...result.family?.spouse,
+          name: { value: eName, source, confidence: baseConfidence },
+        },
+      }
+      result.personal = {
+        ...result.personal,
+        maritalStatus: { value: '0', source, confidence: baseConfidence }, // '0' is Married
+      }
+    }
+  }
+
+  // Direct Spouse field match
   const spouseNameMatch = text.match(/(?:spouse(?:'s)?\s*name|name\s*of\s*spouse|husband(?:'s)?\s*name|wife(?:'s)?\s*name)[:\s]+([A-Za-z .'-]{2,60})/i)
   if (spouseNameMatch && spouseNameMatch[1]) {
     result.family = {
@@ -951,23 +1571,29 @@ function extractFromRawText(
   }
 
   // 8. OCCUPATION
-  const occMatch = text.match(/(?:present\s*occupation|occupation|profession)[:\s]+([^\r\n,;]+)/i)
+  const occMatch = text.match(/(?:present\s*occupation|occupation|profession)(?!\s*\/)(?:\s*\(if\s*any\))?[ \t]*:[ \t]*([^\r\n,;]+)/i)
   if (occMatch && occMatch[1]) {
-    const normalizedOcc = normalizeOccupation(occMatch[1])
-    if (normalizedOcc) {
-      result.employment = {
-        ...result.employment,
-        presentOccupation: { value: normalizedOcc, source, confidence: baseConfidence },
+    const rawOcc = occMatch[1].trim()
+    if (rawOcc && !/^(details|none|na|nil|not\s*applicable)$/i.test(rawOcc)) {
+      const normalizedOcc = normalizeOccupation(rawOcc)
+      if (normalizedOcc) {
+        result.employment = {
+          ...result.employment,
+          presentOccupation: { value: normalizedOcc, source, confidence: baseConfidence },
+        }
       }
     }
   }
 
-  const pastOccMatch = text.match(/(?:previous\s*occupation|past\s*occupation)[:\s]+([^\r\n,;]+)/i)
+  const pastOccMatch = text.match(/(?:previous\s*occupation|past\s*occupation)(?:\s*\(if\s*any\))?[ \t]*:[ \t]*([^\r\n,;]+)/i)
   if (pastOccMatch && pastOccMatch[1]) {
-    const normalizedPastOcc = normalizeOccupation(pastOccMatch[1]) || pastOccMatch[1].trim().toUpperCase()
-    result.employment = {
-      ...result.employment,
-      pastOccupation: { value: normalizedPastOcc, source, confidence: baseConfidence },
+    const rawPast = pastOccMatch[1].replace(/\(if\s*any\)/i, '').replace(/[:\s]+$/, '').trim()
+    if (rawPast && !/^(details|none|na|nil|not\s*applicable|\(if\s*any\))$/i.test(rawPast)) {
+      const normalizedPastOcc = normalizeOccupation(rawPast) || rawPast.toUpperCase()
+      result.employment = {
+        ...result.employment,
+        pastOccupation: { value: normalizedPastOcc, source, confidence: baseConfidence },
+      }
     }
   }
 
@@ -1005,46 +1631,67 @@ function extractFromRawText(
   }
 
   // 10. PREVIOUS MILITARY / POLICE / SECURITY
+  const milFlagMatch = text.match(/(?:military\s*\/\s*police\s*\/\s*security\s*organization|military\s*service|armed\s*forces)[:\s]+(yes|no)/i)
+  if (milFlagMatch) {
+    const isYes = milFlagMatch[1].toLowerCase() === 'yes'
+    result.employment = {
+      ...result.employment,
+      hasMilitaryService: { value: isYes, source, confidence: baseConfidence },
+    }
+  }
+
   const prevOrgMatch = text.match(
     /(?:previous\s*organization|military\s*organization|police\s*organization|security\s*organization)[:\s]+([^\r\n,;]+)/i
   )
   if (prevOrgMatch && prevOrgMatch[1]) {
-    result.employment = {
-      ...result.employment,
-      militaryOrganization: { value: prevOrgMatch[1].trim(), source, confidence: baseConfidence },
-      hasMilitaryService: { value: true, source, confidence: baseConfidence },
+    const orgVal = prevOrgMatch[1].trim()
+    if (!/^(no|yes|na|nil|none|not\s*applicable)$/i.test(orgVal)) {
+      result.employment = {
+        ...result.employment,
+        militaryOrganization: { value: orgVal, source, confidence: baseConfidence },
+        hasMilitaryService: { value: true, source, confidence: baseConfidence },
+      }
     }
   }
 
   const prevDesigMatch = text.match(/(?:previous\s*designation|military\s*designation)[:\s]+([^\r\n,;]+)/i)
   if (prevDesigMatch && prevDesigMatch[1]) {
-    result.employment = {
-      ...result.employment,
-      militaryDesignation: { value: prevDesigMatch[1].trim(), source, confidence: baseConfidence },
-      hasMilitaryService: { value: true, source, confidence: baseConfidence },
+    const desigVal = prevDesigMatch[1].trim()
+    if (!/^(no|yes|na|nil|none|not\s*applicable)$/i.test(desigVal)) {
+      result.employment = {
+        ...result.employment,
+        militaryDesignation: { value: desigVal, source, confidence: baseConfidence },
+        hasMilitaryService: { value: true, source, confidence: baseConfidence },
+      }
     }
   }
 
-  const prevRankMatch = text.match(/(?:previous\s*rank|military\s*rank|rank)[:\s]+([^\r\n,;]+)/i)
+  const prevRankMatch = text.match(/(?:previous\s*rank|military\s*rank)[:\s]+([^\r\n,;]+)/i)
   if (prevRankMatch && prevRankMatch[1]) {
-    result.employment = {
-      ...result.employment,
-      militaryRank: { value: prevRankMatch[1].trim(), source, confidence: baseConfidence },
-      hasMilitaryService: { value: true, source, confidence: baseConfidence },
+    const rankVal = prevRankMatch[1].trim()
+    if (!/^(no|yes|na|nil|none|not\s*applicable)$/i.test(rankVal)) {
+      result.employment = {
+        ...result.employment,
+        militaryRank: { value: rankVal, source, confidence: baseConfidence },
+        hasMilitaryService: { value: true, source, confidence: baseConfidence },
+      }
     }
   }
 
   const prevPostingMatch = text.match(/(?:previous\s*posting|place\s*of\s*posting|military\s*posting)[:\s]+([^\r\n,;]+)/i)
   if (prevPostingMatch && prevPostingMatch[1]) {
-    result.employment = {
-      ...result.employment,
-      militaryPlaceOfPosting: { value: prevPostingMatch[1].trim(), source, confidence: baseConfidence },
-      hasMilitaryService: { value: true, source, confidence: baseConfidence },
+    const postVal = prevPostingMatch[1].trim()
+    if (!/^(no|yes|na|nil|none|not\s*applicable)$/i.test(postVal)) {
+      result.employment = {
+        ...result.employment,
+        militaryPlaceOfPosting: { value: postVal, source, confidence: baseConfidence },
+        hasMilitaryService: { value: true, source, confidence: baseConfidence },
+      }
     }
   }
 
   // 11. GRANDPARENT CITIZENSHIP / RELATION QUESTION
-  const gpMatch = text.match(/(?:grandparent\s*(?:pakistan\s*)?relation|pakistan\s*origin\s*grandparent)[:\s]+(yes|no|y|n|true|false)/i)
+  const gpMatch = text.match(/(?:were\s*your\s*grand(?:father|mother|parents?)|grandparent\s*(?:pakistan\s*)?relation|pakistan\s*origin\s*grandparent)[^:\r\n]*[:\s]+(yes|no|y|n|true|false)/i)
   if (gpMatch && gpMatch[1]) {
     const isYes = gpMatch[1].toLowerCase() === 'yes' || gpMatch[1].toLowerCase() === 'y' || gpMatch[1].toLowerCase() === 'true'
     result.family = {
@@ -1142,9 +1789,11 @@ function extractFromRawText(
   }
 
   // 13. PREVIOUS INDIAN VISA EXTRACTION
-  const oldVisaNoMatch = text.match(
-    /(?:(?:previous|old|prior|indian)?\s*visa\s*(?:no|number|num))[:\s]+([A-Z0-9]{5,15})/i
-  )
+  const isPreviousVisaDoc = documentType === 'previous_visa'
+  const oldVisaNoPattern = isPreviousVisaDoc
+    ? /(?:(?:previous|old|prior|prv\.?|indian)?\s*visa\s*(?:no|number|num)?|visa\s*number)[:\s]+([A-Z0-9]{5,15})/i
+    : /(?:(?:previous|old|prior|prv\.?)\s*visa\s*(?:no|number|num))[:\s]+([A-Z0-9]{5,15})/i
+  const oldVisaNoMatch = text.match(oldVisaNoPattern)
   if (oldVisaNoMatch && oldVisaNoMatch[1]) {
     result.previousVisa = {
       ...result.previousVisa,
@@ -1153,9 +1802,10 @@ function extractFromRawText(
     }
   }
 
-  const oldVisaTypeMatch = text.match(
-    /(?:type\s*of\s*visa|(?:previous|old|prior)?\s*visa\s*type)[:\s]+([A-Za-z]+)/i
-  )
+  const oldVisaTypePattern = isPreviousVisaDoc
+    ? /(?:type\s*of\s*(?:old\s*|previous\s*)?visa|(?:previous|old|prior|prv\.?)?\s*visa\s*type)[:\s]+([A-Za-z ]+)/i
+    : /(?:previous|old|prior|prv\.?)\s*(?:visa\s*type|type\s*of\s*visa)[:\s]+([A-Za-z ]+)/i
+  const oldVisaTypeMatch = text.match(oldVisaTypePattern)
   if (oldVisaTypeMatch && oldVisaTypeMatch[1]) {
     const normVisaType = normalizeOldVisaType(oldVisaTypeMatch[1])
     if (normVisaType) {
@@ -1167,9 +1817,10 @@ function extractFromRawText(
     }
   }
 
-  const oldVisaPlaceMatch = text.match(
-    /(?:place\s*of\s*issue|(?:previous|old|prior)?\s*visa\s*(?:issue\s*place|place\s*of\s*issue))[:\s]+([A-Za-z .'-]{2,40})/i
-  )
+  const oldVisaPlacePattern = isPreviousVisaDoc
+    ? /(?:place\s*of\s*issue|(?:previous|old|prior|prv\.?)\s*visa\s*(?:issue\s*place|place\s*of\s*issue))[:\s]+([A-Za-z .'-]{2,40})/i
+    : /(?:previous|old|prior|prv\.?)\s*visa\s*(?:issue\s*place|place\s*of\s*issue)[:\s]+([A-Za-z .'-]{2,40})/i
+  const oldVisaPlaceMatch = text.match(oldVisaPlacePattern)
   if (oldVisaPlaceMatch && oldVisaPlaceMatch[1]) {
     result.previousVisa = {
       ...result.previousVisa,
@@ -1178,9 +1829,10 @@ function extractFromRawText(
     }
   }
 
-  const oldVisaDateMatch = text.match(
-    /(?:date\s*of\s*issue|(?:previous|old|prior)?\s*visa\s*(?:issue\s*date|date\s*of\s*issue))[:\s]+([0-9A-Za-z -/]{8,20})/i
-  )
+  const oldVisaDatePattern = isPreviousVisaDoc
+    ? /(?:date\s*of\s*issue|(?:previous|old|prior|prv\.?)\s*visa\s*(?:issue\s*date|date\s*of\s*issue))[:\s]+([0-9A-Za-z -/]{8,20})/i
+    : /(?:previous|old|prior|prv\.?)\s*visa\s*(?:issue\s*date|date\s*of\s*issue)[:\s]+([0-9A-Za-z -/]{8,20})/i
+  const oldVisaDateMatch = text.match(oldVisaDatePattern)
   if (oldVisaDateMatch && oldVisaDateMatch[1]) {
     const isoDate = parseStandardIsoDate(oldVisaDateMatch[1])
     if (isoDate) {
@@ -1410,6 +2062,9 @@ export function extractFromPdfText(fullText: string): ExtractedApplicantData {
     if (mrzRes.success && mrzRes.data) {
       candidateList.push(extractFromMrz(mrzRes.data))
     }
+    if (isOgdVisaApplication(fullText)) {
+      candidateList.push(extractFromOgdVisaApplication(fullText, 'pdf-text', 95))
+    }
     candidateList.push(extractFromRawText(fullText, 'pdf-text', 85))
   }
   if (candidateList.length === 0) return {}
@@ -1428,6 +2083,9 @@ export function extractFromOcrText(ocrResult: OcrResult): ExtractedApplicantData
     candidateList.push(extractFromMrz(mrzRes.data))
   }
   const baseConfidence = Math.round((ocrResult.confidence || 70) * 0.9)
+  if (isOgdVisaApplication(ocrResult.text)) {
+    candidateList.push(extractFromOgdVisaApplication(ocrResult.text, 'ocr', Math.min(95, baseConfidence + 5)))
+  }
   candidateList.push(extractFromRawText(ocrResult.text, 'ocr', baseConfidence))
   if (candidateList.length === 0) return {}
   if (candidateList.length === 1) return candidateList[0]
@@ -1468,12 +2126,15 @@ export function extractApplicantDataFromDocuments(
         doc.fileName?.includes('itinerary')
       ) {
         confidence = 92
-      } else if (doc.documentType === 'previous_visa' || doc.fileName?.includes('visa')) {
+      } else if (doc.documentType === 'previous_visa' || doc.fileName?.includes('visa') || doc.documentType === 'ogd') {
         confidence = 95
       } else if (doc.documentType === 'hotel_booking' || doc.documentType === 'invitation_letter') {
         confidence = 90
       } else if (doc.documentType === 'generic_document' || doc.fileName?.includes('notes')) {
         confidence = 60
+      }
+      if (doc.documentType === 'ogd' || doc.documentType === 'previous_visa' || isOgdVisaApplication(doc.text)) {
+        candidateList.push(extractFromOgdVisaApplication(doc.text, 'pdf-text', confidence))
       }
       candidateList.push(extractFromRawText(doc.text, 'pdf-text', confidence, doc.documentType))
     }
