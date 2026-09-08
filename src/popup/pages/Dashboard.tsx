@@ -16,10 +16,13 @@ import type { CountryPageDetectionResult } from '../../countries/india/types'
 import {
   extractFromPdfText,
   extractPdfText,
-  type ExtractedApplicantData,
-  type ExtractedFieldConflict,
+  extractFromOcrText,
+  recognizeText,
 } from '../../core/extraction'
-import { ExtractionReviewModal } from './ExtractionReviewModal'
+import {
+  toUint8Array,
+  extractEmbeddedJpegFromPdf,
+} from '../../core/extraction/pdf/pdfTextExtractor'
 import {
   getSavedApplicationByApplicantId,
   saveApplication,
@@ -53,18 +56,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Extraction Review Modal State
-  const [reviewState, setReviewState] = useState<{
-    candidateData: ExtractedApplicantData
-    conflicts: ExtractedFieldConflict<unknown>[]
-  } | null>(null)
-  const [reviewDoc, setReviewDoc] = useState<DocumentRecord | null>(null)
-
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg)
     setTimeout(() => {
       setToastMessage(null)
-    }, 4000)
+    }, 4500)
   }, [])
 
   // 1. Check current active browser page
@@ -148,6 +144,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const ogdDoc = applicantDocs.find((d) => d.documentType === 'ogd')
   const currentTabDoc = activeTab === 'passport' ? passportDoc : ogdDoc
 
+  interface ExtractionDiagnostic {
+    fileName: string
+    pdfTextStatus: string
+    imagePayloadStatus: string
+    imageMime?: string
+    imageBytes?: number
+    ocrStatus: string
+    ocrCharCount: number
+    ocrError?: string
+    mrzStatus: string
+    extractedFieldsCount: number
+    savedAppFieldsCount: number
+    workerUrl?: string
+    coreUrl?: string
+    langUrl?: string
+    workerInitialized?: string
+    languageLoaded?: string
+    ocrExecuted?: string
+  }
+
+  const [diagnostic, setDiagnostic] = useState<ExtractionDiagnostic | null>(null)
+
   // 3. Document Upload & Extraction Handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetType: string) => {
     const file = e.target.files?.[0]
@@ -170,25 +188,139 @@ export const Dashboard: React.FC<DashboardProps> = ({
           fileDataUrl: dataUrl,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          status: 'processed',
+          status: 'processing',
           source: 'user-upload',
           extractedDataConfirmed: false,
         }
 
-        // Run PDF extraction if PDF
-        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        let extractedApplicant = null
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+        const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|bmp)$/i.test(file.name)
+
+        let diagPdfStatus = 'NO TEXT'
+        let diagImgStatus = 'MISSING'
+        let diagImgMime = file.type || 'application/octet-stream'
+        let diagImgBytes = file.size
+        let diagOcrStatus = 'NOT EXECUTED'
+        let diagOcrChars = 0
+        let diagOcrError: string | undefined = undefined
+        let diagMrzStatus = 'NOT FOUND'
+        let diagWorkerInit = 'NO'
+        let diagLangLoaded = 'NO'
+        let diagOcrExecuted = 'NO'
+
+        let workerUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract/worker.min.js') : 'default'
+        let coreUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
+        let langUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
+
+        if (isPdf) {
           try {
-            const pdfExtract = await extractPdfText(dataUrl)
-            if (pdfExtract.fullText) {
-              const extractedApplicant = extractFromPdfText(pdfExtract.fullText)
-              if (extractedApplicant) {
-                newDoc.extractedData = extractedApplicant
-                newDoc.extractedDataConfirmed = true
+            // First check if raw JPEG is directly embedded in PDF bytes (instant & avoids pdfjs worker)
+            const rawBytes = await toUint8Array(dataUrl)
+            const embeddedJpeg = extractEmbeddedJpegFromPdf(rawBytes)
+            if (embeddedJpeg) {
+              diagImgStatus = `FOUND (${(embeddedJpeg.byteLength / 1024).toFixed(0)} KB JPEG)`
+              diagImgMime = 'image/jpeg'
+              diagImgBytes = embeddedJpeg.byteLength
+              diagOcrStatus = 'EXECUTING'
+              const ocrRes = await recognizeText(embeddedJpeg, { language: 'eng' })
+              diagOcrStatus = ocrRes.success ? 'SUCCESS' : 'FAILED'
+              diagOcrChars = ocrRes.text?.length || 0
+              diagOcrError = ocrRes.error
+              if (ocrRes.diagnostics) {
+                diagWorkerInit = ocrRes.diagnostics.workerInitialized ? 'YES' : 'NO'
+                diagLangLoaded = ocrRes.diagnostics.languageLoaded ? 'YES' : 'NO'
+                diagOcrExecuted = ocrRes.diagnostics.ocrExecuted ? 'YES' : 'NO'
+                if (ocrRes.diagnostics.workerUrl) workerUrl = ocrRes.diagnostics.workerUrl
+                if (ocrRes.diagnostics.coreUrl) coreUrl = ocrRes.diagnostics.coreUrl
+                if (ocrRes.diagnostics.langUrl) langUrl = ocrRes.diagnostics.langUrl
+              }
+              if (ocrRes.text) {
+                if (/P[<A-Z0-9]{2}[A-Z<]{3,}/.test(ocrRes.text)) {
+                  diagMrzStatus = 'FOUND'
+                }
+                extractedApplicant = extractFromOcrText(ocrRes)
+              }
+            } else {
+              // Try text extraction via pdfjs
+              const pdfExtract = await extractPdfText(dataUrl)
+              if (pdfExtract.fullText && pdfExtract.fullText.trim().length >= 50) {
+                diagPdfStatus = 'FOUND'
+                extractedApplicant = extractFromPdfText(pdfExtract.fullText)
+              } else if (pdfExtract.imagePayload) {
+                diagImgStatus = 'RENDERED CANVAS'
+                diagImgMime = 'image/png'
+                diagOcrStatus = 'EXECUTING'
+                const ocrRes = await recognizeText(pdfExtract.imagePayload, { language: 'eng' })
+                diagOcrStatus = ocrRes.success ? 'SUCCESS' : 'FAILED'
+                diagOcrChars = ocrRes.text?.length || 0
+                diagOcrError = ocrRes.error
+                if (ocrRes.diagnostics) {
+                  diagWorkerInit = ocrRes.diagnostics.workerInitialized ? 'YES' : 'NO'
+                  diagLangLoaded = ocrRes.diagnostics.languageLoaded ? 'YES' : 'NO'
+                  diagOcrExecuted = ocrRes.diagnostics.ocrExecuted ? 'YES' : 'NO'
+                  if (ocrRes.diagnostics.workerUrl) workerUrl = ocrRes.diagnostics.workerUrl
+                  if (ocrRes.diagnostics.coreUrl) coreUrl = ocrRes.diagnostics.coreUrl
+                  if (ocrRes.diagnostics.langUrl) langUrl = ocrRes.diagnostics.langUrl
+                }
+                if (ocrRes.text) {
+                  if (/P[<A-Z0-9]{2}[A-Z<]{3,}/.test(ocrRes.text)) {
+                    diagMrzStatus = 'FOUND'
+                  }
+                  extractedApplicant = extractFromOcrText(ocrRes)
+                }
               }
             }
           } catch (extErr) {
-            console.warn('PDF extraction warning:', extErr)
+            console.error('PDF extraction error:', extErr)
+            diagPdfStatus = `ERROR: ${extErr instanceof Error ? extErr.message : String(extErr)}`
           }
+        } else if (isImage) {
+          try {
+            diagImgStatus = 'IMAGE FILE'
+            diagImgMime = file.type || 'image/jpeg'
+            diagImgBytes = file.size
+            diagOcrStatus = 'EXECUTING'
+            const ocrRes = await recognizeText(dataUrl, { language: 'eng' })
+            diagOcrStatus = ocrRes.success ? 'SUCCESS' : 'FAILED'
+            diagOcrChars = ocrRes.text?.length || 0
+            diagOcrError = ocrRes.error
+            if (ocrRes.diagnostics) {
+              diagWorkerInit = ocrRes.diagnostics.workerInitialized ? 'YES' : 'NO'
+              diagLangLoaded = ocrRes.diagnostics.languageLoaded ? 'YES' : 'NO'
+              diagOcrExecuted = ocrRes.diagnostics.ocrExecuted ? 'YES' : 'NO'
+              if (ocrRes.diagnostics.workerUrl) workerUrl = ocrRes.diagnostics.workerUrl
+              if (ocrRes.diagnostics.coreUrl) coreUrl = ocrRes.diagnostics.coreUrl
+              if (ocrRes.diagnostics.langUrl) langUrl = ocrRes.diagnostics.langUrl
+            }
+            if (ocrRes.text) {
+              if (/P[<A-Z0-9]{2}[A-Z<]{3,}/.test(ocrRes.text)) {
+                diagMrzStatus = 'FOUND'
+              }
+              extractedApplicant = extractFromOcrText(ocrRes)
+            }
+          } catch (imgErr) {
+            console.error('Image OCR error:', imgErr)
+            diagOcrStatus = 'FAILED'
+            diagOcrError = imgErr instanceof Error ? imgErr.message : String(imgErr)
+          }
+        }
+
+        const hasFields = Boolean(
+          extractedApplicant &&
+          (extractedApplicant.personal?.lastName?.value ||
+           extractedApplicant.personal?.firstName?.value ||
+           extractedApplicant.passport?.passportNumber?.value ||
+           extractedApplicant.family?.father?.name?.value)
+        )
+
+        if (hasFields && extractedApplicant) {
+          newDoc.extractedData = extractedApplicant
+          newDoc.extractedDataConfirmed = true
+          newDoc.status = 'processed'
+        } else {
+          newDoc.extractedDataConfirmed = false
+          newDoc.status = 'failed'
         }
 
         await saveDocument(newDoc)
@@ -215,24 +347,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
         await refreshApplicantData()
         setIsExtracting(false)
 
-        // AUTOMATICALLY OPEN WORKSPACE IN A NEW TAB
-        const workspaceUrl = chrome?.runtime?.getURL
-          ? chrome.runtime.getURL(
-              `application.html?applicantId=${encodeURIComponent(
+        const savedCount = Object.keys(mergedApp.fields).filter(
+          (k) =>
+            mergedApp.fields[k] &&
+            typeof mergedApp.fields[k] === 'object' &&
+            typeof mergedApp.fields[k].value === 'string' &&
+            mergedApp.fields[k].value.trim() !== ''
+        ).length
+
+        setDiagnostic({
+          fileName: file.name,
+          pdfTextStatus: diagPdfStatus,
+          imagePayloadStatus: diagImgStatus,
+          imageMime: diagImgMime,
+          imageBytes: diagImgBytes,
+          ocrStatus: diagOcrStatus,
+          ocrCharCount: diagOcrChars,
+          ocrError: diagOcrError,
+          workerUrl,
+          coreUrl,
+          langUrl,
+          workerInitialized: diagWorkerInit,
+          languageLoaded: diagLangLoaded,
+          ocrExecuted: diagOcrExecuted,
+          mrzStatus: diagMrzStatus,
+          extractedFieldsCount: hasFields ? 15 : 0,
+          savedAppFieldsCount: savedCount,
+        })
+
+        if (hasFields) {
+          // AUTOMATICALLY OPEN WORKSPACE IN A NEW TAB
+          const workspaceUrl = chrome?.runtime?.getURL
+            ? chrome.runtime.getURL(
+                `application.html?applicantId=${encodeURIComponent(
+                  selectedApplicant.applicantId
+                )}&documentType=${encodeURIComponent(targetType)}`
+              )
+            : `application.html?applicantId=${encodeURIComponent(
                 selectedApplicant.applicantId
               )}&documentType=${encodeURIComponent(targetType)}`
-            )
-          : `application.html?applicantId=${encodeURIComponent(
-              selectedApplicant.applicantId
-            )}&documentType=${encodeURIComponent(targetType)}`
 
-        if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
-          chrome.tabs.create({ url: workspaceUrl })
+          if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+            chrome.tabs.create({ url: workspaceUrl })
+          } else {
+            window.open(workspaceUrl, '_blank')
+          }
+
+          showToast(`✓ Document extracted (${savedCount} fields populated) & workspace opened.`)
         } else {
-          window.open(workspaceUrl, '_blank')
+          setErrorMessage('Extraction produced 0 structured fields from this document.')
         }
-
-        showToast(`Document uploaded & workspace opened.`)
       }
 
       reader.readAsDataURL(file)
@@ -243,48 +407,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }
 
-  // 4. Extraction Confirmation Handler
-  const handleConfirmExtraction = async (confirmedData: ExtractedApplicantData) => {
-    if (!selectedApplicant || !reviewDoc) return
-
-    try {
-      const updatedDoc: DocumentRecord = {
-        ...reviewDoc,
-        extractedData: confirmedData,
-        extractedDataConfirmed: true,
-        updatedAt: new Date().toISOString(),
-      }
-      await saveDocument(updatedDoc)
-
-      // Refresh docs list
-      const docs = await getDocumentsByApplicantId(selectedApplicant.applicantId)
-      const pDoc = docs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed) || docs.find((d) => d.documentType === 'passport')
-      const oDoc = docs.find((d) => d.documentType === 'ogd' && d.extractedDataConfirmed) || docs.find((d) => d.documentType === 'ogd')
-
-      // Populate or update SavedApplication
-      const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
-      const mergedApp = populateApplicationFromDocuments({
-        applicantId: selectedApplicant.applicantId,
-        passportDoc: pDoc,
-        ogdDoc: oDoc,
-        existingApp,
-        notes: selectedApplicant.notes,
-      })
-
-      await saveApplication(mergedApp)
-      setSavedApplication(mergedApp)
-      setReviewState(null)
-      setReviewDoc(null)
-      await refreshApplicantData()
-
-      showToast('✓ Document data confirmed! Ready for Application Workspace.')
-    } catch (err) {
-      console.error('Error confirming extraction:', err)
-      setErrorMessage('Failed to confirm document data.')
-    }
-  }
-
-  // 5. Open Full-Page Application Workspace
+  // 4. Open Full-Page Application Workspace
   const handleOpenApplicationWorkspace = () => {
     if (!selectedApplicant) return
     const workspaceUrl = chrome?.runtime?.getURL
@@ -298,7 +421,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }
 
-  // 6. Execute Autofill on Current Page
+  // 5. Execute Autofill on Current Page
   const handleAutofillCurrentPage = async () => {
     if (!selectedApplicant) {
       setErrorMessage('Please select an applicant profile first.')
@@ -316,7 +439,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       if (response.status === 'success' && response.data?.result) {
         const res = response.data.result
-        showToast(`✓ Autofilled ${res.filledFields} fields (${res.skippedFields} skipped).`)
+        const filled = res.filledFields
+        const alreadyFilled = res.results.filter(
+          (r) => r.status === 'already-matching' || r.status === 'already-filled' || r.status === 'skipped-existing'
+        ).length
+        const missing = res.results.filter(
+          (r) => r.status === 'skipped' || r.failureType === 'source-data-missing'
+        ).length
+        const manualCount = res.results.filter(
+          (r) =>
+            r.failureType === 'manual-required' ||
+            r.status === 'unsupported' ||
+            r.failureType === 'unsupported-field'
+        ).length
+
+        showToast(
+          `✓ Filled: ${filled} | Already filled: ${alreadyFilled} | Blank: ${missing} | Manual/Security: ${manualCount}`
+        )
         setCanUndo(true)
       } else {
         const err = response.status === 'error' ? response.error : 'Autofill could not be completed on this page.'
@@ -330,7 +469,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }
 
-  // 7. Undo Autofill
+  // 6. Undo Autofill
   const handleUndoAutofill = async () => {
     setIsUndoing(true)
     setErrorMessage(null)
@@ -446,19 +585,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {activeTab === 'passport' ? 'Passport Document' : 'OGD Document (Previous India History)'}
                   </span>
                   {currentTabDoc ? (
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
-                        currentTabDoc.extractedDataConfirmed
-                          ? 'bg-emerald-950 text-emerald-400 border-emerald-700/60'
-                          : 'bg-amber-950 text-amber-400 border-amber-700/60'
-                      }`}
-                    >
-                      {currentTabDoc.extractedDataConfirmed ? 'Confirmed' : 'Review required'}
-                    </span>
+                    currentTabDoc.status === 'processed' && currentTabDoc.extractedDataConfirmed ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border bg-emerald-950 text-emerald-400 border-emerald-700/60">
+                        Extracted & Confirmed ✓
+                      </span>
+                    ) : currentTabDoc.status === 'processing' ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border bg-blue-950 text-blue-400 border-blue-700/60 animate-pulse">
+                        Processing OCR...
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border bg-rose-950 text-rose-400 border-rose-700/60">
+                        Extraction Failed ✕
+                      </span>
+                    )
                   ) : (
                     <span className="text-[11px] text-slate-500 italic">No document</span>
                   )}
                 </div>
+
+                {/* Diagnostic Panel */}
+                {diagnostic && diagnostic.fileName === currentTabDoc?.fileName && (
+                  <div className="bg-slate-950 rounded p-2.5 border border-slate-700 text-[10px] font-mono text-slate-300 space-y-1">
+                    <div className="text-[11px] font-bold text-amber-400 flex justify-between border-b border-slate-800 pb-1">
+                      <span>🛠️ OCR Runtime Diagnostics</span>
+                      <button onClick={() => setDiagnostic(null)} className="text-slate-400 hover:text-white cursor-pointer">✕</button>
+                    </div>
+                    <div className="space-y-0.5 pt-0.5">
+                      <div>PDF Text: <span className={diagnostic.pdfTextStatus === 'FOUND' ? 'text-emerald-400 font-semibold' : 'text-amber-400'}>{diagnostic.pdfTextStatus}</span></div>
+                      <div>Image payload: <span className={diagnostic.imagePayloadStatus.startsWith('FOUND') || diagnostic.imagePayloadStatus === 'IMAGE FILE' ? 'text-emerald-400 font-semibold' : 'text-amber-400'}>{diagnostic.imagePayloadStatus}</span></div>
+                      {diagnostic.imageMime && <div>Image MIME: <span className="text-slate-300">{diagnostic.imageMime}</span></div>}
+                      {diagnostic.imageBytes !== undefined && <div>Image bytes: <span className="text-slate-300">{diagnostic.imageBytes.toLocaleString()}</span></div>}
+                      {diagnostic.workerUrl && <div className="truncate" title={diagnostic.workerUrl}>Worker URL: <span className="text-slate-400">{diagnostic.workerUrl}</span></div>}
+                      {diagnostic.coreUrl && <div className="truncate" title={diagnostic.coreUrl}>Core URL: <span className="text-slate-400">{diagnostic.coreUrl}</span></div>}
+                      {diagnostic.langUrl && <div className="truncate" title={diagnostic.langUrl}>Language URL: <span className="text-slate-400">{diagnostic.langUrl}</span></div>}
+                      <div>Worker initialized: <span className={diagnostic.workerInitialized === 'YES' ? 'text-emerald-400 font-semibold' : 'text-rose-400'}>{diagnostic.workerInitialized}</span></div>
+                      <div>Language loaded: <span className={diagnostic.languageLoaded === 'YES' ? 'text-emerald-400 font-semibold' : 'text-rose-400'}>{diagnostic.languageLoaded}</span></div>
+                      <div>OCR executed: <span className={diagnostic.ocrExecuted === 'YES' ? 'text-emerald-400 font-semibold' : 'text-rose-400'}>{diagnostic.ocrExecuted}</span></div>
+                      <div>OCR: <span className={diagnostic.ocrStatus === 'SUCCESS' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{diagnostic.ocrStatus}</span> ({diagnostic.ocrCharCount} chars)</div>
+                      <div>MRZ: <span className={diagnostic.mrzStatus === 'FOUND' ? 'text-emerald-400 font-semibold' : 'text-amber-400'}>{diagnostic.mrzStatus}</span></div>
+                      <div>Populated Fields: <span className="text-emerald-400 font-bold">{diagnostic.savedAppFieldsCount}</span></div>
+                    </div>
+                    {diagnostic.ocrError && (
+                      <div className="text-rose-400 text-[9px] bg-rose-950/60 p-1.5 rounded border border-rose-800/60 break-all mt-1">
+                        <span className="font-bold">OCR Error:</span> {diagnostic.ocrError}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {currentTabDoc ? (
                   <div className="space-y-2">
@@ -470,23 +643,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 pt-1">
-                      {!currentTabDoc.extractedDataConfirmed && currentTabDoc.extractedData && (
-                        <button
-                          onClick={() => {
-                            setReviewDoc(currentTabDoc)
-                            setReviewState({
-                              candidateData: currentTabDoc.extractedData!,
-                              conflicts: [],
-                            })
-                          }}
-                          className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-semibold py-1.5 px-3 rounded text-xs transition-colors"
-                        >
-                          Review Extracted Data
-                        </button>
-                      )}
-
-                      <label className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 font-medium py-1.5 px-3 rounded text-xs cursor-pointer text-center transition-colors">
-                        Replace
+                      <label className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 font-medium py-1.5 px-3 rounded text-xs cursor-pointer text-center transition-colors">
+                        Replace File
                         <input
                           type="file"
                           accept=".pdf,image/*"
@@ -594,22 +752,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Extraction Review Modal */}
-      {reviewState && selectedApplicant && reviewDoc && (
-        <ExtractionReviewModal
-          targetApplicant={selectedApplicant}
-          initialData={reviewState.candidateData}
-          conflicts={reviewState.conflicts}
-          onConfirm={handleConfirmExtraction}
-          onClose={() => {
-            setReviewState(null)
-            setReviewDoc(null)
-          }}
-        />
-      )}
     </div>
   )
 }
 
 export default Dashboard
+
