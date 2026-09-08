@@ -18,7 +18,7 @@ if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
 /**
  * Converts input (File, ArrayBuffer, or Data URL string) into Uint8Array.
  */
-async function toUint8Array(input: File | ArrayBuffer | string): Promise<Uint8Array> {
+export async function toUint8Array(input: File | ArrayBuffer | Uint8Array | string): Promise<Uint8Array> {
   if (input instanceof Uint8Array) {
     return input
   }
@@ -56,13 +56,82 @@ function cleanRawPageText(text: string): string {
 }
 
 /**
+ * Converts Uint8Array to base64 data URL using 32KB chunks for high performance.
+ */
+export function uint8ArrayToDataUrl(bytes: Uint8Array, mimeType = 'image/jpeg'): string {
+  if (typeof Buffer !== 'undefined') {
+    return `data:${mimeType};base64,${Buffer.from(bytes).toString('base64')}`
+  }
+  const chunks: string[] = []
+  const chunkSize = 0x8000 // 32KB chunking
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize)
+    chunks.push(String.fromCharCode.apply(null, Array.from(chunk)))
+  }
+  return `data:${mimeType};base64,${btoa(chunks.join(''))}`
+}
+
+/**
+ * Extracts raw embedded JPEG image stream from PDF binary data.
+ */
+export function extractEmbeddedJpegFromPdf(bytes: Uint8Array): Uint8Array | null {
+  for (let i = 0; i < bytes.length - 4; i++) {
+    if (bytes[i] === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff) {
+      for (let j = i + 3; j < bytes.length - 1; j++) {
+        if (bytes[j] === 0xff && bytes[j + 1] === 0xd9) {
+          return bytes.subarray(i, j + 2)
+        }
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Renders or extracts an image representation of a PDF page for OCR.
+ */
+export async function renderPdfPageToImage(
+  input: File | ArrayBuffer | Uint8Array | string,
+  pageNumber = 1,
+  scale = 2.0
+): Promise<string | null> {
+  try {
+    const bytes = await toUint8Array(input)
+    const embeddedJpeg = extractEmbeddedJpegFromPdf(bytes)
+    if (embeddedJpeg) {
+      return uint8ArrayToDataUrl(embeddedJpeg, 'image/jpeg')
+    }
+
+    if (typeof document !== 'undefined' && document.createElement) {
+      const loadingTask = pdfjsLib.getDocument({ data: bytes, useSystemFonts: true })
+      const pdfDoc = await loadingTask.promise
+      if (pageNumber <= pdfDoc.numPages) {
+        const page = await pdfDoc.getPage(pageNumber)
+        const viewport = page.getViewport({ scale })
+        const canvas = document.createElement('canvas')
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          await page.render({ canvasContext: ctx, canvas, viewport }).promise
+          return canvas.toDataURL('image/png')
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('PDF image extraction/rendering warning:', err)
+  }
+  return null
+}
+
+/**
  * Extracts machine-readable text page-by-page from a PDF document.
  * 
  * Supports text-based PDFs and handles scanned/image-only PDFs gracefully (status: 'no-text').
- * Does NOT perform OCR, MRZ parsing, or auto-populate ApplicantProfile.
+ * If no selectable text is found, extracts or renders the first page image payload for OCR.
  */
 export async function extractPdfText(
-  input: File | ArrayBuffer | string
+  input: File | ArrayBuffer | Uint8Array | string
 ): Promise<PdfExtractionResult> {
   try {
     const bytes = await toUint8Array(input)
@@ -121,12 +190,14 @@ export async function extractPdfText(
 
     // Handle scanned/image-only PDFs where no text items exist
     if (totalCharacters === 0) {
+      const imagePayload = await renderPdfPageToImage(bytes, 1)
       return {
         success: true,
         pageCount,
         pages,
         fullText: '',
         extractedCharacterCount: 0,
+        imagePayload: imagePayload || undefined,
         status: 'no-text',
       }
     }
