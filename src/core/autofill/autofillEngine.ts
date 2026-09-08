@@ -56,12 +56,12 @@ export function getFailureSeverity(category: FailureCategory): FailureSeverity {
 export function isControlCompatible(element: HTMLElement, mapping: FieldMapping): boolean {
   const inputType = mapping.inputType
 
-  if (element instanceof HTMLSelectElement) {
+  if (element instanceof HTMLSelectElement || element.tagName === 'SELECT') {
     return inputType === 'select'
   }
 
-  if (element instanceof HTMLInputElement) {
-    const type = element.type.toLowerCase()
+  if (element instanceof HTMLInputElement || element.tagName === 'INPUT') {
+    const type = ((element as HTMLInputElement).type || 'text').toLowerCase()
     if (type === 'checkbox') {
       return inputType === 'checkbox'
     }
@@ -74,7 +74,7 @@ export function isControlCompatible(element: HTMLElement, mapping: FieldMapping)
     return inputType === 'text' || inputType === 'date' || inputType === 'unknown'
   }
 
-  if (element instanceof HTMLTextAreaElement) {
+  if (element instanceof HTMLTextAreaElement || element.tagName === 'TEXTAREA') {
     return inputType === 'text' || inputType === 'textarea'
   }
 
@@ -254,14 +254,26 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
 
         // Check Ambiguous Target
         if (els.length > 1) {
-          fieldResult = {
-            fieldId: mapping.id,
-            status: 'failed',
-            failureType: 'ambiguous-target',
-            reason: 'Visa Autofill detected multiple similar fields.',
-            attempts,
+          const isRadioGroup =
+            mapping.inputType === 'radio' &&
+            els.every(
+              (el) =>
+                ((typeof HTMLInputElement !== 'undefined' && el instanceof HTMLInputElement) || el.tagName === 'INPUT') &&
+                ((el as HTMLInputElement).type || '').toLowerCase() === 'radio' &&
+                Boolean((el as HTMLInputElement).name) &&
+                (el as HTMLInputElement).name === (els[0] as HTMLInputElement).name
+            )
+
+          if (!isRadioGroup) {
+            fieldResult = {
+              fieldId: mapping.id,
+              status: 'failed',
+              failureType: 'ambiguous-target',
+              reason: 'Visa Autofill detected multiple similar fields.',
+              attempts,
+            }
+            break // manual-required, exit loop
           }
-          break // manual-required, exit loop
         }
 
         const element = els[0]
