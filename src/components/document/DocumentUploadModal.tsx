@@ -7,6 +7,13 @@ import {
 import type { DocumentRecord, GenericDocumentCategory } from '../../core/document'
 import { Button } from '../ui'
 
+import {
+  extractFromPdfText,
+  extractPdfText,
+  extractFromOcrText,
+  recognizeText,
+} from '../../core/extraction'
+
 export interface DocumentUploadModalProps {
   applicantId: string
   onSave: (doc: DocumentRecord) => Promise<void>
@@ -68,6 +75,52 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         reader.readAsDataURL(selectedFile)
       })
 
+      let extractedApplicant = undefined
+      const isPdf = selectedFile.type === 'application/pdf' || selectedFile.name.toLowerCase().endsWith('.pdf')
+      const isImage = selectedFile.type.startsWith('image/') || /\.(jpe?g|png|webp|bmp)$/i.test(selectedFile.name)
+
+      if (isPdf) {
+        try {
+          const pdfExtract = await extractPdfText(dataUrl)
+          if (pdfExtract.fullText && pdfExtract.fullText.trim().length >= 50) {
+            extractedApplicant = extractFromPdfText(pdfExtract.fullText)
+          } else {
+            const imgTarget = pdfExtract.imagePayload || dataUrl
+            const ocrRes = await recognizeText(imgTarget, { language: 'eng' })
+            if (ocrRes.text) {
+              extractedApplicant = extractFromOcrText(ocrRes)
+            }
+          }
+        } catch (extErr) {
+          console.warn('PDF extraction warning:', extErr)
+          try {
+            const ocrRes = await recognizeText(dataUrl, { language: 'eng' })
+            if (ocrRes.text) {
+              extractedApplicant = extractFromOcrText(ocrRes)
+            }
+          } catch (ocrErr) {
+            console.warn('OCR fallback warning:', ocrErr)
+          }
+        }
+      } else if (isImage) {
+        try {
+          const ocrRes = await recognizeText(dataUrl, { language: 'eng' })
+          if (ocrRes.text) {
+            extractedApplicant = extractFromOcrText(ocrRes)
+          }
+        } catch (imgErr) {
+          console.warn('Image OCR warning:', imgErr)
+        }
+      }
+
+      const hasFields = Boolean(
+        extractedApplicant &&
+        (extractedApplicant.personal?.lastName?.value ||
+         extractedApplicant.personal?.firstName?.value ||
+         extractedApplicant.passport?.passportNumber?.value ||
+         extractedApplicant.family?.father?.name?.value)
+      )
+
       const now = new Date().toISOString()
       const newDoc: DocumentRecord = {
         documentId: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -78,11 +131,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         fileSize: selectedFile.size,
         createdAt: now,
         updatedAt: now,
-        status: 'uploaded',
+        status: hasFields ? 'processed' : 'failed',
         source: 'user-upload',
         description: description.trim() || undefined,
         expiryDate: expiryDate || undefined,
         fileDataUrl: dataUrl,
+        extractedData: hasFields ? extractedApplicant : undefined,
+        extractedDataConfirmed: hasFields,
       }
 
       await onSave(newDoc)
