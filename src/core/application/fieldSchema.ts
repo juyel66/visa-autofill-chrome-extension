@@ -727,6 +727,8 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'ENGINEER', label: 'ENGINEER' },
           { value: 'ADVOCATE', label: 'ADVOCATE / LAWYER' },
           { value: 'JOURNALIST', label: 'JOURNALIST' },
+          { value: 'FARMER', label: 'FARMER' },
+          { value: 'AGRICULTURE', label: 'AGRICULTURE' },
           { value: 'UN-EMPLOYED', label: 'UN-EMPLOYED' },
           { value: 'OTHERS', label: 'OTHERS' },
         ],
@@ -889,6 +891,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'entrypoint',
         sourceApplicantPath: 'travel.entryPoint',
         options: [
+          { value: 'BY ROAD PHULBARI', label: 'BY ROAD PHULBARI' },
           { value: 'HARIDASPUR RAIL', label: 'HARIDASPUR RAIL' },
           { value: 'HARIDASPUR ROAD', label: 'HARIDASPUR ROAD (BENAPOLE)' },
           { value: 'CHANGRIBANDHA ROAD', label: 'CHANGRIBANDHA ROAD' },
@@ -909,6 +912,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'exitpoint',
         sourceApplicantPath: 'travel.exitPoint',
         options: [
+          { value: 'BY ROAD PHULBARI', label: 'BY ROAD PHULBARI' },
           { value: 'HARIDASPUR RAIL', label: 'HARIDASPUR RAIL' },
           { value: 'HARIDASPUR ROAD', label: 'HARIDASPUR ROAD (BENAPOLE)' },
           { value: 'CHANGRIBANDHA ROAD', label: 'CHANGRIBANDHA ROAD' },
