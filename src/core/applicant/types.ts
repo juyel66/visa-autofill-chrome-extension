@@ -137,6 +137,20 @@ export interface PersonalInfo {
   maritalStatus?: string
 }
 
+export interface AdditionalQuestionAnswer {
+  flag?: string | boolean
+  details?: string
+}
+
+export interface AdditionalQuestionsDetails {
+  question1?: AdditionalQuestionAnswer
+  question2?: AdditionalQuestionAnswer
+  question3?: AdditionalQuestionAnswer
+  question4?: AdditionalQuestionAnswer
+  question5?: AdditionalQuestionAnswer
+  question6?: AdditionalQuestionAnswer
+}
+
 export interface ApplicantProfile {
   applicantId: string
   personalInfo?: PersonalInfo
@@ -151,6 +165,7 @@ export interface ApplicantProfile {
   accommodation?: AccommodationDetails
   reference?: ReferenceDetails
   sponsorMission?: ReferenceDetails
+  additionalQuestions?: AdditionalQuestionsDetails
   createdAt: string // ISO timestamp string
   updatedAt: string // ISO timestamp string
   notes?: string
