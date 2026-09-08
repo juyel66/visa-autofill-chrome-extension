@@ -16,6 +16,7 @@ export interface PdfExtractionResult {
   fullText: string
   extractedCharacterCount: number
   status: PdfExtractionStatus
+  imagePayload?: string
   error?: string
 }
 
