@@ -25,5 +25,17 @@
   "permissions": [
     "activeTab",
     "storage"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "tesseract/*",
+        "assets/*"
+      ],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ]
+    }
   ]
 }
