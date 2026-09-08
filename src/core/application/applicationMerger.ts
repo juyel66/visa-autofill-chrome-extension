@@ -2,6 +2,7 @@ import type { DocumentRecord } from '../document/types'
 import type { ApplicantProfile } from '../applicant/types'
 import { applyExtractionToApplicant } from '../extraction/data/extractionMapper'
 import { resolveApplicantValue } from '../autofill/valueResolver'
+import { parseDateString, formatToIsoDate } from '../autofill/dateNormalizer'
 import { getAllSchemaFields } from './fieldSchema'
 import type { ApplicationFieldValue, SavedApplication } from './types'
 
@@ -24,24 +25,7 @@ const HISTORICAL_FIELD_KEYS = new Set([
   'previous_posting',
 ])
 
-const PASSPORT_IDENTITY_KEYS = new Set([
-  'appl.surname',
-  'appl.applname',
-  'appl.applsex',
-  'appl.birthdate',
-  'appl.nationality',
-  'appl.placbrth',
-  'appl.country_of_birth',
-  'appl.passport_number',
-  'appl.passport_issue_place',
-  'appl.passport_issue_date',
-  'appl.passport_expiry_date',
-])
-
-/**
- * Builds or updates a SavedApplication from confirmed documents (Passport and optional OGD)
- * preserving user manual edits as the highest precedence.
- */
+// Application merger helper constants and functions
 export function populateApplicationFromDocuments(options: {
   applicantId: string
   passportDoc?: DocumentRecord | null
@@ -78,6 +62,10 @@ export function populateApplicationFromDocuments(options: {
     ogdProfile = applyExtractionToApplicant(base, ogdDoc.extractedData)
   }
 
+  const activeProfile = passportProfile || ogdProfile
+  const activeDocId = passportDoc?.documentId || ogdDoc?.documentId
+  const activeSource = passportDoc ? 'passport' : 'ogd'
+
   for (const fieldDef of allFields) {
     const key = fieldDef.key
 
@@ -106,18 +94,16 @@ export function populateApplicationFromDocuments(options: {
       }
     }
 
-    // Priority 3: OGD Document (Historical / Old visa / Previous travel data)
+    // Priority 3: OGD Document (Historical / Old visa / Previous travel data / fallback identity)
     if (ogdProfile && fieldDef.sourceApplicantPath) {
       const isHistorical = HISTORICAL_FIELD_KEYS.has(key)
-      const isIdentity = PASSPORT_IDENTITY_KEYS.has(key)
 
       // Only let OGD populate if:
       // (a) It's a historical field, OR
-      // (b) It's not a strict current passport identity field and passport didn't have it
-      if (isHistorical || (!isIdentity && !resolvedValue)) {
+      // (b) Passport document did not provide a value for this field
+      if (isHistorical || !resolvedValue) {
         const ogdVal = resolveApplicantValue(ogdProfile, fieldDef.sourceApplicantPath)
         if (ogdVal !== undefined && ogdVal !== '') {
-          // If passport already had a value for a non-historical field, do NOT let OGD overwrite it
           if (!resolvedValue || isHistorical) {
             resolvedValue = ogdVal
             source = 'ogd'
@@ -127,35 +113,157 @@ export function populateApplicationFromDocuments(options: {
       }
     }
 
-    // Derivation pass for fields deterministically tied to confirmed passport identity
-    if (!resolvedValue) {
-      if (key === 'appl.countryname' && (passportProfile?.personalInfo?.nationality === 'BANGLADESH' || passportProfile?.passport?.issuingCountry === 'BANGLADESH')) {
+    // Derivation pass for fields deterministically tied to confirmed documents
+    if (!resolvedValue && activeProfile) {
+      if (
+        key === 'appl.countryname' &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' ||
+          activeProfile.passport?.issuingCountry === 'BANGLADESH' ||
+          activeProfile.presentAddress?.country === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
-        source = 'passport'
-        docId = passportDoc?.documentId
-      } else if (key === 'appl.country_of_birth' && (passportProfile?.personalInfo?.nationality === 'BANGLADESH' || passportProfile?.personalInfo?.townCityOfBirth)) {
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        key === 'appl.country_of_birth' &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || activeProfile.personalInfo?.townCityOfBirth)
+      ) {
         resolvedValue = 'BANGLADESH'
-        source = 'passport'
-        docId = passportDoc?.documentId
-      } else if (key === 'appl.nationality_by' && passportProfile?.personalInfo?.nationality === 'BANGLADESH') {
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.nationality_by' && activeProfile.personalInfo?.nationality === 'BANGLADESH') {
         resolvedValue = 'Birth'
-        source = 'passport'
-        docId = passportDoc?.documentId
-      } else if (key === 'appl.oth_ppt' && passportProfile && !passportProfile.passport?.holdsOtherPassport) {
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.email_re' && activeProfile.contact?.email) {
+        resolvedValue = activeProfile.contact.email
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.journeydate' && activeProfile.travel?.intendedArrivalDate) {
+        resolvedValue = activeProfile.travel.intendedArrivalDate
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.oth_ppt' && activeProfile.passport?.holdsOtherPassport !== true) {
         resolvedValue = 'No'
-        source = 'passport'
-        docId = passportDoc?.documentId
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.father_nationality' && activeProfile.family?.father?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.father_country_of_birth' && activeProfile.family?.father?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.father_prev_nationality' && activeProfile.family?.father?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.mother_nationality' && activeProfile.family?.mother?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.mother_country_of_birth' && activeProfile.family?.mother?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.mother_prev_nationality' && activeProfile.family?.mother?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.spouse_nationality' && activeProfile.family?.spouse?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.spouse_country_of_birth' && activeProfile.family?.spouse?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.spouse_prev_nationality' && activeProfile.family?.spouse?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.prev_passport_country_issue' && activeProfile.passport?.holdsOtherPassport === true) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'appl.other_ppt_nationality' && activeProfile.passport?.holdsOtherPassport === true) {
+        resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (key === 'grandparent_flag' && (activeProfile.family?.hasPakistanRelation === false || ogdProfile?.family?.hasPakistanRelation === false)) {
+        resolvedValue = 'No'
+        source = ogdProfile?.family?.hasPakistanRelation === false ? 'ogd' : activeSource
+        docId = ogdProfile?.family?.hasPakistanRelation === false ? ogdDoc?.documentId : activeDocId
+      } else if (key === 'prev_org' && (activeProfile.employment?.hasMilitaryService === false || ogdProfile?.employment?.hasMilitaryService === false)) {
+        resolvedValue = 'No'
+        source = ogdProfile?.employment?.hasMilitaryService === false ? 'ogd' : activeSource
+        docId = ogdProfile?.employment?.hasMilitaryService === false ? ogdDoc?.documentId : activeDocId
+      } else if (key === 'old_visa_flag' && (activeProfile.previousVisa?.hasPreviousVisa === false || ogdProfile?.previousVisa?.hasPreviousVisa === false)) {
+        resolvedValue = 'No'
+        source = ogdProfile?.previousVisa?.hasPreviousVisa === false ? 'ogd' : activeSource
+        docId = ogdProfile?.previousVisa?.hasPreviousVisa === false ? ogdDoc?.documentId : activeDocId
       }
     }
 
     if (resolvedValue !== undefined && resolvedValue !== '') {
-      let finalVal = resolvedValue
+      let finalVal: string | boolean = resolvedValue
+
+      // Radio normalization
+      if (fieldDef.inputType === 'radio') {
+        const s = String(finalVal).trim().toLowerCase()
+        if (s === 'false' || s === '0' || s === 'no') {
+          finalVal = 'No'
+        } else if (s === 'true' || s === '1' || s === 'yes') {
+          finalVal = 'Yes'
+        }
+      }
+
+      // Checkbox normalization
+      if (fieldDef.inputType === 'checkbox') {
+        const s = String(finalVal).trim().toLowerCase()
+        if (s === 'false' || s === '0' || s === 'no') {
+          finalVal = false
+        } else if (s === 'true' || s === '1' || s === 'yes') {
+          finalVal = true
+        }
+      }
+
+      // Date normalization to DD/MM/YYYY
       if (
-        (fieldDef.inputType === 'date' || fieldDef.placeholder === 'DD/MM/YYYY') &&
-        /^\d{4}-\d{2}-\d{2}$/.test(finalVal)
+        typeof finalVal === 'string' &&
+        (fieldDef.inputType === 'date' || fieldDef.placeholder === 'DD/MM/YYYY' || key.includes('date'))
       ) {
-        const [y, m, d] = finalVal.split('-')
-        finalVal = `${d}/${m}/${y}`
+        if (/^\d{4}-\d{2}-\d{2}$/.test(finalVal)) {
+          const [y, m, d] = finalVal.split('-')
+          finalVal = `${d}/${m}/${y}`
+        } else {
+          const parsed = parseDateString(finalVal)
+          if (parsed) {
+            const iso = formatToIsoDate(parsed)
+            const [y, m, d] = iso.split('-')
+            finalVal = `${d}/${m}/${y}`
+          }
+        }
+      }
+
+      // Special field value normalizations
+      if (typeof finalVal === 'string') {
+        if (key === 'marital_status') {
+          if (finalVal === '0' || finalVal.toUpperCase() === 'MARRIED') finalVal = 'Married'
+          else if (finalVal === '1' || finalVal.toUpperCase() === 'SINGLE' || finalVal.toUpperCase() === 'UNMARRIED') finalVal = 'Single'
+        } else if (key === 'duration') {
+          finalVal = finalVal.replace(/months?/i, '').trim()
+        } else if (key === 'visa_entry_id') {
+          if (/multiple/i.test(finalVal)) finalVal = 'Multiple'
+          else if (/double/i.test(finalVal)) finalVal = 'Double'
+          else if (/triple/i.test(finalVal)) finalVal = 'Triple'
+          else if (/single/i.test(finalVal)) finalVal = 'Single'
+        } else if (key === 'occupation') {
+          if (/farmer|agriculture/i.test(finalVal)) finalVal = 'FARMER'
+        } else if (key === 'entrypoint' || key === 'exitpoint') {
+          if (/phulbari|fulbari/i.test(finalVal)) finalVal = 'BY ROAD PHULBARI'
+        }
       }
 
       fields[key] = {
@@ -182,8 +290,22 @@ export function populateApplicationFromDocuments(options: {
 
     if (existingApp?.manualEdits[flagKey] && existingApp.fields[flagKey]) {
       fields[flagKey] = existingApp.fields[flagKey]
-    } else if (!fields[flagKey]) {
-      fields[flagKey] = { value: 'No', source: 'missing', isUserEdited: false }
+    } else {
+      const isRefusalQ = q === 2 && (ogdProfile?.previousVisa?.hasRefusal === false || activeProfile?.previousVisa?.hasRefusal === false)
+      if (isRefusalQ) {
+        fields[flagKey] = {
+          value: 'No',
+          source: 'ogd',
+          documentId: ogdDoc?.documentId,
+          isUserEdited: false,
+        }
+      } else if (!fields[flagKey]) {
+        fields[flagKey] = {
+          value: 'No',
+          source: 'missing',
+          isUserEdited: false,
+        }
+      }
     }
 
     if (existingApp?.manualEdits[ansKey] && existingApp.fields[ansKey]) {
@@ -230,6 +352,13 @@ export function convertSavedApplicationToApplicantProfile(
     return String(f.value).trim()
   }
 
+  const getFieldDate = (key: string): string | undefined => {
+    const raw = getFieldStr(key)
+    if (!raw) return undefined
+    const parsed = parseDateString(raw)
+    return parsed ? formatToIsoDate(parsed) : raw
+  }
+
   const getFieldBool = (key: string): boolean | undefined => {
     const f = savedApp.fields[key]
     if (!f || f.value === '' || f.value === undefined || f.value === null) return undefined
@@ -255,7 +384,7 @@ export function convertSavedApplicationToApplicantProfile(
         if (g === 'other' || g === 'transgender') return 'other'
         return undefined
       })(),
-      dateOfBirth: getFieldStr('appl.birthdate'),
+      dateOfBirth: getFieldDate('appl.birthdate'),
       townCityOfBirth: getFieldStr('appl.placbrth'),
       countryOfBirth: getFieldStr('appl.country_of_birth'),
       nationalIdNumber: getFieldStr('appl.nic_no'),
@@ -275,8 +404,8 @@ export function convertSavedApplicationToApplicantProfile(
     passport: {
       passportNumber: getFieldStr('appl.passport_number'),
       placeOfIssue: getFieldStr('appl.passport_issue_place'),
-      issueDate: getFieldStr('appl.passport_issue_date'),
-      expiryDate: getFieldStr('appl.passport_expiry_date'),
+      issueDate: getFieldDate('appl.passport_issue_date'),
+      expiryDate: getFieldDate('appl.passport_expiry_date'),
       issuingCountry: getFieldStr('appl.countryname'),
       holdsOtherPassport: getFieldBool('appl.oth_ppt'),
       otherPassportDetails: {
@@ -351,7 +480,7 @@ export function convertSavedApplicationToApplicantProfile(
     travel: {
       duration: getFieldStr('duration'),
       visaEntryType: getFieldStr('visa_entry_id'),
-      intendedArrivalDate: getFieldStr('journeydate') || getFieldStr('appl.journeydate'),
+      intendedArrivalDate: getFieldDate('journeydate') || getFieldDate('appl.journeydate'),
       entryPoint: getFieldStr('entrypoint'),
       exitPoint: getFieldStr('exitpoint'),
       countriesVisited: getFieldStr('country_visited'),
@@ -366,7 +495,7 @@ export function convertSavedApplicationToApplicantProfile(
       visaNumber: getFieldStr('old_visa_no'),
       visaType: getFieldStr('old_visa_type_id'),
       placeOfIssue: getFieldStr('oldvisaissueplace'),
-      dateOfIssue: getFieldStr('oldvisaissuedate'),
+      dateOfIssue: getFieldDate('oldvisaissuedate'),
     },
 
     reference: {
@@ -382,6 +511,33 @@ export function convertSavedApplicationToApplicantProfile(
       addressLine2: getFieldStr('add2ofsponsor_msn'),
       phone: getFieldStr('phoneofsponsor_msn'),
     },
+
+    additionalQuestions: {
+      question1: {
+        flag: getFieldStr('question_1_flag') || 'No',
+        details: getFieldStr('answer_1'),
+      },
+      question2: {
+        flag: getFieldStr('question_2_flag') || 'No',
+        details: getFieldStr('answer_2'),
+      },
+      question3: {
+        flag: getFieldStr('question_3_flag') || 'No',
+        details: getFieldStr('answer_3'),
+      },
+      question4: {
+        flag: getFieldStr('question_4_flag') || 'No',
+        details: getFieldStr('answer_4'),
+      },
+      question5: {
+        flag: getFieldStr('question_5_flag') || 'No',
+        details: getFieldStr('answer_5'),
+      },
+      question6: {
+        flag: getFieldStr('question_6_flag') || 'No',
+        details: getFieldStr('answer_6'),
+      },
+    },
   }
 
   // Also preserve special derived mission if notes or fields specify
@@ -392,3 +548,4 @@ export function convertSavedApplicationToApplicantProfile(
 
   return profile
 }
+
