@@ -1,6 +1,7 @@
 import type { GenericPageDetectionResult } from '../../core/messaging/types'
 
 export type IndiaVisaFlow = 'regular' | 'evisa' | 'unknown'
+
  
 
 
@@ -28,6 +29,8 @@ export type CanonicalIndiaVisaPage =
   | 'ADDITIONAL_QUESTIONS'
   | 'PHOTO_UPLOAD'
   | 'UNKNOWN'
+
+
 
 export type IndiaVisaPage =
   | CanonicalIndiaVisaPage
