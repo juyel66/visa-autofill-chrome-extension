@@ -14,8 +14,32 @@ import { runAddressFamilyExtractionTests } from '../src/countries/india/__tests_
 import { runTravelDetailsExtractionTests } from '../src/countries/india/__tests__/travelDetailsExtraction.test'
 import { runRuntimeAutofillRegressionTests } from '../src/core/autofill/__tests__/runtimeAutofillRegression.test'
 import { runApplicationWorkspaceTests } from '../src/core/application/__tests__/applicationWorkspace.test'
+import { runEndToEndWorkflowTests } from '../src/countries/india/__tests__/endToEndWorkflow.test'
+import { runOgdFullFieldExtractionTests } from '../src/core/extraction/__tests__/ogdFullFieldExtraction.test'
+import { runScannedPassportOcrTests } from '../src/core/extraction/__tests__/scannedPassportOcr.test'
 
 async function execute() {
+  console.log('--- RUNNING SCANNED PASSPORT OCR TESTS (TASK 058) ---')
+  const passOcrRes = await runScannedPassportOcrTests()
+  console.log(`Passed: ${passOcrRes.passed}, Count: ${passOcrRes.totalSubtests}`)
+  if (!passOcrRes.passed) {
+    console.error('Failures:', passOcrRes.failures)
+  }
+
+  console.log('--- RUNNING OGD FULL-FIELD EXTRACTION TESTS (TASK 057) ---')
+  const ogdRes = await runOgdFullFieldExtractionTests()
+  console.log(`Passed: ${ogdRes.passed}, Count: ${ogdRes.totalSubtests}`)
+  if (!ogdRes.passed) {
+    console.error('Failures:', ogdRes.failures)
+  }
+
+  console.log('--- RUNNING COMPLETE END-TO-END WORKFLOW TESTS (TASK 056) ---')
+  const e2eWorkflowRes = await runEndToEndWorkflowTests()
+  console.log(`Passed: ${e2eWorkflowRes.passed}, Count: ${e2eWorkflowRes.totalSubtests}`)
+  if (!e2eWorkflowRes.passed) {
+    console.error('Failures:', e2eWorkflowRes.failures)
+  }
+
   console.log('--- RUNNING APPLICATION WORKSPACE & SAVED APPLICATION TESTS (TASK 054) ---')
   const appWorkspaceRes = await runApplicationWorkspaceTests()
   console.log(`Passed: ${appWorkspaceRes.passed}, Count: ${appWorkspaceRes.totalSubtests}`)
@@ -113,6 +137,8 @@ async function execute() {
   }
   
   if (
+    ogdRes.passed &&
+    e2eWorkflowRes.passed &&
     appWorkspaceRes.passed &&
     domVerifyRes.passed &&
     candResolverRes.passed &&
@@ -140,3 +166,4 @@ execute().catch(err => {
   console.error(err)
   process.exit(1)
 })
+
