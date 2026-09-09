@@ -120,7 +120,7 @@ chrome.runtime.onMessage.addListener(
           return
         }
 
-        // Tab and Applicant Consistency Check
+        // Tab and Applicant Consistency Check and rebuild file
         if (
           activeWorkflowState.status !== 'idle' &&
           activeWorkflowState.tabId !== null &&
