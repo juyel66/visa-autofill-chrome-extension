@@ -13,10 +13,16 @@ function ensureTesseractAssets() {
     fs.mkdirSync(publicTesseractDir, { recursive: true })
   }
 
-  // 1. Worker
+  // 1. Worker (packaged and patched for Chrome MV3 extension protocol support)
   const workerSrc = join(__dirname, 'node_modules', 'tesseract.js', 'dist', 'worker.min.js')
   if (fs.existsSync(workerSrc)) {
-    fs.copyFileSync(workerSrc, join(publicTesseractDir, 'worker.min.js'))
+    let workerCode = fs.readFileSync(workerSrc, 'utf8')
+    const target1 = 'if((U=t.sent).ok){t.next=32;break}'
+    const repl1 = 'if((U=t.sent).ok||0===U.status||200===U.status){t.next=32;break}'
+    if (workerCode.includes(target1)) {
+      workerCode = workerCode.replace(target1, repl1)
+    }
+    fs.writeFileSync(join(publicTesseractDir, 'worker.min.js'), workerCode)
   }
 
   // 2. Core (copy all wasm and wasm.js and js files from tesseract.js-core)
