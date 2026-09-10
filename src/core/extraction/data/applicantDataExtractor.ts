@@ -7,6 +7,13 @@ import type {
   ExtractedFieldConflict,
   ExtractionSource,
 } from './types'
+import {
+  extractReligionFromExplicitDocumentText,
+} from './religionExtractor'
+import {
+  normalizeNameString,
+  splitBangladeshiFullName,
+} from '../../normalization/bangladeshiNameNormalizer'
 
 /**
  * Maps structured Passport MRZ data into generic candidate applicant fields.
@@ -397,13 +404,15 @@ export function extractFromOgdVisaApplication(
   // Surname
   const surname = getBoundedValue(/(?:surname(?:\s*\(as\s*shown\s*in\s*passport\))?|last\s*name)[:\s]+([^\r\n:]+?)(?=\s+(?:given\s*name|sex|date\s*of\s*birth|nationality|place\s*of\s*birth)|$|\r?\n)/i)
   if (surname) {
-    result.personal!.lastName = { value: surname.toUpperCase(), source, confidence: baseConfidence }
+    const norm = normalizeNameString(surname) || surname.toUpperCase()
+    result.personal!.lastName = { value: norm, source, confidence: baseConfidence }
   }
 
   // Given Name
   const givenName = getBoundedValue(/(?:given\s*name(?:\(s\))?(?:\s*\(as\s*shown\s*in\s*passport\))?|first\s*name)[:\s]+([^\r\n:]+?)(?=\s+(?:surname|sex|date\s*of\s*birth|nationality|place\s*of\s*birth|previous\s*name)|$|\r?\n)/i)
   if (givenName) {
-    result.personal!.firstName = { value: givenName.toUpperCase(), source, confidence: baseConfidence }
+    const norm = normalizeNameString(givenName) || givenName.toUpperCase()
+    result.personal!.firstName = { value: norm, source, confidence: baseConfidence }
   }
 
   if (result.personal!.lastName?.value && result.personal!.firstName?.value) {
@@ -460,17 +469,10 @@ export function extractFromOgdVisaApplication(
     result.personal!.nationalIdNumber = { value: nidMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
   }
 
-  // Religion
-  const relMatch = text.match(/(?:religion)[:\s]+([A-Za-z]+)/i)
-  if (relMatch) {
-    const r = relMatch[1].trim().toUpperCase()
-    let normRel = r
-    if (r.includes('HINDU')) normRel = 'HINDU'
-    else if (r.includes('ISLAM') || r.includes('MUSLIM')) normRel = 'ISLAM'
-    else if (r.includes('BUDDH')) normRel = 'BUDDHISM'
-    else if (r.includes('CHRIST')) normRel = 'CHRISTIAN'
-    else if (r.includes('SIKH')) normRel = 'SIKH'
-    result.personal!.religion = { value: normRel, source, confidence: baseConfidence }
+  // Religion (Strict explicit documentary evidence only)
+  const relExtract = extractReligionFromExplicitDocumentText(text, 'ogd')
+  if (relExtract) {
+    result.personal!.religion = { value: relExtract.value, source, confidence: baseConfidence }
   }
 
   // Educational Qualification
@@ -876,9 +878,10 @@ function extractFromRawText(
     /(?:surname(?:\s*\/\s*nom)?|last\s*name)[:\s]+([A-Za-z .'-]{2,40})/i
   )
   if (surnameMatch && surnameMatch[1]) {
+    const norm = normalizeNameString(surnameMatch[1]) || surnameMatch[1].trim().toUpperCase()
     result.personal = {
       ...result.personal,
-      lastName: { value: surnameMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
+      lastName: { value: norm, source, confidence: baseConfidence },
     }
   }
 
@@ -886,9 +889,10 @@ function extractFromRawText(
     /(?:given\s*name(?:\(s\))?(?:\s*\/\s*pr[ée]noms)?|given\s*names|first\s*name)[:\s]+([A-Za-z .'-]{2,60})/i
   )
   if (givenNameMatch && givenNameMatch[1]) {
+    const norm = normalizeNameString(givenNameMatch[1]) || givenNameMatch[1].trim().toUpperCase()
     result.personal = {
       ...result.personal,
-      firstName: { value: givenNameMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
+      firstName: { value: norm, source, confidence: baseConfidence },
     }
   }
 
@@ -897,23 +901,20 @@ function extractFromRawText(
       /(?:full\s*name|name\s*of\s*holder|bearer(?:'s)?\s*name|holder(?:'s)?\s*name|name)[:\s]+([A-Za-z .'-]{3,60})/i
     )
     if (fullNameMatch && fullNameMatch[1]) {
-      const rawName = fullNameMatch[1].trim().toUpperCase()
+      const rawName = fullNameMatch[1].trim()
       const isNotApplicantName = /(?:father|mother|spouse|husband|wife|sponsor|reference|hotel|company|employer|emergency)/i.test(fullNameMatch[0])
       if (!isNotApplicantName && rawName.length > 2) {
+        const split = splitBangladeshiFullName(rawName)
+        const normFullName = normalizeNameString(rawName) || rawName.toUpperCase()
         result.personal = {
           ...result.personal,
-          fullName: { value: rawName, source, confidence: baseConfidence },
+          fullName: { value: normFullName, source, confidence: baseConfidence },
         }
-        const nameParts = rawName.split(/\s+/).filter(Boolean)
-        if (nameParts.length === 1 && !result.personal.lastName) {
-          result.personal.lastName = { value: nameParts[0], source, confidence: baseConfidence }
-        } else if (nameParts.length > 1) {
-          if (!result.personal.lastName) {
-            result.personal.lastName = { value: nameParts[nameParts.length - 1], source, confidence: baseConfidence }
-          }
-          if (!result.personal.firstName) {
-            result.personal.firstName = { value: nameParts.slice(0, -1).join(' '), source, confidence: baseConfidence }
-          }
+        if (!result.personal.lastName && split.surname) {
+          result.personal.lastName = { value: split.surname, source, confidence: baseConfidence }
+        }
+        if (!result.personal.firstName && split.givenNames) {
+          result.personal.firstName = { value: split.givenNames, source, confidence: baseConfidence }
         }
       }
     }
@@ -1099,7 +1100,7 @@ function extractFromRawText(
 
   // 9. Previous Passport Details
   const prevPptMatch = text.match(
-    /(?:previous\s*passport\s*(?:no|number|\.|\/|\s*n°\s*de\s*l['’]ancien\s*passeport)?|prev\s*passport\s*no)[:\s]+([A-Z0-9]{6,12})/i
+    /(?:previous\s*passport\s*(?:no|number|\.|\/|\s*n°\s*de\s*l['’]ancien\s*passeport)?|prev\s*passport\s*no)[:\s.]+([A-Z0-9]{6,12})/i
   )
   if (prevPptMatch && prevPptMatch[1]) {
     result.passport = {
@@ -1109,25 +1110,17 @@ function extractFromRawText(
         passportNumber: { value: prevPptMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
         countryOfIssue: { value: 'BANGLADESH', source, confidence: baseConfidence },
         placeOfIssue: { value: 'DHAKA', source, confidence: baseConfidence },
+        nationalityInPassport: { value: 'BANGLADESH', source, confidence: baseConfidence },
       },
     }
   }
 
-  // 10. Religion, Education, Visible Identification Marks
-  const religionMatch = text.match(/(?:religion)[:\s]+([A-Za-z]+)/i)
-  if (religionMatch && religionMatch[1]) {
-    const rawRel = religionMatch[1].trim().toUpperCase()
-    let normRel: string | undefined
-    if (rawRel.includes('ISLAM') || rawRel.includes('MUSLIM')) normRel = 'ISLAM'
-    else if (rawRel.includes('HINDU')) normRel = 'HINDU'
-    else if (rawRel.includes('BUDDH')) normRel = 'BUDDHISM'
-    else if (rawRel.includes('CHRIST')) normRel = 'CHRISTIAN'
-    else if (rawRel.includes('SIKH')) normRel = 'SIKH'
-    else normRel = 'OTHERS'
-
+  // 10. Religion, Education, Visible Identification Marks (Strict explicit documentary evidence only)
+  const relExtract = extractReligionFromExplicitDocumentText(text, source)
+  if (relExtract) {
     result.personal = {
       ...result.personal,
-      religion: { value: normRel, source, confidence: baseConfidence },
+      religion: { value: relExtract.value, source, confidence: baseConfidence },
     }
   }
 
@@ -1207,7 +1200,7 @@ function extractFromRawText(
   // Extract Present Address Block if line 1 wasn't found as a dedicated key
   if (!result.presentAddress?.addressLine1) {
     const presAddrBlock = text.match(
-      /(?:present\s*address|residential\s*address|current\s*address|home\s*address|mailing\s*address|postal\s*address|address)[:\s]+([^\r\n]+(?:\r?\n[ \t]*(?!permanent|father|mother|marital|occupation|employer|previous|passport|date\s*of\s*birth|postal\s*code|pincode|country|district|state|province)[^\r\n:]+)*)/i
+      /(?:present\s*address|residential\s*address|current\s*address|home\s*address|mailing\s*address|postal\s*address)[:\s]+([^\r\n]+(?:\r?\n[ \t]*(?!permanent|emergency|legal|father|mother|marital|occupation|employer|previous|passport|date\s*of\s*birth|postal\s*code|pincode|country|district|state|province)[^\r\n:]+)*)/i
     )
     if (presAddrBlock && presAddrBlock[1]) {
       const lines = presAddrBlock[1]
@@ -1321,10 +1314,13 @@ function extractFromRawText(
           city = cityMatch[1].toUpperCase()
         }
 
+        let line1 = cleanLines[0] || fullAddr
+        line1 = line1.replace(/,\s*(?:THAKURGAON|DHAKA|CHITTAGONG|SYLHET|RAJSHAHI|KHULNA|BARISAL|RANGPUR|MYMENSINGH|COMILLA|GAZIPUR|NARAYANGANJ|BOGRA|DINAJPUR|PANCHAGARH)\s*$/i, '').trim()
+
         result.permanentAddress = {
           ...result.permanentAddress,
-          addressLine1: { value: cleanLines[0] || fullAddr, source, confidence: baseConfidence },
-          addressLine2: { value: cleanLines.length > 1 ? cleanLines.slice(1).join(', ') : city, source, confidence: baseConfidence },
+          addressLine1: { value: line1, source, confidence: baseConfidence },
+          addressLine2: { value: city, source, confidence: baseConfidence },
           district: { value: city, source, confidence: baseConfidence },
           villageTownCity: { value: city, source, confidence: baseConfidence },
           postalCode: pinCode ? { value: pinCode, source, confidence: baseConfidence } : undefined,
