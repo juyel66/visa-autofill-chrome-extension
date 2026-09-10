@@ -4,6 +4,7 @@ import { applyExtractionToApplicant } from '../extraction/data/extractionMapper'
 import { resolveApplicantValue } from '../autofill/valueResolver'
 import { parseDateString, formatToIsoDate } from '../autofill/dateNormalizer'
 import { getAllSchemaFields } from './fieldSchema'
+import { resolveApplicantReligion } from '../extraction/data/religionExtractor'
 import type { ApplicationFieldValue, SavedApplication } from './types'
 
 const HISTORICAL_FIELD_KEYS = new Set([
@@ -25,6 +26,55 @@ const HISTORICAL_FIELD_KEYS = new Set([
   'previous_posting',
 ])
 
+export const PASSPORT_IDENTITY_KEYS = new Set([
+  'appl.surname',
+  'surname',
+  'appl.applname',
+  'applname',
+  'appl.applsex',
+  'applsex',
+  'appl.birthdate',
+  'birthdate',
+  'appl.nationality',
+  'nationality',
+  'appl.country_of_birth',
+  'country_of_birth',
+  'appl.placbrth',
+  'placbrth',
+  'appl.nic_no',
+  'nic_no',
+  'appl.pptno',
+  'pptno',
+  'appl.passport_number',
+  'appl.issuedate',
+  'issuedate',
+  'appl.passport_issue_date',
+  'appl.expdate',
+  'expdate',
+  'appl.passport_expiry_date',
+  'appl.issueplace',
+  'issueplace',
+  'appl.passport_issue_place',
+  'appl.father_name',
+  'father_name',
+  'appl.mother_name',
+  'mother_name',
+  'appl.spouse_name',
+  'spouse_name',
+  'appl.pres_add1',
+  'pres_add1',
+  'appl.pres_state',
+  'pres_state',
+  'appl.pres_pincode',
+  'pres_pincode',
+  'appl.pres_phone',
+  'pres_phone',
+  'appl.perm_add1',
+  'perm_add1',
+  'marital_status',
+  'appl.marital_status',
+])
+
 // Application merger helper constants and functions
 export function populateApplicationFromDocuments(options: {
   applicantId: string
@@ -37,7 +87,6 @@ export function populateApplicationFromDocuments(options: {
 
   const allFields = getAllSchemaFields()
   const fields: Record<string, ApplicationFieldValue> = {}
-  const manualEdits: Record<string, boolean> = { ...(existingApp?.manualEdits || {}) }
 
   // 1. Build temporary profiles from confirmed documents if available
   let passportProfile: ApplicantProfile | null = null
@@ -62,15 +111,66 @@ export function populateApplicationFromDocuments(options: {
     ogdProfile = applyExtractionToApplicant(base, ogdDoc.extractedData)
   }
 
+  // 2. Cross-applicant identity checks:
+  const currentPptNo = passportProfile?.passport?.passportNumber?.trim().toUpperCase()
+  const currentSurname = passportProfile?.personalInfo?.surname?.trim().toUpperCase()
+  const existingPptNo = (
+    existingApp?.fields['appl.pptno']?.value ||
+    existingApp?.fields['appl.passport_number']?.value ||
+    existingApp?.fields['passport_number']?.value ||
+    existingApp?.fields['pptno']?.value ||
+    ''
+  )
+    .toString()
+    .trim()
+    .toUpperCase()
+  const existingSurname = (
+    existingApp?.fields['appl.surname']?.value ||
+    existingApp?.fields['surname']?.value ||
+    ''
+  )
+    .toString()
+    .trim()
+    .toUpperCase()
+
+  const isMismatchedExistingApp = Boolean(
+    (currentPptNo && existingPptNo && currentPptNo !== existingPptNo) ||
+    (currentSurname && existingSurname && !currentSurname.includes(existingSurname) && !existingSurname.includes(currentSurname) && (!existingPptNo || existingPptNo !== currentPptNo))
+  )
+
+  const manualEdits: Record<string, boolean> = isMismatchedExistingApp ? {} : { ...(existingApp?.manualEdits || {}) }
+
+  let ogdIsDifferentApplicant = false
+  if (passportProfile && ogdProfile) {
+    const oPpt = ogdProfile.passport?.passportNumber?.trim().toUpperCase()
+    const oSurname = ogdProfile.personalInfo?.surname?.trim().toUpperCase()
+    if (currentPptNo && oPpt && currentPptNo !== oPpt) {
+      ogdIsDifferentApplicant = true
+    } else if (currentSurname && oSurname && !currentSurname.includes(oSurname) && !oSurname.includes(currentSurname)) {
+      ogdIsDifferentApplicant = true
+    }
+  }
+
   const activeProfile = passportProfile || ogdProfile
   const activeDocId = passportDoc?.documentId || ogdDoc?.documentId
   const activeSource = passportDoc ? 'passport' : 'ogd'
 
   for (const fieldDef of allFields) {
     const key = fieldDef.key
+    const isPassportIdentityField = PASSPORT_IDENTITY_KEYS.has(key)
 
     // Priority 1: User Manual Edit preserved
-    if (existingApp && existingApp.fields[key] && existingApp.manualEdits[key]) {
+    // Only preserve manual edits if:
+    // (a) existingApp is from the same applicant/passport (!isMismatchedExistingApp), AND
+    // (b) existingApp has a recorded manual edit with isUserEdited: true
+    const preserveManualEdit =
+      !isMismatchedExistingApp &&
+      existingApp &&
+      existingApp.fields[key] &&
+      existingApp.manualEdits[key] &&
+      (existingApp.fields[key].isUserEdited === true || existingApp.fields[key].source === 'manual')
+
+    if (preserveManualEdit) {
       fields[key] = {
         ...existingApp.fields[key],
         source: 'manual',
@@ -80,11 +180,56 @@ export function populateApplicationFromDocuments(options: {
       continue
     }
 
+    // Special handling for Religion: Strict documentary evidence, source priority, and conflict detection
+    if (key === 'appl.religion' || key === 'religion') {
+      const relResolution = resolveApplicantReligion({
+        passportExtractedValue:
+          passportProfile?.personalInfo?.religion ||
+          passportDoc?.extractedData?.personal?.religion?.value,
+        ogdExtractedValue:
+          ogdProfile?.personalInfo?.religion ||
+          ogdDoc?.extractedData?.personal?.religion?.value,
+        existingManualValue: existingApp?.fields[key]?.value,
+        isUserEdited:
+          !isMismatchedExistingApp &&
+          Boolean(existingApp?.manualEdits[key] && existingApp?.fields[key]?.isUserEdited),
+      })
+
+      if (relResolution.value) {
+        fields[key] = {
+          value: relResolution.value,
+          source: relResolution.source,
+          documentId:
+            relResolution.source === 'passport'
+              ? passportDoc?.documentId
+              : relResolution.source === 'ogd'
+              ? ogdDoc?.documentId
+              : undefined,
+          confidence: relResolution.confidence,
+          isUserEdited: relResolution.source === 'manual',
+          originalExtractedValue: relResolution.rawSourceValue || relResolution.value,
+          hasConflict: relResolution.conflict,
+          conflictDetails: relResolution.conflictDetails,
+        }
+        if (relResolution.source === 'manual') {
+          manualEdits[key] = true
+        }
+      } else {
+        fields[key] = {
+          value: '',
+          source: 'missing',
+          isUserEdited: false,
+          hasConflict: false,
+        }
+      }
+      continue
+    }
+
     let resolvedValue: string | undefined
     let source: 'passport' | 'ogd' | 'missing' = 'missing'
     let docId: string | undefined
 
-    // Priority 2: Passport Document (Primary source for identity, passport, address)
+    // Priority 2: Passport Document (Primary authoritative source for identity, passport, address)
     if (passportProfile && fieldDef.sourceApplicantPath) {
       const pVal = resolveApplicantValue(passportProfile, fieldDef.sourceApplicantPath)
       if (pVal !== undefined && pVal !== '') {
@@ -94,14 +239,14 @@ export function populateApplicationFromDocuments(options: {
       }
     }
 
-    // Priority 3: OGD Document (Historical / Old visa / Previous travel data / fallback identity)
+    // Priority 3: OGD Document (Historical / Old visa / Previous travel data / fallback identity if same applicant)
     if (ogdProfile && fieldDef.sourceApplicantPath) {
       const isHistorical = HISTORICAL_FIELD_KEYS.has(key)
 
       // Only let OGD populate if:
       // (a) It's a historical field, OR
-      // (b) Passport document did not provide a value for this field
-      if (isHistorical || !resolvedValue) {
+      // (b) Passport document did not provide a value for this field AND OGD is not a different applicant
+      if (isHistorical || (!resolvedValue && (!isPassportIdentityField || !ogdIsDifferentApplicant))) {
         const ogdVal = resolveApplicantValue(ogdProfile, fieldDef.sourceApplicantPath)
         if (ogdVal !== undefined && ogdVal !== '') {
           if (!resolvedValue || isHistorical) {
@@ -147,59 +292,117 @@ export function populateApplicationFromDocuments(options: {
         resolvedValue = 'No'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.father_nationality' && activeProfile.family?.father?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+      } else if (
+        (key === 'father_nationality' || key === 'appl.father_nationality') &&
+        activeProfile.family?.father?.name &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.father_country_of_birth' && activeProfile.family?.father?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+      } else if (
+        (key === 'father_country_of_birth' || key === 'appl.father_country_of_birth') &&
+        activeProfile.family?.father?.name &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.father_prev_nationality' && activeProfile.family?.father?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+      } else if (
+        (key === 'father_prev_nationality' || key === 'appl.father_prev_nationality') &&
+        activeProfile.family?.father?.name &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.mother_nationality' && activeProfile.family?.mother?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+      } else if (
+        (key === 'mother_nationality' || key === 'appl.mother_nationality') &&
+        activeProfile.family?.mother?.name &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.mother_country_of_birth' && activeProfile.family?.mother?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+      } else if (
+        (key === 'mother_country_of_birth' || key === 'appl.mother_country_of_birth') &&
+        activeProfile.family?.mother?.name &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.mother_prev_nationality' && activeProfile.family?.mother?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+      } else if (
+        (key === 'mother_prev_nationality' || key === 'appl.mother_prev_nationality') &&
+        activeProfile.family?.mother?.name &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.spouse_nationality' && activeProfile.family?.spouse?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+      } else if (
+        (key === 'spouse_nationality' || key === 'appl.spouse_nationality') &&
+        activeProfile.family?.spouse?.name &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.spouse_country_of_birth' && activeProfile.family?.spouse?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+      } else if (
+        (key === 'spouse_country_of_birth' || key === 'appl.spouse_country_of_birth') &&
+        activeProfile.family?.spouse?.name &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.spouse_prev_nationality' && activeProfile.family?.spouse?.name && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')) {
+      } else if (
+        (key === 'spouse_prev_nationality' || key === 'appl.spouse_prev_nationality') &&
+        activeProfile.family?.spouse?.name &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.prev_passport_country_issue' && activeProfile.passport?.holdsOtherPassport === true) {
+      } else if (
+        (key === 'marital_status' || key === 'appl.marital_status') &&
+        activeProfile.family?.spouse?.name
+      ) {
+        resolvedValue = 'Married'
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'appl.prev_passport_country_issue' || key === 'prev_passport_country_issue') &&
+        activeProfile.passport?.holdsOtherPassport === true
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.other_ppt_nationality' && activeProfile.passport?.holdsOtherPassport === true) {
+      } else if (
+        (key === 'appl.other_ppt_nationality' || key === 'other_ppt_nationality') &&
+        activeProfile.passport?.holdsOtherPassport === true
+      ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'grandparent_flag' && (activeProfile.family?.hasPakistanRelation === false || ogdProfile?.family?.hasPakistanRelation === false)) {
+      } else if (
+        (key === 'grandparent_flag' || key === 'appl.grandparent_flag') &&
+        (activeProfile.family?.hasPakistanRelation === false || ogdProfile?.family?.hasPakistanRelation === false)
+      ) {
         resolvedValue = 'No'
         source = ogdProfile?.family?.hasPakistanRelation === false ? 'ogd' : activeSource
         docId = ogdProfile?.family?.hasPakistanRelation === false ? ogdDoc?.documentId : activeDocId
-      } else if (key === 'prev_org' && (activeProfile.employment?.hasMilitaryService === false || ogdProfile?.employment?.hasMilitaryService === false)) {
+      } else if (
+        (key === 'prev_org' || key === 'appl.prev_org') &&
+        (activeProfile.employment?.hasMilitaryService === false || ogdProfile?.employment?.hasMilitaryService === false)
+      ) {
         resolvedValue = 'No'
         source = ogdProfile?.employment?.hasMilitaryService === false ? 'ogd' : activeSource
         docId = ogdProfile?.employment?.hasMilitaryService === false ? ogdDoc?.documentId : activeDocId
-      } else if (key === 'old_visa_flag' && (activeProfile.previousVisa?.hasPreviousVisa === false || ogdProfile?.previousVisa?.hasPreviousVisa === false)) {
+      } else if (
+        (key === 'old_visa_flag' || key === 'appl.old_visa_flag') &&
+        (activeProfile.previousVisa?.hasPreviousVisa === false || ogdProfile?.previousVisa?.hasPreviousVisa === false)
+      ) {
         resolvedValue = 'No'
         source = ogdProfile?.previousVisa?.hasPreviousVisa === false ? 'ogd' : activeSource
         docId = ogdProfile?.previousVisa?.hasPreviousVisa === false ? ogdDoc?.documentId : activeDocId
@@ -266,6 +469,16 @@ export function populateApplicationFromDocuments(options: {
         }
       }
 
+      // Select option value normalization
+      if (fieldDef.options && typeof finalVal === 'string') {
+        const match = fieldDef.options.find(
+          (opt) => opt.value.toUpperCase() === (finalVal as string).toUpperCase() || opt.label.toUpperCase() === (finalVal as string).toUpperCase()
+        )
+        if (match) {
+          finalVal = match.value
+        }
+      }
+
       fields[key] = {
         value: finalVal,
         source,
@@ -288,7 +501,7 @@ export function populateApplicationFromDocuments(options: {
     const flagKey = `question_${q}_flag`
     const ansKey = `answer_${q}`
 
-    if (existingApp?.manualEdits[flagKey] && existingApp.fields[flagKey]) {
+    if (!isMismatchedExistingApp && existingApp?.manualEdits[flagKey] && existingApp.fields[flagKey]) {
       fields[flagKey] = existingApp.fields[flagKey]
     } else {
       const isRefusalQ = q === 2 && (ogdProfile?.previousVisa?.hasRefusal === false || activeProfile?.previousVisa?.hasRefusal === false)
@@ -308,7 +521,7 @@ export function populateApplicationFromDocuments(options: {
       }
     }
 
-    if (existingApp?.manualEdits[ansKey] && existingApp.fields[ansKey]) {
+    if (!isMismatchedExistingApp && existingApp?.manualEdits[ansKey] && existingApp.fields[ansKey]) {
       fields[ansKey] = existingApp.fields[ansKey]
     } else if (!fields[ansKey]) {
       fields[ansKey] = { value: '', source: 'missing', isUserEdited: false }
@@ -316,6 +529,15 @@ export function populateApplicationFromDocuments(options: {
   }
 
   const now = new Date().toISOString()
+  const religionField = fields['appl.religion']
+  const religionMetadata = {
+    religion: (religionField?.value ? String(religionField.value) : null) as string | null,
+    religionSource: (religionField?.source && religionField.source !== 'missing' ? religionField.source : null) as 'passport' | 'official_document' | 'ogd' | 'manual' | null,
+    religionConfidence: (religionField?.confidence || 'none') as 'high' | 'medium' | 'low' | 'none',
+    religionConflict: Boolean(religionField?.hasConflict),
+    conflictDetails: religionField?.conflictDetails,
+  }
+
   return {
     applicationId: existingApp?.applicationId || `app_${applicantId}_${Date.now()}`,
     applicantId,
@@ -333,6 +555,7 @@ export function populateApplicationFromDocuments(options: {
       ogd: ogdDoc || undefined,
     },
     manualEdits,
+    religionMetadata,
     photograph: existingApp?.photograph,
   }
 }
