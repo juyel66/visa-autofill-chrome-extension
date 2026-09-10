@@ -1,7 +1,16 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import type { ApplicantProfile } from '../core/applicant/types'
 import type { DocumentRecord } from '../core/document/types'
-import { getLatestDocument } from '../core/document'
+import { getLatestDocument, saveDocument } from '../core/document'
+import {
+  extractPdfText,
+  extractFromPdfText,
+  recognizeText,
+  extractFromOcrText,
+  toUint8Array,
+  extractEmbeddedJpegFromPdf,
+  type ExtractedApplicantData,
+} from '../core/extraction'
 import {
   getAllSchemaFields,
   WORKSPACE_SECTIONS,
@@ -42,9 +51,60 @@ export const App: React.FC = () => {
     async (targetId: string, appList: ApplicantProfile[], allDocs: DocumentRecord[]) => {
       const existing = await getSavedApplicationByApplicantId(targetId)
       const profileDocs = allDocs.filter((d) => d.applicantId === targetId)
-      const passportDoc = getLatestDocument(profileDocs, 'passport')
+      let passportDoc = getLatestDocument(profileDocs, 'passport')
       const ogdDoc = getLatestDocument(profileDocs, 'ogd')
       const activeProf = appList.find((a) => a.applicantId === targetId)
+
+      // Auto-heal legacy passport document records that lack contact extraction in storage
+      if (
+        passportDoc &&
+        passportDoc.fileDataUrl &&
+        (!passportDoc.extractedData?.contact?.phone && !passportDoc.extractedData?.presentAddress?.phone)
+      ) {
+        try {
+          let reExtracted: ExtractedApplicantData | undefined = undefined
+          const isPdf = passportDoc.mimeType === 'application/pdf' || passportDoc.fileName.toLowerCase().endsWith('.pdf')
+          if (isPdf) {
+            const rawBytes = await toUint8Array(passportDoc.fileDataUrl)
+            const embeddedJpeg = extractEmbeddedJpegFromPdf(rawBytes)
+            if (embeddedJpeg) {
+              const ocrRes = await recognizeText(embeddedJpeg, { language: 'eng' })
+              if (ocrRes.text) reExtracted = extractFromOcrText(ocrRes)
+            } else {
+              const pdfExtract = await extractPdfText(passportDoc.fileDataUrl)
+              if (pdfExtract.fullText && pdfExtract.fullText.trim().length >= 50) {
+                reExtracted = extractFromPdfText(pdfExtract.fullText)
+              } else if (pdfExtract.imagePayload) {
+                const ocrRes = await recognizeText(pdfExtract.imagePayload, { language: 'eng' })
+                if (ocrRes.text) reExtracted = extractFromOcrText(ocrRes)
+              }
+            }
+          } else {
+            const ocrRes = await recognizeText(passportDoc.fileDataUrl, { language: 'eng' })
+            if (ocrRes.text) reExtracted = extractFromOcrText(ocrRes)
+          }
+
+          if (reExtracted && (reExtracted.contact?.phone || reExtracted.presentAddress?.phone)) {
+            const updatedDoc: DocumentRecord = {
+              ...passportDoc,
+              extractedData: {
+                ...passportDoc.extractedData,
+                ...reExtracted,
+                contact: reExtracted.contact || passportDoc.extractedData?.contact,
+                presentAddress: {
+                  ...passportDoc.extractedData?.presentAddress,
+                  ...reExtracted.presentAddress,
+                },
+              },
+              extractedDataConfirmed: true,
+            }
+            await saveDocument(updatedDoc)
+            passportDoc = updatedDoc
+          }
+        } catch (healErr) {
+          console.warn('Auto-healing passport document contact info warning:', healErr)
+        }
+      }
 
       const mergedApp = populateApplicationFromDocuments({
         applicantId: targetId,
@@ -53,6 +113,17 @@ export const App: React.FC = () => {
         existingApp: existing,
         notes: activeProf?.notes,
       })
+
+      console.group('🌐 [VISA AUTOFILL WORKSPACE] LOADED APPLICATION')
+      console.log('Target Applicant ID:', targetId)
+      console.log('Selected Passport Doc:', passportDoc?.documentId, passportDoc?.extractedData)
+      console.log('Selected OGD Doc:', ogdDoc?.documentId, ogdDoc?.extractedData)
+      console.log('Section 3 Phone:', mergedApp.fields['pres_phone']?.value, 'Badge:', mergedApp.fields['pres_phone']?.source)
+      console.log('Section 3 ISD:', mergedApp.fields['isd_code']?.value, 'Badge:', mergedApp.fields['isd_code']?.source)
+      console.log('Section 3 Mobile:', mergedApp.fields['mobile']?.value, 'Badge:', mergedApp.fields['mobile']?.source)
+      console.log('All Application Fields:', mergedApp.fields)
+      console.groupEnd()
+
       setApplication(mergedApp)
     },
     []
@@ -177,34 +248,44 @@ export const App: React.FC = () => {
     if (!application) return
     const pres1 = String(application.fields['pres_addr1']?.value || '')
     const pres2 = String(application.fields['pres_addr2']?.value || '')
-    const presCity = String(application.fields['state_name']?.value || '')
+    const presCity = String(application.fields['village_town_city']?.value || application.fields['state_name']?.value || '')
+    const presDistrict = String(application.fields['district']?.value || '')
+    const presState = String(application.fields['state_province']?.value || application.fields['state_name']?.value || '')
+    const presCountry = String(application.fields['present_country']?.value || application.fields['appl.countryname']?.value || '')
+    const presPin = String(application.fields['pincode']?.value || '')
 
     const updatedFields = { ...application.fields }
     const updatedEdits = { ...application.manualEdits }
 
     if (pres1) {
-      updatedFields['perm_add1'] = {
-        value: pres1,
-        source: 'manual',
-        isUserEdited: true,
-      }
+      updatedFields['perm_add1'] = { value: pres1, source: 'manual', isUserEdited: true }
       updatedEdits['perm_add1'] = true
     }
     if (pres2) {
-      updatedFields['perm_add2'] = {
-        value: pres2,
-        source: 'manual',
-        isUserEdited: true,
-      }
+      updatedFields['perm_add2'] = { value: pres2, source: 'manual', isUserEdited: true }
       updatedEdits['perm_add2'] = true
     }
     if (presCity) {
-      updatedFields['perm_add3'] = {
-        value: presCity,
-        source: 'manual',
-        isUserEdited: true,
-      }
+      updatedFields['permanent_village_town_city'] = { value: presCity, source: 'manual', isUserEdited: true }
+      updatedEdits['permanent_village_town_city'] = true
+    }
+    if (presDistrict) {
+      updatedFields['permanent_district'] = { value: presDistrict, source: 'manual', isUserEdited: true }
+      updatedEdits['permanent_district'] = true
+    }
+    if (presState) {
+      updatedFields['permanent_state_province'] = { value: presState, source: 'manual', isUserEdited: true }
+      updatedEdits['permanent_state_province'] = true
+      updatedFields['perm_add3'] = { value: presState, source: 'manual', isUserEdited: true }
       updatedEdits['perm_add3'] = true
+    }
+    if (presCountry) {
+      updatedFields['permanent_country'] = { value: presCountry, source: 'manual', isUserEdited: true }
+      updatedEdits['permanent_country'] = true
+    }
+    if (presPin) {
+      updatedFields['permanent_postal_code'] = { value: presPin, source: 'manual', isUserEdited: true }
+      updatedEdits['permanent_postal_code'] = true
     }
 
     setApplication({
@@ -239,12 +320,64 @@ export const App: React.FC = () => {
     }
   }
 
-  const handleRefreshFromDocuments = () => {
+  const handleRefreshFromDocuments = async () => {
     if (!applicantId) return
+    setLoading(true)
     const profileDocs = documents.filter((d) => d.applicantId === applicantId)
-    const passportDoc = getLatestDocument(profileDocs, 'passport')
+    let passportDoc = getLatestDocument(profileDocs, 'passport')
     const ogdDoc = getLatestDocument(profileDocs, 'ogd')
     const activeProf = applicants.find((a) => a.applicantId === applicantId)
+
+    if (
+      passportDoc &&
+      passportDoc.fileDataUrl &&
+      (!passportDoc.extractedData?.contact?.phone && !passportDoc.extractedData?.presentAddress?.phone)
+    ) {
+      try {
+        let reExtracted: ExtractedApplicantData | undefined = undefined
+        const isPdf = passportDoc.mimeType === 'application/pdf' || passportDoc.fileName.toLowerCase().endsWith('.pdf')
+        if (isPdf) {
+          const rawBytes = await toUint8Array(passportDoc.fileDataUrl)
+          const embeddedJpeg = extractEmbeddedJpegFromPdf(rawBytes)
+          if (embeddedJpeg) {
+            const ocrRes = await recognizeText(embeddedJpeg, { language: 'eng' })
+            if (ocrRes.text) reExtracted = extractFromOcrText(ocrRes)
+          } else {
+            const pdfExtract = await extractPdfText(passportDoc.fileDataUrl)
+            if (pdfExtract.fullText && pdfExtract.fullText.trim().length >= 50) {
+              reExtracted = extractFromPdfText(pdfExtract.fullText)
+            } else if (pdfExtract.imagePayload) {
+              const ocrRes = await recognizeText(pdfExtract.imagePayload, { language: 'eng' })
+              if (ocrRes.text) reExtracted = extractFromOcrText(ocrRes)
+            }
+          }
+        } else {
+          const ocrRes = await recognizeText(passportDoc.fileDataUrl, { language: 'eng' })
+          if (ocrRes.text) reExtracted = extractFromOcrText(ocrRes)
+        }
+
+        if (reExtracted && (reExtracted.contact?.phone || reExtracted.presentAddress?.phone)) {
+          const updatedDoc: DocumentRecord = {
+            ...passportDoc,
+            extractedData: {
+              ...passportDoc.extractedData,
+              ...reExtracted,
+              contact: reExtracted.contact || passportDoc.extractedData?.contact,
+              presentAddress: {
+                ...passportDoc.extractedData?.presentAddress,
+                ...reExtracted.presentAddress,
+              },
+            },
+            extractedDataConfirmed: true,
+          }
+          await saveDocument(updatedDoc)
+          setDocuments((prev) => prev.map((d) => (d.documentId === updatedDoc.documentId ? updatedDoc : d)))
+          passportDoc = updatedDoc
+        }
+      } catch (healErr) {
+        console.warn('Re-sync auto-healing error:', healErr)
+      }
+    }
 
     const refreshed = populateApplicationFromDocuments({
       applicantId,
@@ -255,6 +388,7 @@ export const App: React.FC = () => {
     })
 
     setApplication(refreshed)
+    setLoading(false)
     showToast('Updated workspace fields from latest confirmed documents.', 'info')
   }
 
@@ -292,16 +426,10 @@ export const App: React.FC = () => {
     (field: ApplicationFieldDef): boolean => {
       if (searchQuery.trim()) return true
       if (showAllFields) return true
-      if (field.visibleByDefault !== false) return true
-
-      // If hidden by default, reveal if it has a non-empty value (so no data is concealed)
-      const val = application?.fields[field.key]?.value
-      if (val !== '' && val !== undefined && val !== null && val !== false) {
-        return true
-      }
-      return false
+      if (field.visibleByDefault === false) return false
+      return true
     },
-    [searchQuery, showAllFields, application]
+    [searchQuery, showAllFields]
   )
 
   // Calculate statistics across all 100 canonical fields
