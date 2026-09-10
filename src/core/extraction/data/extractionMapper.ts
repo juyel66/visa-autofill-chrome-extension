@@ -63,7 +63,7 @@ export function applyExtractionToApplicant(
     pass.otherPassportDetails?.passportNumber?.value
   )
 
-  const hasPresent = Boolean(
+  const hasExplicitPresent = Boolean(
     pres.addressLine1?.value ||
     pres.addressLine2?.value ||
     pres.villageTownCity?.value ||
@@ -83,12 +83,45 @@ export function applyExtractionToApplicant(
     perm.postalCode?.value
   )
 
+  const rawContactPhone = pres.phone?.value || c.phone?.value || perm.phone?.value
+  const rawContactIsd = pres.isdCode?.value || c.isdCode?.value
+  const rawContactMob = pres.mobile?.value || c.mobile?.value || perm.mobile?.value
+
+  let derivedPhone: string | undefined = rawContactPhone
+  let derivedIsd: string | undefined = rawContactIsd
+  let derivedMob: string | undefined = rawContactMob
+
+  if (derivedPhone) {
+    const cleanDigits = derivedPhone.replace(/[^\d]/g, '')
+    if (derivedPhone.startsWith('+880') || cleanDigits.startsWith('880')) {
+      if (!derivedIsd) derivedIsd = '880'
+      if (!derivedMob) derivedMob = cleanDigits.slice(3)
+    } else if (derivedPhone.startsWith('+')) {
+      const intlMatch = derivedPhone.match(/^\+(\d{1,4})(\d{6,14})$/)
+      if (intlMatch) {
+        if (!derivedIsd) derivedIsd = intlMatch[1]
+        if (!derivedMob) derivedMob = intlMatch[2]
+      }
+    } else if (cleanDigits.startsWith('01') && cleanDigits.length >= 10) {
+      if (!derivedIsd) derivedIsd = '880'
+      if (!derivedMob) derivedMob = cleanDigits.slice(1)
+      if (!derivedPhone.startsWith('+')) derivedPhone = `+880${cleanDigits.slice(1)}`
+    }
+  } else if (derivedMob && derivedIsd) {
+    derivedPhone = `+${derivedIsd}${derivedMob}`
+  } else if (derivedMob && (p.nationality?.value === 'BANGLADESH' || pres.country?.value === 'BANGLADESH' || perm.country?.value === 'BANGLADESH')) {
+    derivedIsd = '880'
+    derivedPhone = `+880${derivedMob}`
+  }
+
   const hasContact = Boolean(
     c.email?.value ||
-    c.mobile?.value ||
-    c.phone?.value ||
-    pres.phone?.value
+    derivedPhone ||
+    derivedIsd ||
+    derivedMob
   )
+
+  const hasPresent = hasExplicitPresent || hasPerm || Boolean(derivedPhone || derivedIsd || derivedMob)
 
   const hasFamily = Boolean(
     fam.father ||
@@ -197,13 +230,16 @@ export function applyExtractionToApplicant(
       : undefined,
     presentAddress: hasPresent
       ? {
-          addressLine1: pres.addressLine1?.value ? pres.addressLine1.value : undefined,
-          addressLine2: pres.addressLine2?.value ? pres.addressLine2.value : undefined,
-          villageTownCity: pres.villageTownCity?.value ? pres.villageTownCity.value : undefined,
-          district: pres.district?.value ? pres.district.value : undefined,
-          stateProvince: pres.stateProvince?.value ? pres.stateProvince.value : undefined,
-          country: pres.country?.value ? pres.country.value : undefined,
-          postalCode: pres.postalCode?.value ? pres.postalCode.value : undefined,
+          addressLine1: (hasExplicitPresent ? pres.addressLine1?.value : perm.addressLine1?.value) || undefined,
+          addressLine2: (hasExplicitPresent ? pres.addressLine2?.value : perm.addressLine2?.value) || undefined,
+          villageTownCity: (hasExplicitPresent ? pres.villageTownCity?.value : perm.villageTownCity?.value) || undefined,
+          district: (hasExplicitPresent ? pres.district?.value : perm.district?.value) || undefined,
+          stateProvince: (hasExplicitPresent ? pres.stateProvince?.value : perm.stateProvince?.value) || undefined,
+          country: (hasExplicitPresent ? pres.country?.value : perm.country?.value) || undefined,
+          postalCode: (hasExplicitPresent ? pres.postalCode?.value : perm.postalCode?.value) || undefined,
+          phone: derivedPhone || undefined,
+          isdCode: derivedIsd || undefined,
+          mobile: derivedMob || undefined,
         }
       : undefined,
     permanentAddress: hasPerm
@@ -217,11 +253,12 @@ export function applyExtractionToApplicant(
           postalCode: perm.postalCode?.value ? perm.postalCode.value : undefined,
         }
       : undefined,
-    contact: hasContact
+    contact: (hasContact || Boolean(derivedPhone || derivedIsd || derivedMob))
       ? {
           email: c.email?.value ? c.email.value : undefined,
-          mobile: c.mobile?.value ? c.mobile.value : undefined,
-          phone: c.phone?.value ? c.phone.value : pres.phone?.value ? pres.phone.value : undefined,
+          isdCode: derivedIsd || undefined,
+          mobile: derivedMob || undefined,
+          phone: derivedPhone || undefined,
         }
       : undefined,
     family: hasFamily
