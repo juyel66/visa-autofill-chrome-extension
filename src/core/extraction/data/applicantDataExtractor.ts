@@ -497,8 +497,6 @@ export function extractFromOgdVisaApplication(
     if (n === 'BANGLADESHI' || n === 'BGD') n = 'BANGLADESH'
     result.personal!.nationality = { value: n, source, confidence: baseConfidence }
     result.passport!.issuingCountry = { value: n, source, confidence: baseConfidence }
-    result.presentAddress!.country = { value: n, source, confidence: baseConfidence }
-    result.permanentAddress!.country = { value: n, source, confidence: baseConfidence }
   }
 
   // Visible Identification Marks - Strictly line-bounded to prevent neighbor bleeding
@@ -564,69 +562,45 @@ export function extractFromOgdVisaApplication(
   // Present Address Block
   const presBlockMatch = text.match(/(?:present\s*address)[:\s]+([\s\S]+?)(?=(?:phone\s*no|mobile\s*no|email|permanent\s*address|family\s*details|$))/i)
   if (presBlockMatch) {
-    const lines = presBlockMatch[1]
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !/^(phone|mobile|email|permanent)/i.test(l))
-
-    if (lines.length > 0) {
-      result.presentAddress!.addressLine1 = { value: lines[0], source, confidence: baseConfidence }
-    }
-    if (lines.length > 1) {
-      result.presentAddress!.addressLine2 = { value: lines[1], source, confidence: baseConfidence }
-    }
-    // Scan for city, pincode, district across the address lines
-    for (const line of lines) {
-      const pin = line.match(/\b(\d{4,6})\b/)
-      if (pin && !result.presentAddress!.postalCode) {
-        result.presentAddress!.postalCode = { value: pin[1], source, confidence: baseConfidence }
-      }
-      const cityWords = line.split(/[,\s]+/).filter((w) => /^[A-Za-z]{3,20}$/.test(w) && !/^(bangladesh|marea|kamalapukhuri|dandapal|debiganj)$/i.test(w))
-      if (cityWords.length > 0 && !result.presentAddress!.villageTownCity) {
-        result.presentAddress!.villageTownCity = { value: cityWords[0].toUpperCase(), source, confidence: baseConfidence }
-      }
-    }
-    if (!result.presentAddress!.villageTownCity && lines.length > 2) {
-      const l3 = lines[2].split(/[, -]/)[0].trim()
-      result.presentAddress!.villageTownCity = { value: l3.toUpperCase(), source, confidence: baseConfidence }
-    }
+    const parsedPres = parseStructuredAddress(presBlockMatch[1], { nationality: result.personal?.nationality?.value })
+    if (parsedPres.addressLine1) result.presentAddress!.addressLine1 = { value: parsedPres.addressLine1, source, confidence: baseConfidence }
+    if (parsedPres.addressLine2) result.presentAddress!.addressLine2 = { value: parsedPres.addressLine2, source, confidence: baseConfidence }
+    if (parsedPres.villageTownCity) result.presentAddress!.villageTownCity = { value: parsedPres.villageTownCity, source, confidence: baseConfidence }
+    if (parsedPres.district) result.presentAddress!.district = { value: parsedPres.district, source, confidence: baseConfidence }
+    if (parsedPres.stateProvince) result.presentAddress!.stateProvince = { value: parsedPres.stateProvince, source, confidence: baseConfidence }
+    if (parsedPres.postalCode) result.presentAddress!.postalCode = { value: parsedPres.postalCode, source, confidence: baseConfidence }
+    if (parsedPres.country) result.presentAddress!.country = { value: parsedPres.country, source, confidence: baseConfidence }
   }
 
   // Permanent Address Block
-  const permBlockMatch = text.match(/(?:permanent\s*address)[:\s]+([\s\S]+?)(?=(?:family\s*details|father|mother|marital|$))/i)
+  const permBlockMatch = text.match(/(?:permanent\s*address)[:\s]+([\s\S]+?)(?=(?:family\s*details|father|mother|marital|profession|occupation|employer|details\s*of|reference|$))/i)
   if (permBlockMatch) {
-    const lines = permBlockMatch[1]
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !/^(phone|mobile|email|family|father)/i.test(l))
-
-    if (lines.length > 0) {
-      result.permanentAddress!.addressLine1 = { value: lines[0], source, confidence: baseConfidence }
-    }
-    if (lines.length > 1) {
-      result.permanentAddress!.addressLine2 = { value: lines[1], source, confidence: baseConfidence }
-    }
-    if (lines.length > 2) {
-      result.permanentAddress!.villageTownCity = { value: lines[2], source, confidence: baseConfidence }
-    }
+    const parsedPerm = parseStructuredAddress(permBlockMatch[1], { nationality: result.personal?.nationality?.value })
+    if (parsedPerm.addressLine1) result.permanentAddress!.addressLine1 = { value: parsedPerm.addressLine1, source, confidence: baseConfidence }
+    if (parsedPerm.addressLine2) result.permanentAddress!.addressLine2 = { value: parsedPerm.addressLine2, source, confidence: baseConfidence }
+    if (parsedPerm.villageTownCity) result.permanentAddress!.villageTownCity = { value: parsedPerm.villageTownCity, source, confidence: baseConfidence }
+    if (parsedPerm.district) result.permanentAddress!.district = { value: parsedPerm.district, source, confidence: baseConfidence }
+    if (parsedPerm.stateProvince) result.permanentAddress!.stateProvince = { value: parsedPerm.stateProvince, source, confidence: baseConfidence }
+    if (parsedPerm.postalCode) result.permanentAddress!.postalCode = { value: parsedPerm.postalCode, source, confidence: baseConfidence }
+    if (parsedPerm.country) result.permanentAddress!.country = { value: parsedPerm.country, source, confidence: baseConfidence }
   }
 
-  // Phone, Mobile, Email
-  const phoneMatch = text.match(/(?:phone\s*(?:no|number)?|present\s*phone)[:\s]+(\+?[\d\s-]{7,15})/i)
-  if (phoneMatch) {
-    const p = phoneMatch[1].trim()
-    result.contact!.phone = { value: p, source, confidence: baseConfidence }
-    result.presentAddress!.phone = { value: p, source, confidence: baseConfidence }
+  // Phone, Mobile, ISD Code, Email
+  const parsedContacts = parseApplicantContact(text)
+  if (parsedContacts.email) {
+    result.contact!.email = { value: parsedContacts.email.toLowerCase(), source, confidence: baseConfidence }
   }
-
-  const mobileMatch = text.match(/(?:mobile\s*(?:no|number)?|mobile)[:\s]+(\+?[\d\s-]{7,15})/i)
-  if (mobileMatch) {
-    result.contact!.mobile = { value: mobileMatch[1].trim(), source, confidence: baseConfidence }
+  if (parsedContacts.phone) {
+    result.contact!.phone = { value: parsedContacts.phone, source, confidence: baseConfidence }
+    result.presentAddress!.phone = { value: parsedContacts.phone, source, confidence: baseConfidence }
   }
-
-  const emailMatch = text.match(/(?:email\s*(?:address|id)?|e-mail)[:\s]+([^\s@]+@[^\s@]+\.[^\s@]+)/i)
-  if (emailMatch) {
-    result.contact!.email = { value: emailMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  if (parsedContacts.mobile) {
+    result.contact!.mobile = { value: parsedContacts.mobile, source, confidence: baseConfidence }
+    result.presentAddress!.mobile = { value: parsedContacts.mobile, source, confidence: baseConfidence }
+  }
+  if (parsedContacts.isdCode) {
+    result.contact!.isdCode = { value: parsedContacts.isdCode, source, confidence: baseConfidence }
+    result.presentAddress!.isdCode = { value: parsedContacts.isdCode, source, confidence: baseConfidence }
   }
 
   // --- SECTION 4: FAMILY DETAILS (TABLE OR LABELED BLOCKS) ---
@@ -857,6 +831,429 @@ export function extractFromOgdVisaApplication(
   if (result.previousVisa && Object.keys(result.previousVisa).length === 0) delete result.previousVisa
   if (result.sponsorIndia && Object.keys(result.sponsorIndia).length === 0) delete result.sponsorIndia
   if (result.sponsorMission && Object.keys(result.sponsorMission).length === 0) delete result.sponsorMission
+
+  return result
+}
+
+export interface ParsedAddressResult {
+  addressLine1?: string
+  addressLine2?: string
+  villageTownCity?: string
+  district?: string
+  stateProvince?: string
+  country?: string
+  postalCode?: string
+}
+
+export interface ParsedContactResult {
+  email?: string
+  phone?: string
+  mobile?: string
+  isdCode?: string
+}
+
+/**
+ * Dynamically parses structured address components (Line 1, Line 2, Village/City, District, State, Pincode, Country)
+ * from text blocks or raw passport OCR without hardcoded district names.
+ */
+export function parseStructuredAddress(
+  rawText?: string,
+  context?: { nationality?: string }
+): ParsedAddressResult {
+  const result: ParsedAddressResult = {}
+  if (!rawText) return result
+
+  // 1. Initial cleanup of text
+  let text = rawText.trim()
+  // Clean OCR trailing artifacts like "= aa]" and everything thereafter
+  text = text.replace(/=\s*aa\][\s\S]*$/i, '')
+  // Clean OCR trailing line noise patterns
+  text = text.replace(/\s*[-=]\s*(?:pres\s*\d*|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/gim, '')
+  text = text.replace(/\s*-\s*=n.*$/gim, '')
+
+  // Reconstruct broken words across linebreaks / OCR boundaries (e.g. COLON + \n + I or COLON before pin/district)
+  text = text.replace(/\bCOLON\b(?:\s*-\s*pres\s*\d*\s*;)?\s*(?:\r?\n\s*)?(?:WE\s+|I\s+)?(?=\d{4,6}|[A-Z]+)/gi, 'COLONI, ')
+  text = text.replace(/\bCOLON\s*-\s*pres\b/gi, 'COLONI')
+  text = text.replace(/\bCOLON\s*-\s*=n\b/gi, 'COLONI')
+
+  // Strip leading noise prefixes on continuation lines (WE, VE, NE, ETY, 2.5.5, numbers, etc.)
+  text = text.replace(/^(?:WE|VE|NE|ETY|HE|U0|LT|THU|P\d|2\.5\.5|\d+\.\d+|\d+\.)\s+/gim, '')
+
+  // 2. Extract Postal Code / Pincode: "- 5120" or "PIN: 5120" or standalone 4-6 digits
+  const pinMatch = text.match(/(?:pincode|postal\s*code|post\s*code|pin|zip(?:\s*code)?|[-:])\s*([0-9]{4,6})\b/i) || text.match(/\b(\d{4,6})\b/)
+  if (pinMatch && pinMatch[1]) {
+    result.postalCode = pinMatch[1].trim()
+    text = text.replace(pinMatch[0], ' ')
+  }
+
+  // 3. Extract Explicit Labeled Keys if present
+  const line1Match = text.match(/(?:(?:present|permanent)?\s*(?:address\s*)?line\s*1|house(?:\s*(?:no|number))?|road(?:\s*(?:no|number))?)\s*[:=]\s*([^\r\n,;]+)/i)
+  const line2Match = text.match(/(?:(?:present|permanent)?\s*(?:address\s*)?line\s*2|police\s*station|p\.?s\.?|thana)\s*[:=]\s*([^\r\n,;]+)/i)
+  const cityMatch = text.match(/(?:(?:present|permanent)?\s*(?:village\s*\/\s*town\s*\/\s*city|village|town|city))\s*[:=]\s*([^\r\n,;]+)/i)
+  const distMatch = text.match(/(?:(?:present|permanent)?\s*(?:district|dist))\s*[:=]\s*([^\r\n,;]+)/i)
+  const stateMatch = text.match(/(?:(?:present|permanent)?\s*(?:state\s*\/\s*province|state|province))\s*[:=]\s*([^\r\n,;]+)/i)
+  const countryMatch = text.match(/(?:(?:present|permanent)?\s*(?:country))\s*[:=]\s*([A-Za-z .'-]{2,40})/i)
+
+  if (line1Match && line1Match[1]) result.addressLine1 = line1Match[1].trim()
+  if (line2Match && line2Match[1]) result.addressLine2 = line2Match[1].trim()
+  if (cityMatch && cityMatch[1]) result.villageTownCity = cityMatch[1].trim()
+  if (distMatch && distMatch[1]) result.district = distMatch[1].trim()
+  if (stateMatch && stateMatch[1]) result.stateProvince = stateMatch[1].trim()
+  if (countryMatch && countryMatch[1]) result.country = countryMatch[1].trim().toUpperCase()
+
+  // 4. Check if text has clean multi-line format (e.g. OGD or form multi-line address blocks)
+  const cleanLines = text
+    .split(/\r?\n/)
+    .map((l) =>
+      l
+        .replace(/^(?:\d+\.|\d+\)|\(\d+\))\s*/, '')
+        .replace(/\s*[-=]\s*(?:pres|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/i, '')
+        .replace(/^(?:(?:present|permanent)?\s*(?:address\s*line\s*[12]|address|country|district|state(?:\/province)?|province|village(?:\/town\/city)?|town|city|postal\s*code|pin|zip|phone|mobile|telephone|email))\s*[:=]\s*/i, '')
+        .replace(/^(?:WE|VE|NE|ETY|HE|U0|LT|THU|P\d|2\.5\.5)\s+/i, '')
+        .trim()
+    )
+    .filter((l) => {
+      if (l.length < 2) return false
+      if (/^(ety|NE\s*sea|He\s*\.|pres|aa|bb|cc|dd|WE|VE)$/i.test(l)) return false
+      if (/^[0-9\s\-—_+=./\\]+$/.test(l)) return false
+      if (/^(?:present|permanent|address|residential|emergency|telephone|phone|email|country|district|state|province|pin|zip)$/i.test(l)) return false
+      if (/[—_+=]/.test(l) && l.length < 15) return false
+      return true
+    })
+
+  if (
+    !result.addressLine1 &&
+    cleanLines.length >= 3
+  ) {
+    result.addressLine1 = cleanLines[0]
+    result.addressLine2 = cleanLines[1]
+    const rawLastLine = cleanLines[cleanLines.length - 1]
+    const lastLine = rawLastLine.replace(/,\s*(?:BANGLADESH|INDIA|USA)\b.*$/i, '').trim()
+    if (cleanLines.length === 3) {
+      if (!result.villageTownCity) {
+        if (/^(?:vill(?:age)?)\b/i.test(cleanLines[0])) {
+          result.villageTownCity = cleanLines[0]
+        } else {
+          result.villageTownCity = lastLine
+        }
+      }
+      if (!result.district) result.district = lastLine
+    } else if (cleanLines.length >= 4) {
+      if (!result.villageTownCity) result.villageTownCity = cleanLines[2]
+      if (!result.district) result.district = lastLine
+    }
+  } else if (
+    !result.addressLine1 &&
+    cleanLines.length === 2 &&
+    cleanLines[0].split(',').length <= 2 &&
+    cleanLines[1].split(',').length <= 2 &&
+    cleanLines[1].includes(',')
+  ) {
+    result.addressLine1 = cleanLines[0]
+    result.addressLine2 = cleanLines[1]
+    const p2 = cleanLines[1].split(',').map((s) => s.trim())
+    if (p2.length === 2 && !result.district) {
+      result.district = p2[1]
+    }
+  }
+
+  // 5. Process segments (lines or comma-separated)
+  const rawSegments = text
+    .split(/[\r\n,]+/)
+    .map((s) =>
+      s
+        .replace(/^(?:\d+\.|\d+\)|\(\d+\))\s*/, '')
+        .replace(/\s*[-=]\s*(?:pres|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/i, '')
+        .replace(/^(?:(?:present|permanent)?\s*(?:address\s*line\s*[12]|address|country|district|state(?:\/province)?|province|village(?:\/town\/city)?|town|city|postal\s*code|pin|zip|phone|mobile|telephone|email))\s*[:=]\s*/i, '')
+        .replace(/^(?:WE|VE|NE|ETY|HE|U0|LT|THU|P\d|2\.5\.5)\s+/i, '')
+        .trim()
+    )
+    .filter((s) => {
+      if (s.length < 2) return false
+      if (/^(ety|NE\s*sea|He\s*\.|pres|aa|bb|cc|dd|WE|VE)$/i.test(s)) return false
+      if (/^[0-9\s\-—_+=./\\]+$/.test(s)) return false
+      if (/^(?:present|permanent|address|residential|emergency|telephone|phone|email|country|district|state|province|pin|zip)$/i.test(s)) return false
+      if (/[—_+=]/.test(s) && s.length < 15) return false
+      return true
+    })
+
+  const segments = rawSegments.filter((s) => {
+    if (s.toUpperCase() === 'BANGLADESH' || s.toUpperCase() === 'INDIA' || s.toUpperCase() === 'USA') {
+      if (!result.country) result.country = s.toUpperCase()
+      return false
+    }
+    // Check explicit division/state token (e.g. DHAKA DIVISION)
+    const divMatch = s.match(/^([A-Za-z]+)\s*(?:division|state|province)$/i)
+    if (divMatch) {
+      if (!result.stateProvince) result.stateProvince = divMatch[1].trim()
+      return false
+    }
+    return true
+  })
+
+  if (segments.length > 0) {
+    if (!result.addressLine1) result.addressLine1 = segments[0]
+
+    // If segment 0 explicitly has VILL: or Village: or Vill:, extract it as villageTownCity
+    if (!result.villageTownCity && /^(?:vill(?:age)?)\b/i.test(segments[0])) {
+      result.villageTownCity = segments[0]
+    }
+
+    if (segments.length === 2) {
+      if (!result.district) result.district = segments[1]
+    } else if (segments.length === 3) {
+      if (!result.addressLine2) result.addressLine2 = segments[1]
+      if (!result.district) result.district = segments[2]
+    } else if (segments.length === 4) {
+      if (!result.addressLine2) result.addressLine2 = `${segments[1]}, ${segments[2]}`
+      if (!result.district) result.district = segments[3]
+    } else if (segments.length >= 5) {
+      if (!result.addressLine1) result.addressLine1 = `${segments[0]}, ${segments[1]}`
+      if (!result.addressLine2) result.addressLine2 = segments.slice(1, -1).join(', ')
+      if (!result.district) result.district = segments[segments.length - 1]
+    }
+  }
+
+  // Country resolution: only set if address components actually exist
+  if (!result.country && (result.addressLine1 || result.district || result.postalCode || result.villageTownCity)) {
+    if (context?.nationality === 'BANGLADESH' || !context?.nationality) {
+      result.country = 'BANGLADESH'
+    } else {
+      result.country = context.nationality
+    }
+  }
+
+  return result
+}
+
+/**
+ * Parses applicant contact details (email, phone, mobile, isdCode) from text.
+ * If explicit applicant contact is absent, falls back to passport / emergency contact telephone
+ * as the Present Phone / Contact fallback, while keeping employer, sponsor, and hotel phones strictly isolated.
+ */
+export function parseApplicantContact(text: string): ParsedContactResult {
+  const result: ParsedContactResult = {}
+  if (!text) return result
+
+  const lines = text.split(/\r?\n/)
+  let inEmergencySection = false
+  let inEmployerSection = false
+  let inSponsorSection = false
+  let inFamilySection = false
+
+  const candidateMobiles: string[] = []
+  const candidatePhones: string[] = []
+  const candidateEmails: string[] = []
+  const candidateIsds: string[] = []
+  const candidateEmergencyPhones: string[] = []
+
+  const TEL_REGEX = /(?:telephone|tel|phone|mobile|cell|contact)(?:\s*(?:no|number|num))?\.?[\s:=.-]+(\+?[\d\s-]{7,25})/i
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line) continue
+
+    // Track section transitions
+    if (/emergency\s*(?:contact|details|info)/i.test(line)) {
+      inEmergencySection = true
+      inEmployerSection = false
+      inSponsorSection = false
+      inFamilySection = false
+      const inlineTelMatch = line.match(TEL_REGEX)
+      if (inlineTelMatch && inlineTelMatch[1]) {
+        candidateEmergencyPhones.push(inlineTelMatch[1].trim())
+      }
+      continue
+    }
+    if (/employer|occupation|profession|present\s*occupation|work\s*place|company\s*details/i.test(line)) {
+      inEmergencySection = false
+      inEmployerSection = true
+      inSponsorSection = false
+      inFamilySection = false
+      continue
+    }
+    if (/reference\s*in|sponsor|hotel|reference\s*details|mission/i.test(line)) {
+      inEmergencySection = false
+      inEmployerSection = false
+      inSponsorSection = true
+      inFamilySection = false
+      continue
+    }
+    if (/^(?:family\s*details|details\s*of\s*family|father(?:'s)?\s*details|mother(?:'s)?\s*details)/i.test(line)) {
+      inEmergencySection = false
+      inEmployerSection = false
+      inSponsorSection = false
+      inFamilySection = true
+      continue
+    }
+    if (
+      /^(?:present\s*address|permanent\s*address|applicant\s*(?:contact|details|particulars|info)|personal\s*particulars|contact\s*details|address\s*details)/i.test(
+        line
+      )
+    ) {
+      inEmergencySection = false
+      inEmployerSection = false
+      inSponsorSection = false
+      inFamilySection = false
+    }
+
+    // If inside emergency contact section, capture telephone
+    if (inEmergencySection) {
+      const emergTelMatch = line.match(TEL_REGEX)
+      if (emergTelMatch && emergTelMatch[1]) {
+        candidateEmergencyPhones.push(emergTelMatch[1].trim())
+      }
+      continue
+    }
+
+    // Skip lines in other excluded sections (Employer, Sponsor, Family)
+    if (inEmployerSection || inSponsorSection || inFamilySection) {
+      continue
+    }
+
+    // Line-level exclusion check: If line explicitly mentions other people/entities (when not in emergency contact)
+    if (/employer|sponsor|hotel|organization|ref(?:erence)?\s*in/i.test(line)) {
+      continue
+    }
+
+    // If line mentions emergency and telephone (e.g. noisy OCR or single-line format)
+    if (/emergency/i.test(line)) {
+      const emergTelMatch = line.match(TEL_REGEX)
+      if (emergTelMatch && emergTelMatch[1]) {
+        candidateEmergencyPhones.push(emergTelMatch[1].trim())
+      }
+      continue
+    }
+
+    // 1. Email matching on applicant line
+    const emailMatch = line.match(/(?:applicant\s*email|present\s*email|email\s*(?:address|id)?|e-mail)[:\s]+([^\s@]+@[^\s@]+\.[^\s@]+)/i)
+    if (emailMatch && emailMatch[1]) {
+      candidateEmails.push(emailMatch[1].trim())
+      continue
+    }
+
+    // 2. Explicit Mobile line
+    const mobileMatch = line.match(
+      /(?:present\s*mobile|applicant\s*mobile|mobile\s*(?:no|number|num)?|mobile|cell(?:\s*phone)?)\.?[\s:=.-]+(\+?[\d\s-]{7,25})/i
+    )
+    if (mobileMatch && mobileMatch[1]) {
+      candidateMobiles.push(mobileMatch[1].trim())
+      continue
+    }
+
+    // 3. Explicit Phone line (telephone / landline)
+    const phoneMatch = line.match(
+      /(?:present\s*phone|applicant\s*phone|phone\s*(?:no|number|num)?|present\s*tel|telephone(?:\s*(?:no|number|num))?|tel\s*(?:no|number|num)?|telephone|contact(?:\s*(?:no|number|num))?)\.?[\s:=.-]+(\+?[\d\s-]{7,25})/i
+    )
+    if (phoneMatch && phoneMatch[1]) {
+      candidatePhones.push(phoneMatch[1].trim())
+      continue
+    }
+
+    // 4. Standalone ISD Code line: "ISD Code: 880" or "ISD: 880" or "Country Code: 880"
+    const isdMatch = line.match(/(?:isd\s*(?:code)?|country\s*code)[:\s]+(\+?\d{1,4})\b/i)
+    if (isdMatch && isdMatch[1]) {
+      candidateIsds.push(isdMatch[1].replace(/^\+/, '').trim())
+    }
+  }
+
+  // 1. Email
+  if (candidateEmails.length > 0) {
+    result.email = candidateEmails[0]
+  }
+
+  // 2. ISD Code candidates
+  if (candidateIsds.length > 0) {
+    result.isdCode = candidateIsds[0]
+  }
+
+  // 3. Process Candidate Phones
+  for (const rawPhone of candidatePhones) {
+    const cleanWithPlus = rawPhone.replace(/[^\d+]/g, '')
+    const cleanDigits = rawPhone.replace(/[^\d]/g, '')
+    if (!result.phone) result.phone = rawPhone.trim()
+    if (cleanWithPlus.startsWith('+880')) {
+      if (!result.isdCode) result.isdCode = '880'
+      if (!result.mobile) result.mobile = cleanDigits.slice(3)
+    } else if (cleanDigits.startsWith('880') && cleanDigits.length >= 12) {
+      if (!result.isdCode) result.isdCode = '880'
+      if (!result.mobile) result.mobile = cleanDigits.slice(3)
+    } else if (cleanWithPlus.startsWith('+91')) {
+      if (!result.isdCode) result.isdCode = '91'
+      if (!result.mobile) result.mobile = cleanDigits.slice(2)
+    } else if (cleanWithPlus.startsWith('+')) {
+      const intlMatch = cleanWithPlus.match(/^\+(\d{1,4})(\d{6,14})$/)
+      if (intlMatch) {
+        if (!result.isdCode) result.isdCode = intlMatch[1]
+        if (!result.mobile) result.mobile = intlMatch[2]
+      }
+    }
+  }
+
+  // 4. Process Candidate Mobiles
+  for (const rawMobile of candidateMobiles) {
+    const cleanWithPlus = rawMobile.replace(/[^\d+]/g, '')
+    const cleanDigits = rawMobile.replace(/[^\d]/g, '')
+
+    if (cleanWithPlus.startsWith('+880')) {
+      if (!result.isdCode) result.isdCode = '880'
+      const local = cleanDigits.slice(3) // 880XXXXXXXXXX -> XXXXXXXXXX
+      result.mobile = local
+      if (!result.phone) result.phone = cleanWithPlus
+    } else if (cleanDigits.startsWith('880') && cleanDigits.length >= 12) {
+      if (!result.isdCode) result.isdCode = '880'
+      const local = cleanDigits.slice(3)
+      result.mobile = local
+      if (!result.phone) result.phone = '+' + cleanDigits
+    } else if (cleanWithPlus.startsWith('+91')) {
+      if (!result.isdCode) result.isdCode = '91'
+      const local = cleanDigits.slice(2)
+      result.mobile = local
+      if (!result.phone) result.phone = cleanWithPlus
+    } else if (cleanWithPlus.startsWith('+')) {
+      const intlMatch = cleanWithPlus.match(/^\+(\d{1,4})(\d{6,14})$/)
+      if (intlMatch) {
+        if (!result.isdCode) result.isdCode = intlMatch[1]
+        result.mobile = intlMatch[2]
+        if (!result.phone) result.phone = cleanWithPlus
+      } else {
+        result.mobile = cleanDigits
+        if (!result.phone) result.phone = cleanWithPlus
+      }
+    } else {
+      result.mobile = rawMobile.trim()
+    }
+  }
+
+  // 5. Fallback: If no explicit phone or mobile exists, use passport emergency contact telephone
+  if (!result.phone && !result.mobile && candidateEmergencyPhones.length > 0) {
+    const rawEmerg = candidateEmergencyPhones[0]
+    const cleanWithPlus = rawEmerg.replace(/[^\d+]/g, '')
+    const cleanDigits = rawEmerg.replace(/[^\d]/g, '')
+
+    if (cleanWithPlus.startsWith('+880')) {
+      result.isdCode = '880'
+      result.mobile = cleanDigits.slice(3)
+      result.phone = cleanWithPlus
+    } else if (cleanDigits.startsWith('880') && cleanDigits.length >= 12) {
+      result.isdCode = '880'
+      result.mobile = cleanDigits.slice(3)
+      result.phone = '+' + cleanDigits
+    } else if (cleanWithPlus.startsWith('+')) {
+      const intlMatch = cleanWithPlus.match(/^\+(\d{1,4})(\d{6,14})$/)
+      if (intlMatch) {
+        result.isdCode = intlMatch[1]
+        result.mobile = intlMatch[2]
+        result.phone = cleanWithPlus
+      } else {
+        result.mobile = cleanDigits
+        result.phone = cleanWithPlus
+      }
+    } else {
+      result.mobile = rawEmerg.trim()
+      result.phone = rawEmerg.trim()
+    }
+  }
 
   return result
 }
@@ -1153,212 +1550,140 @@ function extractFromRawText(
     }
   }
 
-  // 11. Email: "Email: test@example.com"
-  const emailMatch = text.match(/(?:email|e-mail)[:\s]+([^\s@]+@[^\s@]+\.[^\s@]+)/i)
-  if (emailMatch && emailMatch[1]) {
+  // 11. Contact Details (Email, Phone, Mobile, ISD Code)
+  const contactDetails = parseApplicantContact(text)
+  if (contactDetails.email) {
     result.contact = {
       ...result.contact,
-      email: { value: emailMatch[1].trim().toLowerCase(), source, confidence: baseConfidence },
+      email: { value: contactDetails.email, source, confidence: baseConfidence },
     }
   }
-
-  // 12. Mobile / Phone: "Mobile: +123456789"
-  const mobileMatch = text.match(/(?:mobile|cell(?:\s*phone)?)[:\s]+(\+?[\d\s-]{7,15})/i)
-  if (mobileMatch && mobileMatch[1]) {
+  if (contactDetails.mobile) {
     result.contact = {
       ...result.contact,
-      mobile: { value: mobileMatch[1].trim(), source, confidence: baseConfidence },
+      mobile: { value: contactDetails.mobile, source, confidence: baseConfidence },
+    }
+    result.presentAddress = {
+      ...result.presentAddress,
+      mobile: { value: contactDetails.mobile, source, confidence: baseConfidence },
     }
   }
-
-  const phoneMatch = text.match(/(?:present\s*)?(?:phone|tel|telephone)[:\s]+(\+?[\d\s-]{7,15})/i)
-  if (phoneMatch && phoneMatch[1]) {
+  if (contactDetails.phone) {
     result.contact = {
       ...result.contact,
-      phone: { value: phoneMatch[1].trim(), source, confidence: baseConfidence },
+      phone: { value: contactDetails.phone, source, confidence: baseConfidence },
     }
-  }
-
-  // 5. ADDRESS EXTRACTION (Present & Permanent)
-  // Check explicit line-by-line address fields first
-  const presLine1Match = text.match(/(?:present\s*)?(?:address\s*line\s*1)[:\s]+([^\r\n]+)/i)
-  const presLine2Match = text.match(/(?:present\s*)?(?:address\s*line\s*2)[:\s]+([^\r\n]+)/i)
-
-  if (presLine1Match && presLine1Match[1]) {
     result.presentAddress = {
       ...result.presentAddress,
-      addressLine1: { value: presLine1Match[1].trim(), source, confidence: baseConfidence },
+      phone: { value: contactDetails.phone, source, confidence: baseConfidence },
     }
   }
-  if (presLine2Match && presLine2Match[1]) {
+  if (contactDetails.isdCode) {
+    result.contact = {
+      ...result.contact,
+      isdCode: { value: contactDetails.isdCode, source, confidence: baseConfidence },
+    }
     result.presentAddress = {
       ...result.presentAddress,
-      addressLine2: { value: presLine2Match[1].trim(), source, confidence: baseConfidence },
+      isdCode: { value: contactDetails.isdCode, source, confidence: baseConfidence },
     }
   }
 
-  // Extract Present Address Block if line 1 wasn't found as a dedicated key
-  if (!result.presentAddress?.addressLine1) {
-    const presAddrBlock = text.match(
-      /(?:present\s*address|residential\s*address|current\s*address|home\s*address|mailing\s*address|postal\s*address)[:\s]+([^\r\n]+(?:\r?\n[ \t]*(?!permanent|emergency|legal|father|mother|marital|occupation|employer|previous|passport|date\s*of\s*birth|postal\s*code|pincode|country|district|state|province)[^\r\n:]+)*)/i
-    )
-    if (presAddrBlock && presAddrBlock[1]) {
-      const lines = presAddrBlock[1]
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0)
-
-      if (lines.length > 0) {
-        result.presentAddress = {
-          ...result.presentAddress,
-          addressLine1: { value: lines[0], source, confidence: baseConfidence },
-        }
-        if (lines.length > 1 && !result.presentAddress.addressLine2) {
-          result.presentAddress.addressLine2 = { value: lines[1], source, confidence: baseConfidence }
-        }
-        if (lines.length > 2 && !result.presentAddress.villageTownCity) {
-          result.presentAddress.villageTownCity = { value: lines[2], source, confidence: baseConfidence }
-        }
-      }
+  // 12. ADDRESS EXTRACTION (Present & Permanent)
+  // Check explicit Present Address block (excluding line-labeled fields)
+  const presAddrBlock = text.match(
+    /(?:present\s*address|residential\s*address|current\s*address|home\s*address|mailing\s*address|postal\s*address)(?!\s*(?:line\s*\d|city|town|village|district|state|country|pincode|postal\s*code|phone|mobile|isd))[:\s]+([\s\S]+?)(?=(?:postal\s*code|pin\s*code|country[:\s]|phone|mobile|permanent\s*address|emergency|legal|father|mother|marital|occupation|employer|previous|passport|$))/i
+  )
+  if (presAddrBlock && presAddrBlock[1]) {
+    const parsedPres = parseStructuredAddress(presAddrBlock[1], { nationality: result.personal?.nationality?.value })
+    if (parsedPres.addressLine1) result.presentAddress = { ...result.presentAddress, addressLine1: { value: parsedPres.addressLine1, source, confidence: baseConfidence } }
+    if (parsedPres.addressLine2) result.presentAddress = { ...result.presentAddress, addressLine2: { value: parsedPres.addressLine2, source, confidence: baseConfidence } }
+    if (parsedPres.villageTownCity) result.presentAddress = { ...result.presentAddress, villageTownCity: { value: parsedPres.villageTownCity, source, confidence: baseConfidence } }
+    if (parsedPres.district) result.presentAddress = { ...result.presentAddress, district: { value: parsedPres.district, source, confidence: baseConfidence } }
+    if (parsedPres.stateProvince) result.presentAddress = { ...result.presentAddress, stateProvince: { value: parsedPres.stateProvince, source, confidence: baseConfidence } }
+    if (parsedPres.postalCode) result.presentAddress = { ...result.presentAddress, postalCode: { value: parsedPres.postalCode, source, confidence: baseConfidence } }
+    if (parsedPres.country) result.presentAddress = { ...result.presentAddress, country: { value: parsedPres.country, source, confidence: baseConfidence } }
+  } else {
+    // Check individual line items for present address
+    const presLine1Match = text.match(/(?:present\s*)?(?:address\s*line\s*1)[:\s]+([^\r\n]+)/i)
+    if (presLine1Match && presLine1Match[1]) {
+      result.presentAddress = { ...result.presentAddress, addressLine1: { value: presLine1Match[1].trim(), source, confidence: baseConfidence } }
+    }
+    const presLine2Match = text.match(/(?:present\s*)?(?:address\s*line\s*2)[:\s]+([^\r\n]+)/i)
+    if (presLine2Match && presLine2Match[1]) {
+      result.presentAddress = { ...result.presentAddress, addressLine2: { value: presLine2Match[1].trim(), source, confidence: baseConfidence } }
+    }
+    const presCityMatch = text.match(/(?:present\s*)?(?:city|town|village|village\/town\/city)[:\s]+([^\r\n,;]+)/i)
+    if (presCityMatch && presCityMatch[1] && !result.presentAddress?.villageTownCity) {
+      result.presentAddress = { ...result.presentAddress, villageTownCity: { value: presCityMatch[1].trim(), source, confidence: baseConfidence } }
+    }
+    const presDistrictMatch = text.match(/(?:present\s*)?(?:district)[:\s]+([^\r\n,;]+)/i)
+    if (presDistrictMatch && presDistrictMatch[1] && !result.presentAddress?.district) {
+      result.presentAddress = { ...result.presentAddress, district: { value: presDistrictMatch[1].trim(), source, confidence: baseConfidence } }
+    }
+    const presStateMatch = text.match(/(?:present\s*)?(?:state|province|state\/province)[:\s]+([^\r\n,;]+)/i)
+    if (presStateMatch && presStateMatch[1] && !result.presentAddress?.stateProvince) {
+      result.presentAddress = { ...result.presentAddress, stateProvince: { value: presStateMatch[1].trim(), source, confidence: baseConfidence } }
     }
   }
 
-  const presCityMatch = text.match(/(?:present\s*)?(?:city|town|village|village\/town\/city)[:\s]+([^\r\n,;]+)/i)
-  if (presCityMatch && presCityMatch[1] && (!result.presentAddress || !result.presentAddress.villageTownCity)) {
-    result.presentAddress = {
-      ...result.presentAddress,
-      villageTownCity: { value: presCityMatch[1].trim(), source, confidence: baseConfidence },
-    }
-  }
-
-  const presDistrictMatch = text.match(/(?:present\s*)?(?:district)[:\s]+([^\r\n,;]+)/i)
-  if (presDistrictMatch && presDistrictMatch[1]) {
-    result.presentAddress = {
-      ...result.presentAddress,
-      district: { value: presDistrictMatch[1].trim(), source, confidence: baseConfidence },
-    }
-  }
-
-  const presStateMatch = text.match(/(?:present\s*)?(?:state|province|state\/province)[:\s]+([^\r\n,;]+)/i)
-  if (presStateMatch && presStateMatch[1]) {
-    result.presentAddress = {
-      ...result.presentAddress,
-      stateProvince: { value: presStateMatch[1].trim(), source, confidence: baseConfidence },
-    }
-  }
-
+  // Standalone pincode / postal code and country for Present Address
   const presPinMatch = text.match(/(?:pincode|postal\s*code|post\s*code|pin|zip(?:\s*code)?)[:\s]+([0-9A-Za-z -]{3,12})/i)
-  if (presPinMatch && presPinMatch[1]) {
-    result.presentAddress = {
-      ...result.presentAddress,
-      postalCode: { value: presPinMatch[1].trim(), source, confidence: baseConfidence },
-    }
+  if (presPinMatch && presPinMatch[1] && !result.presentAddress?.postalCode) {
+    result.presentAddress = { ...result.presentAddress, postalCode: { value: presPinMatch[1].trim(), source, confidence: baseConfidence } }
   }
-
   const presCountryMatch = text.match(/(?:present\s*(?:address\s*)?country|residential\s*country|home\s*country|\bcountry(?!\s*(?:code|of\s*birth|of\s*issue)))[:\s]+([A-Za-z .'-]{2,50})/i)
-  if (presCountryMatch && presCountryMatch[1]) {
+  if (presCountryMatch && presCountryMatch[1] && !result.presentAddress?.country) {
     const rawCountry = presCountryMatch[1].trim()
     if (!/^(code|du\s*pays|of\s*birth|of\s*issue)/i.test(rawCountry)) {
-      result.presentAddress = {
-        ...result.presentAddress,
-        country: { value: rawCountry, source, confidence: baseConfidence },
-      }
+      result.presentAddress = { ...result.presentAddress, country: { value: rawCountry, source, confidence: baseConfidence } }
     }
   }
 
-  // Extract Permanent Address Line 1 / Line 2 first
-  const permLine1Match = text.match(/permanent\s*(?:address\s*line\s*1)[:\s]+([^\r\n]+)/i)
-  const permLine2Match = text.match(/permanent\s*(?:address\s*line\s*2)[:\s]+([^\r\n]+)/i)
-
-  if (permLine1Match && permLine1Match[1]) {
-    result.permanentAddress = {
-      ...result.permanentAddress,
-      addressLine1: { value: permLine1Match[1].trim(), source, confidence: baseConfidence },
+  // Check Permanent Address Block (excluding line-labeled fields)
+  const permAddrBlock = text.match(
+    /(?:permanent\s*address)(?!\s*(?:line\s*\d|city|town|village|district|state|country|pincode|postal\s*code|phone|mobile|isd))[:\s]+([\s\S]+?)(?=(?:permanent\s*(?:postal|country|phone|mobile)|postal\s*code|pin\s*code|country[:\s]|emergency|legal\s*guardian|telephone|tel\s*no|present|father|mother|marital|occupation|employer|previous|passport|$))/i
+  )
+  if (permAddrBlock && permAddrBlock[1]) {
+    const parsedPerm = parseStructuredAddress(permAddrBlock[1], { nationality: result.personal?.nationality?.value })
+    if (parsedPerm.addressLine1) result.permanentAddress = { ...result.permanentAddress, addressLine1: { value: parsedPerm.addressLine1, source, confidence: baseConfidence } }
+    if (parsedPerm.addressLine2) result.permanentAddress = { ...result.permanentAddress, addressLine2: { value: parsedPerm.addressLine2, source, confidence: baseConfidence } }
+    if (parsedPerm.villageTownCity) result.permanentAddress = { ...result.permanentAddress, villageTownCity: { value: parsedPerm.villageTownCity, source, confidence: baseConfidence } }
+    if (parsedPerm.district) result.permanentAddress = { ...result.permanentAddress, district: { value: parsedPerm.district, source, confidence: baseConfidence } }
+    if (parsedPerm.stateProvince) result.permanentAddress = { ...result.permanentAddress, stateProvince: { value: parsedPerm.stateProvince, source, confidence: baseConfidence } }
+    if (parsedPerm.postalCode) result.permanentAddress = { ...result.permanentAddress, postalCode: { value: parsedPerm.postalCode, source, confidence: baseConfidence } }
+    if (parsedPerm.country) result.permanentAddress = { ...result.permanentAddress, country: { value: parsedPerm.country, source, confidence: baseConfidence } }
+  } else {
+    const permLine1Match = text.match(/permanent\s*(?:address\s*line\s*1)[:\s]+([^\r\n]+)/i)
+    if (permLine1Match && permLine1Match[1]) {
+      result.permanentAddress = { ...result.permanentAddress, addressLine1: { value: permLine1Match[1].trim(), source, confidence: baseConfidence } }
     }
-  }
-  if (permLine2Match && permLine2Match[1]) {
-    result.permanentAddress = {
-      ...result.permanentAddress,
-      addressLine2: { value: permLine2Match[1].trim(), source, confidence: baseConfidence },
+    const permLine2Match = text.match(/permanent\s*(?:address\s*line\s*2)[:\s]+([^\r\n]+)/i)
+    if (permLine2Match && permLine2Match[1]) {
+      result.permanentAddress = { ...result.permanentAddress, addressLine2: { value: permLine2Match[1].trim(), source, confidence: baseConfidence } }
     }
-  }
-
-  // Extract Permanent Address Block if line 1 wasn't found as a dedicated key
-  if (!result.permanentAddress?.addressLine1) {
-    const permAddrBlock = text.match(
-      /(?:permanent\s*address)[:\s]+([\s\S]+?)(?=(?:emergency|legal\s*guardian|telephone|tel\s*no|present|father|mother|marital|occupation|employer|previous|passport|$))/i
-    )
-    if (permAddrBlock && permAddrBlock[1]) {
-      const rawLines = permAddrBlock[1]
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0 && !/^(emergency|legal|tel|phone|present|father|mother)/i.test(l))
-
-      const cleanLines: string[] = []
-      for (const line of rawLines) {
-        let cLine = line.replace(/^[0-9.\s]+/, '').replace(/^WE\s+/i, '').trim()
-        cLine = cLine.replace(/\s*[-=]\s*(?:pres|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/i, '').replace(/\s*=\s*aa\].*$/i, '').trim()
-        if (cLine.length > 3 && /[A-Z0-9]/i.test(cLine) && !/^(ety|NE\s*sea|He\s*\.)/i.test(cLine)) {
-          cleanLines.push(cLine)
-        }
-      }
-
-      if (cleanLines.length > 0) {
-        const fullAddr = cleanLines.join(', ')
-        const pinMatch = fullAddr.match(/\b(\d{4,6})\b/)
-        const pinCode = pinMatch ? pinMatch[1] : undefined
-
-        let city = 'THAKURGAON'
-        const cityMatch = fullAddr.match(/\b(THAKURGAON|DHAKA|CHITTAGONG|SYLHET|RAJSHAHI|KHULNA|BARISAL|RANGPUR|MYMENSINGH|COMILLA|GAZIPUR|NARAYANGANJ|BOGRA|DINAJPUR|PANCHAGARH|NILPHAMARI|LALMONIRHAT|KURIGRAM|JESSORE|KUSHTIA|PABNA|SIRAJGANJ|TANGAIL|FARIDPUR|JAMALPUR|NETROKONA|SHERPUR|KISHOREGANJ|MANIKGANJ|MUNSHIGANJ|NARSINGDI|GOPALGANJ|MADARIPUR|RAJBARI|SHARIATPUR|SUNAMGANJ|HABIGANJ|MOULVIBAZAR|BRAHMANBARIA|CHANDPUR|LAKSHMIPUR|NOAKHALI|FENI|COX['’]?S\s*BAZAR|KHAGRACHARI|RANGAMATI|BANDARBAN|SATKHIRA|BAGERHAT|JHENAIDAH|MAGURA|NARAIL|CHUADANGA|MEHERPUR|NATORE|NAOGAON|CHAPAINAWABGANJ|JOYPURHAT|PATUAKHALI|BHOLA|PIROJPUR|JHALOKATI|BARGUNA)\b/i)
-        if (cityMatch) {
-          city = cityMatch[1].toUpperCase()
-        }
-
-        let line1 = cleanLines[0] || fullAddr
-        line1 = line1.replace(/,\s*(?:THAKURGAON|DHAKA|CHITTAGONG|SYLHET|RAJSHAHI|KHULNA|BARISAL|RANGPUR|MYMENSINGH|COMILLA|GAZIPUR|NARAYANGANJ|BOGRA|DINAJPUR|PANCHAGARH)\s*$/i, '').trim()
-
-        result.permanentAddress = {
-          ...result.permanentAddress,
-          addressLine1: { value: line1, source, confidence: baseConfidence },
-          addressLine2: { value: city, source, confidence: baseConfidence },
-          district: { value: city, source, confidence: baseConfidence },
-          villageTownCity: { value: city, source, confidence: baseConfidence },
-          postalCode: pinCode ? { value: pinCode, source, confidence: baseConfidence } : undefined,
-          country: { value: 'BANGLADESH', source, confidence: baseConfidence },
-        }
-      }
+    const permCityMatch = text.match(/permanent\s*(?:city|town|village|village\/town\/city)[:\s]+([^\r\n,;]+)/i)
+    if (permCityMatch && permCityMatch[1] && !result.permanentAddress?.villageTownCity) {
+      result.permanentAddress = { ...result.permanentAddress, villageTownCity: { value: permCityMatch[1].trim(), source, confidence: baseConfidence } }
+    }
+    const permDistrictMatch = text.match(/permanent\s*(?:district)[:\s]+([^\r\n,;]+)/i)
+    if (permDistrictMatch && permDistrictMatch[1] && !result.permanentAddress?.district) {
+      result.permanentAddress = { ...result.permanentAddress, district: { value: permDistrictMatch[1].trim(), source, confidence: baseConfidence } }
+    }
+    const permStateMatch = text.match(/permanent\s*(?:state|province|state\/province)[:\s]+([^\r\n,;]+)/i)
+    if (permStateMatch && permStateMatch[1] && !result.permanentAddress?.stateProvince) {
+      result.permanentAddress = { ...result.permanentAddress, stateProvince: { value: permStateMatch[1].trim(), source, confidence: baseConfidence } }
     }
   }
 
-  const permCityMatch = text.match(/permanent\s*(?:city|town|village|village\/town\/city)[:\s]+([^\r\n,;]+)/i)
-  if (permCityMatch && permCityMatch[1] && (!result.permanentAddress || !result.permanentAddress.villageTownCity)) {
-    result.permanentAddress = {
-      ...result.permanentAddress,
-      villageTownCity: { value: permCityMatch[1].trim(), source, confidence: baseConfidence },
-    }
-  }
-
+  // Standalone pincode / postal code and country for Permanent Address
   const permPinMatch = text.match(/permanent\s*(?:pincode|postal\s*code|post\s*code|pin|zip(?:\s*code)?)[:\s]+([0-9A-Za-z -]{3,12})/i)
-  if (permPinMatch && permPinMatch[1]) {
-    result.permanentAddress = {
-      ...result.permanentAddress,
-      postalCode: { value: permPinMatch[1].trim(), source, confidence: baseConfidence },
-    }
+  if (permPinMatch && permPinMatch[1] && !result.permanentAddress?.postalCode) {
+    result.permanentAddress = { ...result.permanentAddress, postalCode: { value: permPinMatch[1].trim(), source, confidence: baseConfidence } }
   }
-
   const permCountryMatch = text.match(/permanent\s*(?:address\s*)?country[:\s]+([A-Za-z .'-]{2,50})/i)
-  if (permCountryMatch && permCountryMatch[1]) {
-    result.permanentAddress = {
-      ...result.permanentAddress,
-      country: { value: permCountryMatch[1].trim(), source, confidence: baseConfidence },
-    }
-  }
-
-  // If permanent address was found on passport scan but present address is empty, set present address to mirror permanent
-  if (result.permanentAddress && !result.presentAddress?.addressLine1) {
-    result.presentAddress = {
-      ...result.permanentAddress,
-    }
+  if (permCountryMatch && permCountryMatch[1] && !result.permanentAddress?.country) {
+    result.permanentAddress = { ...result.permanentAddress, country: { value: permCountryMatch[1].trim(), source, confidence: baseConfidence } }
   }
 
   // 6. FAMILY INFORMATION
@@ -1477,13 +1802,14 @@ function extractFromRawText(
   }
 
   // Emergency Contact & Spouse Extraction
-  const emergMatch = text.match(
-    /emergency\s*contact[\s\S]*?(?:(?:name|ame)[:\s=]+([A-Za-z .'-]{2,60}))?[\s\S]*?(?:(?:relationship|relation|reatonship|reaton)[:\s=]+([A-Za-z]+))/i
-  )
-  if (emergMatch && (emergMatch[1] || emergMatch[2])) {
-    const eName = emergMatch[1] ? emergMatch[1].trim().toUpperCase() : 'JASHODA RANI'
-    const eRel = emergMatch[2] ? emergMatch[2].trim().toUpperCase() : 'SPOUSE'
-    if (eRel === 'SPOUSE' || eRel === 'HUSBAND' || eRel === 'WIFE' || eRel === 'REATONSHIP') {
+  const emergMatch = text.match(/emergency\s*contact[\s\S]{0,400}/i)
+  if (emergMatch) {
+    const emergBlock = emergMatch[0]
+    const eNameMatch = emergBlock.match(/(?:name|ame)[:\s=]+([A-Za-z .'-]{2,60})/i)
+    const eRelMatch = emergBlock.match(/(?:relationship|relation|reatonship|reaton)[:\s=]+([A-Za-z]+)/i)
+    const eName = eNameMatch ? eNameMatch[1].trim().toUpperCase().split(/\r?\n/)[0].trim() : undefined
+    const eRel = eRelMatch ? eRelMatch[1].trim().toUpperCase() : undefined
+    if (eName && (eRel === 'SPOUSE' || eRel === 'HUSBAND' || eRel === 'WIFE' || eRel === 'REATONSHIP')) {
       result.family = {
         ...result.family,
         spouse: {
@@ -2036,8 +2362,16 @@ function extractFromRawText(
   if (result.personal && Object.keys(result.personal).length === 0) delete result.personal
   if (result.passport && Object.keys(result.passport).length === 0) delete result.passport
   if (result.contact && Object.keys(result.contact).length === 0) delete result.contact
-  if (result.presentAddress && Object.keys(result.presentAddress).length === 0) delete result.presentAddress
-  if (result.permanentAddress && Object.keys(result.permanentAddress).length === 0) delete result.permanentAddress
+  if (result.presentAddress) {
+    const p = result.presentAddress
+    const hasMeaningful = p.addressLine1 || p.addressLine2 || p.villageTownCity || p.district || p.stateProvince || p.postalCode || p.phone || p.mobile || p.isdCode
+    if (!hasMeaningful) delete result.presentAddress
+  }
+  if (result.permanentAddress) {
+    const p = result.permanentAddress
+    const hasMeaningful = p.addressLine1 || p.addressLine2 || p.villageTownCity || p.district || p.stateProvince || p.postalCode
+    if (!hasMeaningful) delete result.permanentAddress
+  }
   if (result.family && Object.keys(result.family).length === 0) delete result.family
   if (result.employment && Object.keys(result.employment).length === 0) delete result.employment
   if (result.travel && Object.keys(result.travel).length === 0) delete result.travel
@@ -2064,8 +2398,9 @@ export function extractFromPdfText(fullText: string): ExtractedApplicantData {
     candidateList.push(extractFromRawText(fullText, 'pdf-text', 85))
   }
   if (candidateList.length === 0) return {}
-  if (candidateList.length === 1) return candidateList[0]
-  return mergeExtractedCandidateData(candidateList).merged
+  const result = candidateList.length === 1 ? candidateList[0] : mergeExtractedCandidateData(candidateList).merged
+  console.log('📄 [VISA AUTOFILL] PDF Text Extraction Result:', result)
+  return result
 }
 
 /**
@@ -2084,8 +2419,9 @@ export function extractFromOcrText(ocrResult: OcrResult): ExtractedApplicantData
   }
   candidateList.push(extractFromRawText(ocrResult.text, 'ocr', baseConfidence))
   if (candidateList.length === 0) return {}
-  if (candidateList.length === 1) return candidateList[0]
-  return mergeExtractedCandidateData(candidateList).merged
+  const result = candidateList.length === 1 ? candidateList[0] : mergeExtractedCandidateData(candidateList).merged
+  console.log('🔍 [VISA AUTOFILL] OCR Extraction Result:', result)
+  return result
 }
 
 export interface ExtractedDocumentInput {
@@ -2260,6 +2596,7 @@ export function mergeExtractedCandidateData(
 
   // Contact Fields
   mergeField('contact.email', 'Email Address', (c) => c.contact?.email, (val) => { merged.contact!.email = val })
+  mergeField('contact.isdCode', 'ISD Code', (c) => c.contact?.isdCode, (val) => { merged.contact!.isdCode = val })
   mergeField('contact.mobile', 'Mobile Phone', (c) => c.contact?.mobile, (val) => { merged.contact!.mobile = val })
   mergeField('contact.phone', 'Phone Number', (c) => c.contact?.phone, (val) => { merged.contact!.phone = val })
 
@@ -2271,6 +2608,9 @@ export function mergeExtractedCandidateData(
   mergeField('presentAddress.stateProvince', 'Present State/Province', (c) => c.presentAddress?.stateProvince, (val) => { merged.presentAddress!.stateProvince = val })
   mergeField('presentAddress.country', 'Present Country', (c) => c.presentAddress?.country, (val) => { merged.presentAddress!.country = val })
   mergeField('presentAddress.postalCode', 'Present Postal Code', (c) => c.presentAddress?.postalCode, (val) => { merged.presentAddress!.postalCode = val })
+  mergeField('presentAddress.phone', 'Present Phone Number', (c) => c.presentAddress?.phone, (val) => { merged.presentAddress!.phone = val })
+  mergeField('presentAddress.isdCode', 'Present ISD Code', (c) => c.presentAddress?.isdCode, (val) => { merged.presentAddress!.isdCode = val })
+  mergeField('presentAddress.mobile', 'Present Mobile Number', (c) => c.presentAddress?.mobile, (val) => { merged.presentAddress!.mobile = val })
 
   // Permanent Address Fields
   mergeField('permanentAddress.addressLine1', 'Permanent Address Line 1', (c) => c.permanentAddress?.addressLine1, (val) => { merged.permanentAddress!.addressLine1 = val })
