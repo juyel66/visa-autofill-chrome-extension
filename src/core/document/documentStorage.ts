@@ -135,3 +135,25 @@ export async function deleteDocument(documentId: string): Promise<void> {
   const filtered = list.filter((doc) => doc.documentId !== documentId)
   await storageSet(DOCUMENTS_STORAGE_KEY, filtered)
 }
+
+/**
+ * Finds the latest (most recent by updatedAt/createdAt) document of a given type.
+ * Prioritizes confirmed extractions over unconfirmed ones.
+ */
+export function getLatestDocument(docs: DocumentRecord[], documentType: string): DocumentRecord | undefined {
+  if (!docs || docs.length === 0) return undefined
+  const confirmed = docs.filter((d) => d.documentType === documentType && d.extractedDataConfirmed)
+  if (confirmed.length > 0) {
+    return [...confirmed].sort(
+      (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+    )[0]
+  }
+  const allOfType = docs.filter((d) => d.documentType === documentType)
+  if (allOfType.length > 0) {
+    return [...allOfType].sort(
+      (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+    )[0]
+  }
+  return undefined
+}
+
