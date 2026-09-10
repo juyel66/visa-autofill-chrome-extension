@@ -1,5 +1,12 @@
 import type { FieldSelector } from './types'
 
+function safeCssEscape(val: string): string {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+    return CSS.escape(val)
+  }
+  return val.replace(/([#;?%&,.+*~':"!^$[\]()=>|/\\@])/g, '\\$1')
+}
+
 /**
  * Single selector strategy resolution helper.
  */
@@ -14,11 +21,11 @@ function resolveSingleSelector(selector: FieldSelector): HTMLElement[] {
   try {
     switch (strategy) {
       case 'id': {
-        const els = Array.from(document.querySelectorAll(`[id="${CSS.escape(value)}"]`))
+        const els = Array.from(document.querySelectorAll(`[id="${safeCssEscape(value)}"]`))
         return els.filter((el): el is HTMLElement => el instanceof HTMLElement)
       }
       case 'name': {
-        const els = Array.from(document.querySelectorAll(`[name="${CSS.escape(value)}"]`))
+        const els = Array.from(document.querySelectorAll(`[name="${safeCssEscape(value)}"]`))
         return els.filter((el): el is HTMLElement => el instanceof HTMLElement)
       }
       case 'css': {
@@ -27,7 +34,7 @@ function resolveSingleSelector(selector: FieldSelector): HTMLElement[] {
       }
       case 'label': {
         // Strategy 1: Find <label for="value">
-        const labelsFor = Array.from(document.querySelectorAll(`label[for="${CSS.escape(value)}"]`))
+        const labelsFor = Array.from(document.querySelectorAll(`label[for="${safeCssEscape(value)}"]`))
         for (const labelFor of labelsFor) {
           const forId = labelFor.getAttribute('for')
           if (forId) {
