@@ -1,6 +1,6 @@
 import type { DocumentRecord } from '../document/types'
 
-export type ApplicationFieldSource = 'passport' | 'ogd' | 'manual' | 'missing'
+export type ApplicationFieldSource = 'passport' | 'official_document' | 'ogd' | 'manual' | 'missing'
 
 export type SavedApplicationStatus = 'draft' | 'ready_for_autofill'
 
@@ -8,9 +8,11 @@ export interface ApplicationFieldValue {
   value: string | boolean
   source: ApplicationFieldSource
   documentId?: string
-  confidence?: number
+  confidence?: number | string
   isUserEdited?: boolean
   originalExtractedValue?: string | boolean
+  hasConflict?: boolean
+  conflictDetails?: string
 }
 
 export interface SavedApplication {
@@ -30,6 +32,13 @@ export interface SavedApplication {
     ogd?: DocumentRecord
   }
   manualEdits: Record<string, boolean>
+  religionMetadata?: {
+    religion: string | null
+    religionSource: 'passport' | 'official_document' | 'ogd' | 'manual' | null
+    religionConfidence: 'high' | 'medium' | 'low' | 'none'
+    religionConflict: boolean
+    conflictDetails?: string
+  }
   photograph?: {
     dataUrl?: string
     fileName?: string
