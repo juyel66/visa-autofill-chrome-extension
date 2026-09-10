@@ -42,10 +42,14 @@ function cleanAddress<T extends Address>(addr?: T): T | undefined {
     stateProvince: cleanString(addr.stateProvince),
     country: cleanString(addr.country),
     postalCode: cleanString(addr.postalCode),
+    phone: cleanPhone(addr.phone),
+    isdCode: cleanString(addr.isdCode),
+    mobile: cleanPhone(addr.mobile),
   }
   const hasValues = Boolean(
     res.addressLine1 || res.addressLine2 || res.villageTownCity ||
-    res.district || res.stateProvince || res.country || res.postalCode
+    res.district || res.stateProvince || res.country || res.postalCode ||
+    res.phone || res.isdCode || res.mobile
   )
   return hasValues ? res : undefined
 }
@@ -207,6 +211,7 @@ export function normalizeApplicant(applicant: ApplicantProfile): ApplicantProfil
           email: cleanEmail(applicant.contact.email),
           mobile: cleanPhone(applicant.contact.mobile),
           phone: cleanPhone(applicant.contact.phone),
+          isdCode: cleanString(applicant.contact.isdCode),
         }
       : undefined,
     family: applicant.family
