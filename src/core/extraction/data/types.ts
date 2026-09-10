@@ -89,6 +89,7 @@ export interface ExtractedApplicantData {
     email?: ExtractedField<string>
     mobile?: ExtractedField<string>
     phone?: ExtractedField<string>
+    isdCode?: ExtractedField<string>
   }
   presentAddress?: {
     addressLine1?: ExtractedField<string>
@@ -99,6 +100,8 @@ export interface ExtractedApplicantData {
     country?: ExtractedField<string>
     postalCode?: ExtractedField<string>
     phone?: ExtractedField<string>
+    isdCode?: ExtractedField<string>
+    mobile?: ExtractedField<string>
   }
   permanentAddress?: {
     addressLine1?: ExtractedField<string>
