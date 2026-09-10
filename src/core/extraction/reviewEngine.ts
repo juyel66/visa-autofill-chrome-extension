@@ -115,8 +115,9 @@ export const compareApplicantWithExtraction = (
   // Contact Info
   if (extracted.contact) {
     checkField('contact.email', 'Email Address', applicant.contact?.email, extracted.contact.email)
+    checkField('contact.isdCode', 'ISD Code', applicant.contact?.isdCode, extracted.contact.isdCode)
     checkField('contact.mobile', 'Mobile Phone', applicant.contact?.mobile, extracted.contact.mobile)
-    checkField('contact.phone', 'Phone', applicant.contact?.phone, extracted.contact.phone)
+    checkField('contact.phone', 'Phone Number', applicant.contact?.phone, extracted.contact.phone)
   }
 
   // Present Address Info
@@ -128,6 +129,9 @@ export const compareApplicantWithExtraction = (
     checkField('presentAddress.stateProvince', 'Present State/Province', applicant.presentAddress?.stateProvince, extracted.presentAddress.stateProvince)
     checkField('presentAddress.country', 'Present Country', applicant.presentAddress?.country, extracted.presentAddress.country)
     checkField('presentAddress.postalCode', 'Present Postal Code', applicant.presentAddress?.postalCode, extracted.presentAddress.postalCode)
+    checkField('presentAddress.phone', 'Present Phone Number', applicant.presentAddress?.phone, extracted.presentAddress.phone)
+    checkField('presentAddress.isdCode', 'Present ISD Code', applicant.presentAddress?.isdCode, extracted.presentAddress.isdCode)
+    checkField('presentAddress.mobile', 'Present Mobile Number', applicant.presentAddress?.mobile, extracted.presentAddress.mobile)
   }
 
   // Permanent Address Info
