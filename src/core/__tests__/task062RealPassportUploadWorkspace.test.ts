@@ -120,8 +120,10 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     'Zero Contamination: Nationality does not appear in Visible Identification Marks'
   )
   assert(
-    !extracted.contact?.mobile?.value || extracted.contact.mobile.value !== '+8801744777846',
-    'Zero Contamination: Emergency contact phone does not bleed into applicant mobile'
+    extracted.contact?.phone?.value === '+8801744777846' &&
+      extracted.contact?.isdCode?.value === '880' &&
+      extracted.contact?.mobile?.value === '1744777846',
+    'TASK 074: Passport emergency contact telephone falls back into applicant contact phone, isdCode, and mobile'
   )
   assert(
     extracted.family?.father?.name?.value !== extracted.family?.mother?.name?.value,
@@ -192,13 +194,19 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     'spouse_prev_nationality': 'BANGLADESH',
     'spouse_country_of_birth': 'BANGLADESH',
     'marital_status': 'Married',
-    'perm_add1': 'KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120',
-    'perm_add2': 'THAKURGAON',
-    'perm_add3': 'THAKURGAON',
-    'pres_addr1': 'KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120',
-    'pres_addr2': 'THAKURGAON',
-    'state_name': 'THAKURGAON',
+    'pres_addr1': 'KASHIPUR',
+    'pres_addr2': 'RANISANKAIL, MUZAHIDABAD COLONI',
+    'district': 'THAKURGAON',
+    'present_country': 'BANGLADESH',
     'pincode': '5120',
+    'pres_phone': '+8801744777846',
+    'isd_code': '880',
+    'mobile': '1744777846',
+    'perm_add1': 'KASHIPUR',
+    'perm_add2': 'RANISANKAIL, MUZAHIDABAD COLONI',
+    'permanent_district': 'THAKURGAON',
+    'permanent_country': 'BANGLADESH',
+    'permanent_postal_code': '5120',
     'appl.oth_ppt': 'Yes',
     'appl.oth_pptno': 'BK0965579',
     'appl.oth_ppt_issue_place': 'DHAKA',
@@ -217,6 +225,9 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
 
   // Genuinely missing fields
   const expectedGenuinelyMissing = [
+    'permanent_village_town_city',
+    'permanent_state_province',
+    'perm_add3',
     'duration',
     'visa_entry_id',
     'appl.journeydate',
