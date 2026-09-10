@@ -3,9 +3,11 @@ import { Button } from '../../components/ui'
 import type { ApplicantProfile } from '../../core/applicant'
 import {
   getDocumentsByApplicantId,
+  getLatestDocument,
   saveDocument,
 } from '../../core/document'
 import type { DocumentRecord } from '../../core/document'
+import { saveApplicant } from '../../core/storage'
 import type {
   AutofillResponsePayload,
   UndoResponsePayload,
@@ -18,6 +20,7 @@ import {
   extractPdfText,
   extractFromOcrText,
   recognizeText,
+  applyExtractionToApplicant,
 } from '../../core/extraction'
 import {
   toUint8Array,
@@ -325,14 +328,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         await saveDocument(newDoc)
 
+        // If targetType is passport and has extracted fields, sync the active applicant profile
+        if (targetType === 'passport' && hasFields && extractedApplicant) {
+          try {
+            const updatedProfile = applyExtractionToApplicant(selectedApplicant, extractedApplicant)
+            await saveApplicant(updatedProfile)
+          } catch (syncErr) {
+            console.warn('Could not sync applicant profile with passport extraction:', syncErr)
+          }
+        }
+
         // Populate or update SavedApplication directly
         const docs = await getDocumentsByApplicantId(selectedApplicant.applicantId)
-        const pDoc =
-          docs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed) ||
-          docs.find((d) => d.documentType === 'passport')
-        const oDoc =
-          docs.find((d) => d.documentType === 'ogd' && d.extractedDataConfirmed) ||
-          docs.find((d) => d.documentType === 'ogd')
+        const pDoc = targetType === 'passport' && newDoc.extractedDataConfirmed ? newDoc : getLatestDocument(docs, 'passport')
+        const oDoc = targetType === 'ogd' && newDoc.extractedDataConfirmed ? newDoc : getLatestDocument(docs, 'ogd')
         const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
         const mergedApp = populateApplicationFromDocuments({
           applicantId: selectedApplicant.applicantId,
