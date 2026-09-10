@@ -7,6 +7,7 @@ import {
 import { applyExtractionToApplicant } from '../../../core/extraction/data/extractionMapper'
 import { resolveCandidateData } from '../../../core/autofill/candidateResolver'
 import { executeAutofill } from '../../../core/autofill/autofillEngine'
+import { populateApplicationFromDocuments } from '../../../core/application/applicationMerger'
 import { BANGLADESH_FAMILY_DETAILS_MAPPINGS } from '../mappings/bangladesh/familyDetails'
 import { BANGLADESH_FAMILY_DETAILS_FIXTURE_HTML } from './fixtures'
 import type { ApplicantProfile } from '../../../core/applicant/types'
@@ -1090,6 +1091,85 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
     if (!isIsolated) {
       failures.push(
         `Test 31 Failed: Pre-existing profile data leaked into isolated applicant: ${JSON.stringify(isolatedApplicant)}`
+      )
+    }
+  }
+
+  // =========================================================================
+  // Test 32: Passport Telephone -> Present Phone, ISD, Mobile in Workspace Merger
+  // =========================================================================
+  totalSubtests++
+  {
+    const passportWithPhoneText = `
+      PEOPLE'S REPUBLIC OF BANGLADESH
+      Name: SHREE JOTIMOY RAY
+      Father: SHREE KHIDAR MOHAN
+      Mother: PANCHAMI RANI
+      Nationality: BANGLADESHI
+      DOB: 18 SEP 1993
+      Place of Birth: THAKURGAON
+      Passport No: A21496961
+      Issue Date: 20 JAN 2026
+      Expiry Date: 19 JAN 2031
+      Permanent Address: KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120, THAKURGAON
+      Emergency Contact:
+      Name: JASHODA RANI
+      Relationship: SPOUSE
+      Telephone: +8801744777846
+    `
+
+    const extracted = extractFromPdfText(passportWithPhoneText)
+    if (extracted.contact?.phone?.value !== '+8801744777846' || extracted.presentAddress?.phone?.value !== '+8801744777846') {
+      failures.push(`Test 32 Failed: Phone extraction failed. Extracted contact: ${JSON.stringify(extracted.contact)}, presentAddress: ${JSON.stringify(extracted.presentAddress)}`)
+    }
+
+    if (extracted.contact?.isdCode?.value !== '880' || extracted.contact?.mobile?.value !== '1744777846') {
+      failures.push(`Test 32 Failed: ISD/Mobile decomposition failed. Extracted: isd=${extracted.contact?.isdCode?.value}, mobile=${extracted.contact?.mobile?.value}`)
+    }
+
+    const baseApplicant: ApplicantProfile = {
+      applicantId: '11213',
+      createdAt: '2026-09-10T00:00:00Z',
+      updatedAt: '2026-09-10T00:00:00Z',
+    }
+    const profile = applyExtractionToApplicant(baseApplicant, extracted)
+
+    if (profile.presentAddress?.phone !== '+8801744777846' || profile.presentAddress?.isdCode !== '880' || profile.presentAddress?.mobile !== '1744777846') {
+      failures.push(`Test 32 Failed: applyExtractionToApplicant did not preserve phone/isd/mobile in presentAddress: ${JSON.stringify(profile.presentAddress)}`)
+    }
+
+    const passportDocRecord: DocumentRecord = {
+      documentId: 'doc_1789856595918_z2mch',
+      applicantId: '11213',
+      documentType: 'passport',
+      fileName: 'Josoda passport.pdf',
+      fileSize: 1024,
+      createdAt: '2026-09-10T00:00:00Z',
+      updatedAt: '2026-09-10T00:00:00Z',
+      status: 'processed',
+      source: 'user-upload',
+      extractedData: extracted,
+      extractedDataConfirmed: true,
+    }
+
+    const mergedApplication = populateApplicationFromDocuments({
+      applicantId: '11213',
+      passportDoc: passportDocRecord,
+    })
+
+    if (
+      mergedApplication.fields['pres_phone']?.value !== '+8801744777846' ||
+      mergedApplication.fields['pres_phone']?.source !== 'passport' ||
+      mergedApplication.fields['isd_code']?.value !== '880' ||
+      mergedApplication.fields['isd_code']?.source !== 'passport' ||
+      mergedApplication.fields['mobile']?.value !== '1744777846' ||
+      mergedApplication.fields['mobile']?.source !== 'passport'
+    ) {
+      failures.push(
+        `Test 32 Failed: populateApplicationFromDocuments did not correctly populate Section 3 Phone/ISD/Mobile. ` +
+        `Phone: ${JSON.stringify(mergedApplication.fields['pres_phone'])}, ` +
+        `ISD: ${JSON.stringify(mergedApplication.fields['isd_code'])}, ` +
+        `Mobile: ${JSON.stringify(mergedApplication.fields['mobile'])}`
       )
     }
   }
