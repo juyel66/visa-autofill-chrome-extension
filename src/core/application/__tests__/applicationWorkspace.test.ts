@@ -461,38 +461,38 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
     'Subtest 25c: Missing fields legitimately remain blank without fallback to fake profile values'
   )
 
-  // --- TASK 067-FINAL: One-Page Workspace Visibility & Schema Integrity ---
-  // Subtest 26: Schema Integrity (All 100 fields preserved)
+  // --- TASK 067-FINAL & TASK 070: One-Page Workspace Visibility & Schema Integrity ---
+  // Subtest 26: Schema Integrity (All canonical fields preserved)
   const allFields = getAllSchemaFields()
   const visibleFields = getDefaultVisibleSchemaFields()
   const hiddenFields = getDefaultHiddenSchemaFields()
 
   assert(
-    allFields.length === 100,
-    `Subtest 26a: Total canonical fields remain exactly 100 (got ${allFields.length})`
+    allFields.length === 113,
+    `Subtest 26a: Total registered schema fields is 113 (got ${allFields.length})`
   )
   assert(
-    visibleFields.length === 86,
-    `Subtest 26b: Default visible fields count is 86 (got ${visibleFields.length})`
+    visibleFields.length === 94,
+    `Subtest 26b: Default visible fields count is 94 (got ${visibleFields.length})`
   )
   assert(
-    hiddenFields.length === 14,
-    `Subtest 26c: Default hidden fields count is 14 (got ${hiddenFields.length})`
+    hiddenFields.length === 19,
+    `Subtest 26c: Default hidden fields count is 19 (got ${hiddenFields.length})`
   )
   assert(
-    WORKSPACE_DEFAULT_VISIBLE_FIELDS.length === 86 && WORKSPACE_HIDDEN_FIELDS.length === 14,
-    'Subtest 26d: WORKSPACE_DEFAULT_VISIBLE_FIELDS (86) and WORKSPACE_HIDDEN_FIELDS (14) explicitly configured'
+    WORKSPACE_DEFAULT_VISIBLE_FIELDS.length === 92 && WORKSPACE_HIDDEN_FIELDS.length === 17,
+    'Subtest 26d: WORKSPACE_DEFAULT_VISIBLE_FIELDS (92) and WORKSPACE_HIDDEN_FIELDS (17) explicitly configured'
   )
 
-  // Subtest 26e: All 10 Workspace Sections defined and cover all 100 canonical fields
+  // Subtest 26e: All 10 Workspace Sections defined and cover all workspace fields
   assert(
     WORKSPACE_SECTIONS.length === 10,
     `Subtest 26e: Workspace has exactly 10 sections for single full-page rendering (got ${WORKSPACE_SECTIONS.length})`
   )
   const totalSectionFields = WORKSPACE_SECTIONS.flatMap((s) => s.fieldKeys)
   assert(
-    totalSectionFields.length === 100,
-    `Subtest 26f: All 10 Workspace sections map to all 100 canonical fields (got ${totalSectionFields.length})`
+    totalSectionFields.length === 109,
+    `Subtest 26f: All 10 Workspace sections map to all 109 section fields (got ${totalSectionFields.length})`
   )
 
   // Subtest 27: Hidden fields remain in SavedApplication and retain populated values
@@ -521,12 +521,12 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
     'Subtest 27f: Hidden field answer_1 is retained in SavedApplication'
   )
 
-  // Subtest 28: Save Application preserves all 100 fields and reloads with hidden field values intact
+  // Subtest 28: Save Application preserves all fields and reloads with hidden field values intact
   await saveApplication(khokonApp)
   const reloadedKhokon = await getSavedApplicationByApplicantId('KHOKON_001')
   assert(
-    reloadedKhokon !== null && Object.keys(reloadedKhokon.fields).length === 100,
-    'Subtest 28a: SavedApplication preserves all 100 fields in storage'
+    reloadedKhokon !== null && Object.keys(reloadedKhokon.fields).length === 110,
+    'Subtest 28a: SavedApplication preserves all 110 unique fields in storage'
   )
   assert(
     reloadedKhokon?.fields['appl.surname']?.value === 'AHMED',
