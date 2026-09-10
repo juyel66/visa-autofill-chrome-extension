@@ -10,6 +10,9 @@ export interface Address {
   stateProvince?: string
   country?: string
   postalCode?: string
+  phone?: string
+  isdCode?: string
+  mobile?: string
 }
 
 export interface PermanentAddress extends Address {
@@ -39,6 +42,7 @@ export interface ContactDetails {
   phone?: string
   mobile?: string
   email?: string
+  isdCode?: string
 }
 
 export interface FamilyMember {
