@@ -12,6 +12,8 @@ import {
   extractPdfText,
   extractFromOcrText,
   recognizeText,
+  toUint8Array,
+  extractEmbeddedJpegFromPdf,
 } from '../../core/extraction'
 
 export interface DocumentUploadModalProps {
@@ -81,14 +83,23 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
       if (isPdf) {
         try {
-          const pdfExtract = await extractPdfText(dataUrl)
-          if (pdfExtract.fullText && pdfExtract.fullText.trim().length >= 50) {
-            extractedApplicant = extractFromPdfText(pdfExtract.fullText)
-          } else {
-            const imgTarget = pdfExtract.imagePayload || dataUrl
-            const ocrRes = await recognizeText(imgTarget, { language: 'eng' })
+          const rawBytes = await toUint8Array(dataUrl)
+          const embeddedJpeg = extractEmbeddedJpegFromPdf(rawBytes)
+          if (embeddedJpeg) {
+            const ocrRes = await recognizeText(embeddedJpeg, { language: 'eng' })
             if (ocrRes.text) {
               extractedApplicant = extractFromOcrText(ocrRes)
+            }
+          } else {
+            const pdfExtract = await extractPdfText(dataUrl)
+            if (pdfExtract.fullText && pdfExtract.fullText.trim().length >= 50) {
+              extractedApplicant = extractFromPdfText(pdfExtract.fullText)
+            } else {
+              const imgTarget = pdfExtract.imagePayload || dataUrl
+              const ocrRes = await recognizeText(imgTarget, { language: 'eng' })
+              if (ocrRes.text) {
+                extractedApplicant = extractFromOcrText(ocrRes)
+              }
             }
           }
         } catch (extErr) {
