@@ -326,6 +326,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
           newDoc.status = 'failed'
         }
 
+        console.group('📋 [VISA AUTOFILL] FULL EXTRACTED DOCUMENT DATA')
+        console.log('Document ID:', newDoc.documentId)
+        console.log('Document Type:', targetType)
+        console.log('File Name:', file.name)
+        console.log('Full Extracted Data Object:', extractedApplicant)
+        console.log('Personal:', extractedApplicant?.personal)
+        console.log('Passport:', extractedApplicant?.passport)
+        console.log('Contact:', extractedApplicant?.contact)
+        console.log('Present Address:', extractedApplicant?.presentAddress)
+        console.log('Permanent Address:', extractedApplicant?.permanentAddress)
+        console.log('Family:', extractedApplicant?.family)
+        console.log('Employment:', extractedApplicant?.employment)
+        console.log('Travel:', extractedApplicant?.travel)
+        console.log('Previous Visa:', extractedApplicant?.previousVisa)
+        console.log('Sponsor India:', extractedApplicant?.sponsorIndia)
+        console.log('Sponsor Mission:', extractedApplicant?.sponsorMission)
+        console.groupEnd()
+
         await saveDocument(newDoc)
 
         // If targetType is passport and has extracted fields, sync the active applicant profile
