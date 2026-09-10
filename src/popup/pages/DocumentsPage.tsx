@@ -10,6 +10,7 @@ import type { ApplicantProfile } from '../../core/applicant'
 import {
   deleteDocument,
   getDocumentsByApplicantId,
+  getLatestDocument,
   saveDocument,
 } from '../../core/document'
 import type { DocumentRecord } from '../../core/document'
@@ -18,6 +19,7 @@ import {
   saveApplication,
 } from '../../core/application/applicationStorage'
 import { populateApplicationFromDocuments } from '../../core/application/applicationMerger'
+import { applyExtractionToApplicant } from '../../core/extraction'
 import type {
   ExtractedApplicantData,
   ExtractedFieldConflict,
@@ -152,11 +154,19 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
     await saveDocument(docRecord)
     if (currentApplicantId) {
       try {
-        const docs = await getDocumentsByApplicantId(currentApplicantId)
-        const pDoc = docs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed) || docs.find((d) => d.documentType === 'passport')
-        const oDoc = docs.find((d) => d.documentType === 'ogd' && d.extractedDataConfirmed) || docs.find((d) => d.documentType === 'ogd')
-        const existingApp = await getSavedApplicationByApplicantId(currentApplicantId)
         const activeApp = applicants.find((a) => a.applicantId === currentApplicantId)
+        if (docRecord.documentType === 'passport' && docRecord.extractedDataConfirmed && docRecord.extractedData && activeApp && onUpdateApplicant) {
+          try {
+            const updatedProfile = applyExtractionToApplicant(activeApp, docRecord.extractedData)
+            await onUpdateApplicant(updatedProfile)
+          } catch (profErr) {
+            console.warn('Could not sync applicant profile in DocumentsPage:', profErr)
+          }
+        }
+        const docs = await getDocumentsByApplicantId(currentApplicantId)
+        const pDoc = docRecord.documentType === 'passport' && docRecord.extractedDataConfirmed ? docRecord : getLatestDocument(docs, 'passport')
+        const oDoc = docRecord.documentType === 'ogd' && docRecord.extractedDataConfirmed ? docRecord : getLatestDocument(docs, 'ogd')
+        const existingApp = await getSavedApplicationByApplicantId(currentApplicantId)
         const mergedApp = populateApplicationFromDocuments({
           applicantId: currentApplicantId,
           passportDoc: pDoc,
@@ -355,13 +365,21 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
       await saveDocument(updatedDoc)
       await loadApplicantDocuments(activeId)
 
-      // Sync with SavedApplication
+      // Sync with SavedApplication and ApplicantProfile
       try {
         const { getSavedApplicationByApplicantId, saveApplication } = await import('../../core/application/applicationStorage')
         const { populateApplicationFromDocuments } = await import('../../core/application/applicationMerger')
+        if (updatedDoc.documentType === 'passport' && updatedDoc.extractedDataConfirmed && updatedDoc.extractedData && reviewTargetApplicant && onUpdateApplicant) {
+          try {
+            const updatedProf = applyExtractionToApplicant(reviewTargetApplicant, updatedDoc.extractedData)
+            await onUpdateApplicant(updatedProf)
+          } catch (profErr) {
+            console.warn('Could not sync profile in DocumentsPage review:', profErr)
+          }
+        }
         const allDocs = await getDocumentsByApplicantId(activeId)
-        const pDoc = allDocs.find((d) => d.documentType === 'passport' && d.extractedDataConfirmed) || allDocs.find((d) => d.documentType === 'passport')
-        const oDoc = allDocs.find((d) => d.documentType === 'ogd' && d.extractedDataConfirmed) || allDocs.find((d) => d.documentType === 'ogd')
+        const pDoc = updatedDoc.documentType === 'passport' ? updatedDoc : getLatestDocument(allDocs, 'passport')
+        const oDoc = updatedDoc.documentType === 'ogd' ? updatedDoc : getLatestDocument(allDocs, 'ogd')
         const existingApp = await getSavedApplicationByApplicantId(activeId)
         const mergedApp = populateApplicationFromDocuments({
           applicantId: activeId,
