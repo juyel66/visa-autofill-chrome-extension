@@ -116,6 +116,14 @@ export async function saveDocument(docRecord: DocumentRecord): Promise<void> {
     })
   }
 
+  console.log('[DocumentStorage] saveDocument:', docRecord.documentId, {
+    contactPhone: docRecord.extractedData?.contact?.phone?.value,
+    contactIsd: docRecord.extractedData?.contact?.isdCode?.value,
+    contactMobile: docRecord.extractedData?.contact?.mobile?.value,
+    presentPhone: docRecord.extractedData?.presentAddress?.phone?.value,
+    confirmed: docRecord.extractedDataConfirmed,
+  })
+
   await storageSet(DOCUMENTS_STORAGE_KEY, list)
 }
 
