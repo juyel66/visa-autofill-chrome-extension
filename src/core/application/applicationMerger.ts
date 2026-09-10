@@ -63,14 +63,33 @@ export const PASSPORT_IDENTITY_KEYS = new Set([
   'spouse_name',
   'appl.pres_add1',
   'pres_add1',
+  'pres_add2',
   'appl.pres_state',
   'pres_state',
   'appl.pres_pincode',
   'pres_pincode',
+  'pincode',
   'appl.pres_phone',
   'pres_phone',
+  'village_town_city',
+  'district',
+  'state_province',
+  'present_country',
+  'isd_code',
+  'mobile',
+  'appl.mobile',
+  'appl.email',
+  'appl.email_re',
+  'email',
   'appl.perm_add1',
   'perm_add1',
+  'perm_add2',
+  'permanent_village_town_city',
+  'permanent_district',
+  'permanent_state_province',
+  'permanent_country',
+  'permanent_postal_code',
+  'perm_add3',
   'marital_status',
   'appl.marital_status',
 ])
@@ -162,17 +181,28 @@ export function populateApplicationFromDocuments(options: {
     // Priority 1: User Manual Edit preserved
     // Only preserve manual edits if:
     // (a) existingApp is from the same applicant/passport (!isMismatchedExistingApp), AND
-    // (b) existingApp has a recorded manual edit with isUserEdited: true
-    const preserveManualEdit =
+    // (b) existingApp has a recorded manual edit with isUserEdited: true or source: 'manual', AND
+    // (c) the recorded manual value is actually non-empty (stale empty placeholders from previous schema versions must not block document extraction)
+    const existingField = existingApp?.fields[key]
+    const hasManualEditFlag = Boolean(
       !isMismatchedExistingApp &&
       existingApp &&
-      existingApp.fields[key] &&
+      existingField &&
       existingApp.manualEdits[key] &&
-      (existingApp.fields[key].isUserEdited === true || existingApp.fields[key].source === 'manual')
+      (existingField.isUserEdited === true || existingField.source === 'manual')
+    )
+    const manualVal = existingField?.value
+    const hasNonEmptyManualVal =
+      manualVal !== undefined &&
+      manualVal !== null &&
+      manualVal !== '' &&
+      (typeof manualVal !== 'string' || manualVal.trim() !== '')
 
-    if (preserveManualEdit) {
+    const preserveManualEdit = hasManualEditFlag && hasNonEmptyManualVal
+
+    if (preserveManualEdit && existingField) {
       fields[key] = {
-        ...existingApp.fields[key],
+        ...existingField,
         source: 'manual',
         isUserEdited: true,
       }
@@ -280,10 +310,95 @@ export function populateApplicationFromDocuments(options: {
         resolvedValue = 'Birth'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.email_re' && activeProfile.contact?.email) {
+      } else if (
+        (key === 'appl.email_re' || key === 'appl.email' || key === 'email') &&
+        activeProfile.contact?.email
+      ) {
         resolvedValue = activeProfile.contact.email
         source = activeSource
         docId = activeDocId
+      } else if (key === 'pres_phone' || key === 'appl.pres_phone') {
+        const rawPhone = activeProfile.presentAddress?.phone || activeProfile.contact?.phone || activeProfile.permanentAddress?.phone
+        if (rawPhone) {
+          resolvedValue = rawPhone
+          source = activeSource
+          docId = activeDocId
+        } else if (activeProfile.presentAddress?.mobile || activeProfile.contact?.mobile) {
+          const m = activeProfile.presentAddress?.mobile || activeProfile.contact?.mobile
+          const isd = activeProfile.presentAddress?.isdCode || activeProfile.contact?.isdCode || (activeProfile.personalInfo?.nationality === 'BANGLADESH' || activeProfile.presentAddress?.country === 'BANGLADESH' ? '880' : '')
+          resolvedValue = isd ? `+${isd}${m}` : m
+          source = activeSource
+          docId = activeDocId
+        }
+      } else if (key === 'isd_code') {
+        const rawIsd = activeProfile.presentAddress?.isdCode || activeProfile.contact?.isdCode
+        if (rawIsd) {
+          resolvedValue = rawIsd
+          source = activeSource
+          docId = activeDocId
+        } else {
+          const rawPhone = activeProfile.presentAddress?.phone || activeProfile.contact?.phone || activeProfile.permanentAddress?.phone
+          if (rawPhone) {
+            const cleanDigits = rawPhone.replace(/[^\d]/g, '')
+            if (rawPhone.startsWith('+880') || cleanDigits.startsWith('880')) {
+              resolvedValue = '880'
+              source = activeSource
+              docId = activeDocId
+            } else if (rawPhone.startsWith('+')) {
+              const intlMatch = rawPhone.match(/^\+(\d{1,4})/)
+              if (intlMatch) {
+                resolvedValue = intlMatch[1]
+                source = activeSource
+                docId = activeDocId
+              }
+            } else if (cleanDigits.startsWith('01') && cleanDigits.length >= 10) {
+              resolvedValue = '880'
+              source = activeSource
+              docId = activeDocId
+            }
+          }
+          if (!resolvedValue && (activeProfile.personalInfo?.nationality === 'BANGLADESH' || activeProfile.presentAddress?.country === 'BANGLADESH')) {
+            resolvedValue = '880'
+            source = activeSource
+            docId = activeDocId
+          }
+        }
+      } else if (key === 'mobile' || key === 'appl.mobile') {
+        const rawMob = activeProfile.presentAddress?.mobile || activeProfile.contact?.mobile
+        if (rawMob) {
+          resolvedValue = rawMob
+          source = activeSource
+          docId = activeDocId
+        } else {
+          const rawPhone = activeProfile.presentAddress?.phone || activeProfile.contact?.phone || activeProfile.permanentAddress?.phone
+          if (rawPhone) {
+            const cleanDigits = rawPhone.replace(/[^\d]/g, '')
+            if (rawPhone.startsWith('+880') || cleanDigits.startsWith('880')) {
+              resolvedValue = cleanDigits.slice(3)
+              source = activeSource
+              docId = activeDocId
+            } else if (rawPhone.startsWith('+')) {
+              const intlMatch = rawPhone.match(/^\+(\d{1,4})(\d{6,14})$/)
+              if (intlMatch) {
+                resolvedValue = intlMatch[2]
+                source = activeSource
+                docId = activeDocId
+              } else {
+                resolvedValue = cleanDigits
+                source = activeSource
+                docId = activeDocId
+              }
+            } else if (cleanDigits.startsWith('01') && cleanDigits.length >= 10) {
+              resolvedValue = cleanDigits.slice(1)
+              source = activeSource
+              docId = activeDocId
+            } else {
+              resolvedValue = cleanDigits
+              source = activeSource
+              docId = activeDocId
+            }
+          }
+        }
       } else if (key === 'appl.journeydate' && activeProfile.travel?.intendedArrivalDate) {
         resolvedValue = activeProfile.travel.intendedArrivalDate
         source = activeSource
@@ -406,6 +521,62 @@ export function populateApplicationFromDocuments(options: {
         resolvedValue = 'No'
         source = ogdProfile?.previousVisa?.hasPreviousVisa === false ? 'ogd' : activeSource
         docId = ogdProfile?.previousVisa?.hasPreviousVisa === false ? ogdDoc?.documentId : activeDocId
+      } else if (
+        (key === 'pres_addr1' || key === 'appl.pres_add1') &&
+        !resolvedValue &&
+        activeProfile.permanentAddress?.addressLine1
+      ) {
+        resolvedValue = activeProfile.permanentAddress.addressLine1
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        key === 'pres_addr2' &&
+        !resolvedValue &&
+        activeProfile.permanentAddress?.addressLine2
+      ) {
+        resolvedValue = activeProfile.permanentAddress.addressLine2
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        key === 'village_town_city' &&
+        !resolvedValue &&
+        activeProfile.permanentAddress?.villageTownCity
+      ) {
+        resolvedValue = activeProfile.permanentAddress.villageTownCity
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        key === 'district' &&
+        !resolvedValue &&
+        activeProfile.permanentAddress?.district
+      ) {
+        resolvedValue = activeProfile.permanentAddress.district
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'state_province' || key === 'appl.pres_state' || key === 'pres_state') &&
+        !resolvedValue &&
+        activeProfile.permanentAddress?.stateProvince
+      ) {
+        resolvedValue = activeProfile.permanentAddress.stateProvince
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        key === 'present_country' &&
+        !resolvedValue &&
+        activeProfile.permanentAddress?.country
+      ) {
+        resolvedValue = activeProfile.permanentAddress.country
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'pincode' || key === 'appl.pres_pincode' || key === 'pres_pincode') &&
+        !resolvedValue &&
+        activeProfile.permanentAddress?.postalCode
+      ) {
+        resolvedValue = activeProfile.permanentAddress.postalCode
+        source = activeSource
+        docId = activeDocId
       }
     }
 
@@ -538,6 +709,16 @@ export function populateApplicationFromDocuments(options: {
     conflictDetails: religionField?.conflictDetails,
   }
 
+  console.group('⚙️ [VISA AUTOFILL] APPLICATION MERGER POPULATED FIELDS')
+  console.log('Applicant ID:', applicantId)
+  console.log('Passport Document ID:', passportDoc?.documentId)
+  console.log('OGD Document ID:', ogdDoc?.documentId)
+  console.log('Contact Phone:', fields['pres_phone']?.value, 'Source:', fields['pres_phone']?.source)
+  console.log('Contact ISD:', fields['isd_code']?.value, 'Source:', fields['isd_code']?.source)
+  console.log('Contact Mobile:', fields['mobile']?.value, 'Source:', fields['mobile']?.source)
+  console.log('All Populated Fields Object:', fields)
+  console.groupEnd()
+
   return {
     applicationId: existingApp?.applicationId || `app_${applicantId}_${Date.now()}`,
     applicantId,
@@ -642,21 +823,30 @@ export function convertSavedApplicationToApplicantProfile(
     presentAddress: {
       addressLine1: getFieldStr('pres_addr1'),
       addressLine2: getFieldStr('pres_addr2'),
-      villageTownCity: getFieldStr('state_name'),
+      villageTownCity: getFieldStr('village_town_city'),
+      district: getFieldStr('district'),
+      stateProvince: getFieldStr('state_province'),
       postalCode: getFieldStr('pincode'),
-      country: getFieldStr('appl.countryname'),
+      country: getFieldStr('present_country') || getFieldStr('appl.countryname'),
+      phone: getFieldStr('pres_phone'),
+      isdCode: getFieldStr('isd_code'),
+      mobile: getFieldStr('mobile'),
     },
 
     permanentAddress: {
       addressLine1: getFieldStr('perm_add1'),
       addressLine2: getFieldStr('perm_add2'),
-      villageTownCity: getFieldStr('perm_add3'),
-      country: getFieldStr('appl.countryname'),
+      villageTownCity: getFieldStr('permanent_village_town_city'),
+      district: getFieldStr('permanent_district'),
+      stateProvince: getFieldStr('permanent_state_province'),
+      country: getFieldStr('permanent_country'),
+      postalCode: getFieldStr('permanent_postal_code'),
     },
 
     contact: {
       email: getFieldStr('appl.email'),
       phone: getFieldStr('pres_phone'),
+      isdCode: getFieldStr('isd_code'),
       mobile: getFieldStr('mobile'),
     },
 
