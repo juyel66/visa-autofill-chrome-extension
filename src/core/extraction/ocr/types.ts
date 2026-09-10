@@ -20,8 +20,13 @@ export interface OcrDiagnosticsInfo {
   workerUrl?: string
   coreUrl?: string
   langUrl?: string
+  workerCreated?: boolean
   workerInitialized?: boolean
+  languageFetchStarted?: boolean
+  languageFetchCompleted?: boolean
   languageLoaded?: boolean
+  languageInitCompleted?: boolean
+  ocrStarted?: boolean
   ocrExecuted?: boolean
   errorName?: string
   errorMessage?: string
