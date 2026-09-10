@@ -1,4 +1,5 @@
 import type { Address, ApplicantProfile, FamilyMember, PreviousVisaDetails, ReferenceDetails, TravelDetails } from '../applicant/types'
+import { normalizeNameString } from './bangladeshiNameNormalizer'
 
 /**
  * Helper to safely trim whitespace and collapse repeated internal spaces.
@@ -8,6 +9,11 @@ function cleanString(str?: string): string | undefined {
   if (!str) return undefined
   const cleaned = str.trim().replace(/\s+/g, ' ')
   return cleaned !== '' ? cleaned : undefined
+}
+
+function cleanName(nameStr?: string): string | undefined {
+  if (!nameStr) return undefined
+  return normalizeNameString(nameStr) || cleanString(nameStr)
 }
 
 function cleanEmail(emailStr?: string): string | undefined {
@@ -50,7 +56,7 @@ function cleanAddress<T extends Address>(addr?: T): T | undefined {
 function cleanFamilyMember(member?: FamilyMember): FamilyMember | undefined {
   if (!member) return undefined
   const res = {
-    name: cleanString(member.name),
+    name: cleanName(member.name),
     nationality: cleanString(member.nationality),
     previousNationality: cleanString(member.previousNationality),
     placeOfBirth: cleanString(member.placeOfBirth),
@@ -66,7 +72,7 @@ function cleanFamilyMember(member?: FamilyMember): FamilyMember | undefined {
 function cleanReference(ref?: ReferenceDetails): ReferenceDetails | undefined {
   if (!ref) return undefined
   const res: ReferenceDetails = {
-    name: cleanString(ref.name),
+    name: cleanName(ref.name),
     addressLine1: cleanString(ref.addressLine1),
     addressLine2: cleanString(ref.addressLine2),
     address: typeof ref.address === 'string' ? cleanString(ref.address) : cleanAddress(ref.address as Address),
@@ -151,9 +157,9 @@ export function normalizeApplicant(applicant: ApplicantProfile): ApplicantProfil
     personalInfo: applicant.personalInfo
       ? {
           ...applicant.personalInfo,
-          surname: cleanString(applicant.personalInfo.surname),
-          givenNames: cleanString(applicant.personalInfo.givenNames),
-          previousName: cleanString(applicant.personalInfo.previousName),
+          surname: cleanName(applicant.personalInfo.surname),
+          givenNames: cleanName(applicant.personalInfo.givenNames),
+          previousName: cleanName(applicant.personalInfo.previousName),
           dateOfBirth: cleanString(applicant.personalInfo.dateOfBirth),
           townCityOfBirth: cleanString(applicant.personalInfo.townCityOfBirth),
           countryOfBirth: cleanString(applicant.personalInfo.countryOfBirth),
