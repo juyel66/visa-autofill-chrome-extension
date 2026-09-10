@@ -151,6 +151,20 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         extractedDataConfirmed: hasFields,
       }
 
+      console.group('📤 [VISA AUTOFILL] MODAL UPLOAD EXTRACTED DATA')
+      console.log('Document ID:', newDoc.documentId)
+      console.log('Document Type:', category)
+      console.log('File Name:', selectedFile.name)
+      console.log('Full Extracted Data Object:', extractedApplicant)
+      console.log('Personal:', extractedApplicant?.personal)
+      console.log('Passport:', extractedApplicant?.passport)
+      console.log('Contact:', extractedApplicant?.contact)
+      console.log('Present Address:', extractedApplicant?.presentAddress)
+      console.log('Permanent Address:', extractedApplicant?.permanentAddress)
+      console.log('Family:', extractedApplicant?.family)
+      console.log('Employment:', extractedApplicant?.employment)
+      console.groupEnd()
+
       await onSave(newDoc)
       onClose()
     } catch (err) {
