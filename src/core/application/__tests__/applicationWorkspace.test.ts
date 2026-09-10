@@ -5,6 +5,11 @@ import type { ExtractedApplicantData } from '../../extraction/data/types'
 import {
   BANGLADESH_APPLICATION_SCHEMA,
   getAllSchemaFields,
+  getDefaultVisibleSchemaFields,
+  getDefaultHiddenSchemaFields,
+  WORKSPACE_DEFAULT_VISIBLE_FIELDS,
+  WORKSPACE_HIDDEN_FIELDS,
+  WORKSPACE_SECTIONS,
 } from '../fieldSchema'
 import {
   populateApplicationFromDocuments,
@@ -454,6 +459,82 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
       khokonApp.fields['empname']?.value === '' &&
       khokonApp.fields['old_visa_no']?.value === '',
     'Subtest 25c: Missing fields legitimately remain blank without fallback to fake profile values'
+  )
+
+  // --- TASK 067-FINAL: One-Page Workspace Visibility & Schema Integrity ---
+  // Subtest 26: Schema Integrity (All 100 fields preserved)
+  const allFields = getAllSchemaFields()
+  const visibleFields = getDefaultVisibleSchemaFields()
+  const hiddenFields = getDefaultHiddenSchemaFields()
+
+  assert(
+    allFields.length === 100,
+    `Subtest 26a: Total canonical fields remain exactly 100 (got ${allFields.length})`
+  )
+  assert(
+    visibleFields.length === 86,
+    `Subtest 26b: Default visible fields count is 86 (got ${visibleFields.length})`
+  )
+  assert(
+    hiddenFields.length === 14,
+    `Subtest 26c: Default hidden fields count is 14 (got ${hiddenFields.length})`
+  )
+  assert(
+    WORKSPACE_DEFAULT_VISIBLE_FIELDS.length === 86 && WORKSPACE_HIDDEN_FIELDS.length === 14,
+    'Subtest 26d: WORKSPACE_DEFAULT_VISIBLE_FIELDS (86) and WORKSPACE_HIDDEN_FIELDS (14) explicitly configured'
+  )
+
+  // Subtest 26e: All 10 Workspace Sections defined and cover all 100 canonical fields
+  assert(
+    WORKSPACE_SECTIONS.length === 10,
+    `Subtest 26e: Workspace has exactly 10 sections for single full-page rendering (got ${WORKSPACE_SECTIONS.length})`
+  )
+  const totalSectionFields = WORKSPACE_SECTIONS.flatMap((s) => s.fieldKeys)
+  assert(
+    totalSectionFields.length === 100,
+    `Subtest 26f: All 10 Workspace sections map to all 100 canonical fields (got ${totalSectionFields.length})`
+  )
+
+  // Subtest 27: Hidden fields remain in SavedApplication and retain populated values
+  assert(
+    khokonApp.fields['appl.email_re'] !== undefined,
+    'Subtest 27a: Hidden field appl.email_re is retained in SavedApplication'
+  )
+  assert(
+    khokonApp.fields['appl.journeydate'] !== undefined,
+    'Subtest 27b: Hidden field appl.journeydate is retained in SavedApplication'
+  )
+  assert(
+    khokonApp.fields['appl.changedSurnameCheck'] !== undefined,
+    'Subtest 27c: Hidden field appl.changedSurnameCheck is retained in SavedApplication'
+  )
+  assert(
+    khokonApp.fields['grandparent_details'] !== undefined,
+    'Subtest 27d: Hidden field grandparent_details is retained in SavedApplication'
+  )
+  assert(
+    khokonApp.fields['previous_organization'] !== undefined,
+    'Subtest 27e: Hidden field previous_organization is retained in SavedApplication'
+  )
+  assert(
+    khokonApp.fields['answer_1'] !== undefined,
+    'Subtest 27f: Hidden field answer_1 is retained in SavedApplication'
+  )
+
+  // Subtest 28: Save Application preserves all 100 fields and reloads with hidden field values intact
+  await saveApplication(khokonApp)
+  const reloadedKhokon = await getSavedApplicationByApplicantId('KHOKON_001')
+  assert(
+    reloadedKhokon !== null && Object.keys(reloadedKhokon.fields).length === 100,
+    'Subtest 28a: SavedApplication preserves all 100 fields in storage'
+  )
+  assert(
+    reloadedKhokon?.fields['appl.surname']?.value === 'AHMED',
+    'Subtest 28b: Reloaded application preserves visible field values'
+  )
+  assert(
+    reloadedKhokon?.fields['appl.journeydate'] !== undefined,
+    'Subtest 28c: Reloaded application preserves hidden field values'
   )
 
   return {
