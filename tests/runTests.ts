@@ -20,6 +20,7 @@ import { runScannedPassportOcrTests } from '../src/core/extraction/__tests__/sca
 import { runTask062RealPassportUploadWorkspaceTests } from '../src/core/__tests__/task062RealPassportUploadWorkspace.test'
 import { runHighConfidenceReligionTests } from '../src/core/extraction/__tests__/highConfidenceReligionExtraction.test'
 import { runBangladeshiNameNormalizationReligionSafetyTests } from '../src/core/extraction/__tests__/bangladeshiNameNormalizationReligionSafety.test'
+import { runAddressContactExtractionTests } from '../src/core/extraction/__tests__/addressContactExtraction.test'
 
 async function execute() {
   console.log('--- RUNNING TASK 062: REAL PASSPORT UPLOAD → WORKSPACE VERIFICATION ---')
@@ -160,7 +161,15 @@ async function execute() {
     console.error('Failures:', nameSafetyRes.failures)
   }
 
+  console.log('--- RUNNING ADDRESS & CONTACT STRUCTURE EXTRACTION TESTS (TASK 070) ---')
+  const addrContactRes = await runAddressContactExtractionTests()
+  console.log(`Passed: ${addrContactRes.passed}, Count: ${addrContactRes.totalSubtests}`)
+  if (!addrContactRes.passed) {
+    console.error('Failures:', addrContactRes.failures)
+  }
+
   const results = {
+    addrContact: addrContactRes.passed,
     nameSafety: nameSafetyRes.passed,
     religion: religionRes.passed,
     task062: task062Res.passed,
