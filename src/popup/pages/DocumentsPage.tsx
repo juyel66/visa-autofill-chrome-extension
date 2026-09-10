@@ -362,6 +362,21 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
         updatedAt: new Date().toISOString(),
       }
 
+      console.group('💾 [VISA AUTOFILL] CONFIRMED EXTRACTED DOCUMENT DATA')
+      console.log('Document ID:', updatedDoc.documentId)
+      console.log('Applicant ID:', activeId)
+      console.log('Confirmed Extracted Data Object:', confirmedData)
+      console.log('Personal:', confirmedData?.personal)
+      console.log('Passport:', confirmedData?.passport)
+      console.log('Contact:', confirmedData?.contact)
+      console.log('Present Address:', confirmedData?.presentAddress)
+      console.log('Permanent Address:', confirmedData?.permanentAddress)
+      console.log('Family:', confirmedData?.family)
+      console.log('Employment:', confirmedData?.employment)
+      console.log('Travel:', confirmedData?.travel)
+      console.log('Previous Visa:', confirmedData?.previousVisa)
+      console.groupEnd()
+
       await saveDocument(updatedDoc)
       await loadApplicantDocuments(activeId)
 
