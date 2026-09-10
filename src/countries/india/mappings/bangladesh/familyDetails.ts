@@ -35,12 +35,12 @@ export const BANGLADESH_FAMILY_DETAILS_MAPPINGS: IndiaVisaFieldMapping[] = [
     id: 'bd_family_pres_add3',
     section: 'address-information',
     targetField: 'state_name',
-    sourceField: 'presentAddress.villageTownCity',
+    sourceField: 'presentAddress.stateProvince',
     sourceType: 'confirmed-document',
     selector: BANGLADESH_FAMILY_DETAILS_SELECTORS.presentStateCity,
     inputType: 'text',
     status: 'verified',
-    required: true,
+    required: false,
     page: 'FAMILY_DETAILS',
   },
   {
@@ -126,7 +126,7 @@ export const BANGLADESH_FAMILY_DETAILS_MAPPINGS: IndiaVisaFieldMapping[] = [
     selector: BANGLADESH_FAMILY_DETAILS_SELECTORS.permanentStateCity,
     inputType: 'text',
     status: 'verified',
-    required: true,
+    required: false,
     page: 'FAMILY_DETAILS',
   },
 
