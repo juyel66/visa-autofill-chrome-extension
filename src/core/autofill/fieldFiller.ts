@@ -3,6 +3,13 @@ import { verifyDomValue } from './domVerifier'
 import { normalizeDateForControl } from './dateNormalizer'
 import type { AutofillFieldResult, AutofillPolicy, FieldMapping } from './types'
 
+function safeCssEscape(val: string): string {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+    return CSS.escape(val)
+  }
+  return val.replace(/([#;?%&,.+*~':"!^$[\]()=>|/\\@])/g, '\\$1')
+}
+
 /**
  * Fills a single resolved DOM HTMLElement safely according to its input type and field policy.
  * Only returns status 'filled' after strict DOM-level value verification.
@@ -91,7 +98,7 @@ export function fillField(
   ) {
     const radioGroup = Array.from(
       document.querySelectorAll<HTMLInputElement>(
-        `input[type="radio"][name="${CSS.escape((element as HTMLInputElement).name)}"]`
+        `input[type="radio"][name="${safeCssEscape((element as HTMLInputElement).name)}"]`
       )
     )
     const isTrue = strValue.toLowerCase() === 'true' || strValue.toLowerCase() === 'yes' || strValue === '1' || strValue.toLowerCase() === 'y'
@@ -249,7 +256,7 @@ export function fillField(
     ) {
       const radioGroup = Array.from(
         document.querySelectorAll<HTMLInputElement>(
-          `input[type="radio"][name="${CSS.escape((element as HTMLInputElement).name)}"]`
+          `input[type="radio"][name="${safeCssEscape((element as HTMLInputElement).name)}"]`
         )
       )
       const isTrue = strValue.toLowerCase() === 'true' || strValue.toLowerCase() === 'yes' || strValue === '1' || strValue.toLowerCase() === 'y'
