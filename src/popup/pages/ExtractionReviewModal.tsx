@@ -96,7 +96,15 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
     }
 
     // Build confirmed ExtractedApplicantData payload for parent
-    const confirmedPayload: ExtractedApplicantData = { personal: {}, passport: {}, contact: {} }
+    const confirmedPayload: ExtractedApplicantData = {
+      personal: {},
+      passport: {},
+      contact: {},
+      presentAddress: {},
+      permanentAddress: {},
+      family: {},
+      employment: {},
+    }
 
     reviewResult.reviewItems.forEach((item) => {
       let finalVal: string | undefined
@@ -109,56 +117,112 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
 
       if (finalVal === undefined) return
 
-      const [sec, key] = item.fieldPath.split('.')
+      const [sec, key, subKey] = item.fieldPath.split('.')
       if (sec === 'personalInfo') {
+        if (!confirmedPayload.personal) confirmedPayload.personal = {}
         if (key === 'givenNames') {
-          confirmedPayload.personal!.firstName = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.firstName = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'surname') {
-          confirmedPayload.personal!.lastName = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.lastName = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'dateOfBirth') {
-          confirmedPayload.personal!.dateOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.dateOfBirth = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'nationality') {
-          confirmedPayload.personal!.nationality = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.nationality = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'gender') {
-          confirmedPayload.personal!.gender = { value: finalVal as Gender, source: item.source || 'manual-review' }
+          confirmedPayload.personal.gender = { value: finalVal as Gender, source: item.source || 'manual-review' }
         } else if (key === 'townCityOfBirth') {
-          confirmedPayload.personal!.townCityOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.townCityOfBirth = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'countryOfBirth') {
-          confirmedPayload.personal!.countryOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.countryOfBirth = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'nationalIdNumber') {
-          confirmedPayload.personal!.nationalIdNumber = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.nationalIdNumber = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'religion') {
-          confirmedPayload.personal!.religion = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.religion = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'educationalQualification') {
-          confirmedPayload.personal!.educationalQualification = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.educationalQualification = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'previousNationality') {
-          confirmedPayload.personal!.previousNationality = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.personal.previousNationality = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'maritalStatus') {
+          confirmedPayload.personal.maritalStatus = { value: finalVal, source: item.source || 'manual-review' }
         }
       } else if (sec === 'passport') {
+        if (!confirmedPayload.passport) confirmedPayload.passport = {}
         if (key === 'passportNumber') {
-          confirmedPayload.passport!.passportNumber = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.passport.passportNumber = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'passportType') {
-          confirmedPayload.passport!.passportType = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.passport.passportType = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'issuingCountry') {
-          confirmedPayload.passport!.issuingCountry = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.passport.issuingCountry = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'issueDate') {
-          confirmedPayload.passport!.issueDate = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.passport.issueDate = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'expiryDate') {
-          confirmedPayload.passport!.expiryDate = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.passport.expiryDate = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'placeOfIssue') {
-          confirmedPayload.passport!.placeOfIssue = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.passport.placeOfIssue = { value: finalVal, source: item.source || 'manual-review' }
         }
       } else if (sec === 'contact') {
+        if (!confirmedPayload.contact) confirmedPayload.contact = {}
         if (key === 'email') {
-          confirmedPayload.contact!.email = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.contact.email = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'mobile') {
-          confirmedPayload.contact!.mobile = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.contact.mobile = { value: finalVal, source: item.source || 'manual-review' }
         } else if (key === 'phone') {
-          confirmedPayload.contact!.phone = { value: finalVal, source: item.source || 'manual-review' }
+          confirmedPayload.contact.phone = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'isdCode') {
+          confirmedPayload.contact.isdCode = { value: finalVal, source: item.source || 'manual-review' }
+        }
+      } else if (sec === 'presentAddress') {
+        if (!confirmedPayload.presentAddress) confirmedPayload.presentAddress = {}
+        if (key === 'addressLine1') confirmedPayload.presentAddress.addressLine1 = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'addressLine2') confirmedPayload.presentAddress.addressLine2 = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'villageTownCity') confirmedPayload.presentAddress.villageTownCity = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'district') confirmedPayload.presentAddress.district = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'stateProvince') confirmedPayload.presentAddress.stateProvince = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'country') confirmedPayload.presentAddress.country = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'postalCode') confirmedPayload.presentAddress.postalCode = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'phone') confirmedPayload.presentAddress.phone = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'isdCode') confirmedPayload.presentAddress.isdCode = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'mobile') confirmedPayload.presentAddress.mobile = { value: finalVal, source: item.source || 'manual-review' }
+      } else if (sec === 'permanentAddress') {
+        if (!confirmedPayload.permanentAddress) confirmedPayload.permanentAddress = {}
+        if (key === 'addressLine1') confirmedPayload.permanentAddress.addressLine1 = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'addressLine2') confirmedPayload.permanentAddress.addressLine2 = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'villageTownCity') confirmedPayload.permanentAddress.villageTownCity = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'district') confirmedPayload.permanentAddress.district = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'stateProvince') confirmedPayload.permanentAddress.stateProvince = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'country') confirmedPayload.permanentAddress.country = { value: finalVal, source: item.source || 'manual-review' }
+        else if (key === 'postalCode') confirmedPayload.permanentAddress.postalCode = { value: finalVal, source: item.source || 'manual-review' }
+      } else if (sec === 'family') {
+        if (!confirmedPayload.family) confirmedPayload.family = {}
+        if (key === 'father') {
+          if (!confirmedPayload.family.father) confirmedPayload.family.father = {}
+          if (subKey === 'name') confirmedPayload.family.father.name = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'placeOfBirth') confirmedPayload.family.father.placeOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'countryOfBirth') confirmedPayload.family.father.countryOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'nationality') confirmedPayload.family.father.nationality = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'previousNationality') confirmedPayload.family.father.previousNationality = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'mother') {
+          if (!confirmedPayload.family.mother) confirmedPayload.family.mother = {}
+          if (subKey === 'name') confirmedPayload.family.mother.name = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'placeOfBirth') confirmedPayload.family.mother.placeOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'countryOfBirth') confirmedPayload.family.mother.countryOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'nationality') confirmedPayload.family.mother.nationality = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'previousNationality') confirmedPayload.family.mother.previousNationality = { value: finalVal, source: item.source || 'manual-review' }
+        } else if (key === 'spouse') {
+          if (!confirmedPayload.family.spouse) confirmedPayload.family.spouse = {}
+          if (subKey === 'name') confirmedPayload.family.spouse.name = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'placeOfBirth') confirmedPayload.family.spouse.placeOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'countryOfBirth') confirmedPayload.family.spouse.countryOfBirth = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'nationality') confirmedPayload.family.spouse.nationality = { value: finalVal, source: item.source || 'manual-review' }
+          else if (subKey === 'previousNationality') confirmedPayload.family.spouse.previousNationality = { value: finalVal, source: item.source || 'manual-review' }
         }
       }
     })
 
+    console.log('[ExtractionReviewModal] onConfirm confirmedPayload:', {
+      contact: confirmedPayload.contact,
+      presentAddress: confirmedPayload.presentAddress,
+    })
     onConfirm(confirmedPayload)
   }
 
