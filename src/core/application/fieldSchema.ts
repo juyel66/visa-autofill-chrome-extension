@@ -11,6 +11,7 @@ export interface ApplicationFieldDef {
   description?: string
   manualNotice?: string
   placeholder?: string
+  visibleByDefault?: boolean
 }
 
 export interface ApplicationSectionDef {
@@ -21,6 +22,350 @@ export interface ApplicationSectionDef {
   fields: ApplicationFieldDef[]
   manualNotices?: { title: string; message: string }[]
 }
+
+export interface WorkspaceSectionCardDef {
+  id: string
+  title: string
+  subtitle: string
+  iconName: string
+  fieldKeys: string[]
+  manualNotices?: { title: string; message: string }[]
+}
+
+export const WORKSPACE_DEFAULT_VISIBLE_FIELDS: string[] = [
+  // 1. Personal Details (13)
+  'appl.surname',
+  'appl.applname',
+  'appl.applsex',
+  'appl.birthdate',
+  'appl.placbrth',
+  'appl.country_of_birth',
+  'appl.nationality',
+  'appl.nationality_by',
+  'appl.nic_no',
+  'appl.religion',
+  'appl.visual_mark',
+  'appl.edu_id',
+  'marital_status',
+
+  // 2. Passport Details (9)
+  'appl.passport_number',
+  'appl.passport_issue_place',
+  'appl.passport_issue_date',
+  'appl.passport_expiry_date',
+  'appl.oth_ppt',
+  'appl.oth_pptno',
+  'appl.oth_ppt_issue_place',
+  'appl.prev_passport_country_issue',
+  'appl.other_ppt_nationality',
+
+  // 3. Present Address (9)
+  'pres_addr1',
+  'pres_addr2',
+  'state_name',
+  'pincode',
+  'appl.countryname',
+  'pres_phone',
+  'mobile',
+  'appl.email',
+  'appl.missioncode',
+
+  // 4. Permanent Address (3)
+  'perm_add1',
+  'perm_add2',
+  'perm_add3',
+
+  // 5. Family Details (16)
+  'fthrname',
+  'father_place_of_birth',
+  'father_country_of_birth',
+  'father_nationality',
+  'father_prev_nationality',
+  'mother_name',
+  'mother_place_of_birth',
+  'mother_country_of_birth',
+  'mother_nationality',
+  'mother_prev_nationality',
+  'spouse_name',
+  'spouse_place_of_birth',
+  'spouse_country_of_birth',
+  'spouse_nationality',
+  'spouse_prev_nationality',
+  'grandparent_flag',
+
+  // 6. Profession / Employment (7)
+  'occupation',
+  'empname',
+  'empdesignation',
+  'empaddress',
+  'empphone',
+  'previous_occupation',
+  'prev_org',
+
+  // 7. Visa Details (15)
+  'duration',
+  'visa_entry_id',
+  'journeydate',
+  'entrypoint',
+  'exitpoint',
+  'country_visited',
+  'saarc_flag',
+  'nameofsponsor_ind',
+  'add1ofsponsor_ind',
+  'add2ofsponsor_ind',
+  'phoneofsponsor_ind',
+  'nameofsponsor_msn',
+  'add1ofsponsor_msn',
+  'add2ofsponsor_msn',
+  'phoneofsponsor_msn',
+
+  // 8. Previous Visit / Visa (8)
+  'old_visa_flag',
+  'prv_visit_add1',
+  'prv_visit_add2',
+  'prv_visit_add3',
+  'old_visa_no',
+  'old_visa_type_id',
+  'oldvisaissueplace',
+  'oldvisaissuedate',
+
+  // 9. Additional Questions (6)
+  'question_1_flag',
+  'question_2_flag',
+  'question_3_flag',
+  'question_4_flag',
+  'question_5_flag',
+  'question_6_flag',
+]
+
+export const WORKSPACE_HIDDEN_FIELDS: string[] = [
+  'appl.changedSurnameCheck', // Personal Details conditional
+  'appl.email_re',            // Present Address technical duplicate
+  'grandparent_details',      // Family Details conditional (if grandparent_flag == 'Yes')
+  'previous_organization',    // Profession / Military conditional
+  'previous_designation',     // Profession / Military conditional
+  'previous_rank',            // Profession / Military conditional
+  'previous_posting',         // Profession / Military conditional
+  'appl.journeydate',         // Visa Details technical duplicate
+  'answer_1',                 // Additional Question 1 explanation
+  'answer_2',                 // Additional Question 2 explanation
+  'answer_3',                 // Additional Question 3 explanation
+  'answer_4',                 // Additional Question 4 explanation
+  'answer_5',                 // Additional Question 5 explanation
+  'answer_6',                 // Additional Question 6 explanation
+]
+
+export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
+  {
+    id: 'personalDetails',
+    title: '1. Personal Details',
+    subtitle: 'Primary applicant identity, birth details, religion, and education',
+    iconName: 'User',
+    fieldKeys: [
+      'appl.surname',
+      'appl.applname',
+      'appl.changedSurnameCheck',
+      'appl.applsex',
+      'appl.birthdate',
+      'appl.placbrth',
+      'appl.country_of_birth',
+      'appl.nationality',
+      'appl.nationality_by',
+      'appl.nic_no',
+      'appl.religion',
+      'appl.visual_mark',
+      'appl.edu_id',
+      'marital_status',
+    ],
+  },
+  {
+    id: 'passportDetails',
+    title: '2. Passport Details',
+    subtitle: 'Passport number, validity, issue details, and secondary passports',
+    iconName: 'BookOpen',
+    fieldKeys: [
+      'appl.passport_number',
+      'appl.passport_issue_place',
+      'appl.passport_issue_date',
+      'appl.passport_expiry_date',
+      'appl.oth_ppt',
+      'appl.oth_pptno',
+      'appl.oth_ppt_issue_place',
+      'appl.prev_passport_country_issue',
+      'appl.other_ppt_nationality',
+    ],
+  },
+  {
+    id: 'presentAddress',
+    title: '3. Present Address & Contact',
+    subtitle: 'Current domicile address, phone numbers, email, and Indian Mission',
+    iconName: 'Home',
+    manualNotices: [
+      {
+        title: 'CAPTCHA Security Verification',
+        message: 'CAPTCHA must be solved manually on the Indian Visa website. Extension does not collect or solve CAPTCHA.',
+      },
+    ],
+    fieldKeys: [
+      'pres_addr1',
+      'pres_addr2',
+      'state_name',
+      'pincode',
+      'appl.countryname',
+      'pres_phone',
+      'mobile',
+      'appl.email',
+      'appl.email_re',
+      'appl.missioncode',
+    ],
+  },
+  {
+    id: 'permanentAddress',
+    title: '4. Permanent Address',
+    subtitle: 'Permanent address in home country (matches present address if same)',
+    iconName: 'MapPin',
+    manualNotices: [
+      {
+        title: 'Same Address Checkbox',
+        message: 'The Same Address checkbox is a dynamic portal control and remains manual on the Indian Visa website.',
+      },
+    ],
+    fieldKeys: [
+      'perm_add1',
+      'perm_add2',
+      'perm_add3',
+    ],
+  },
+  {
+    id: 'familyDetails',
+    title: '5. Family Details',
+    subtitle: 'Father, mother, spouse details, and Pakistan ancestry disclosure',
+    iconName: 'Users',
+    fieldKeys: [
+      'fthrname',
+      'father_place_of_birth',
+      'father_country_of_birth',
+      'father_nationality',
+      'father_prev_nationality',
+      'mother_name',
+      'mother_place_of_birth',
+      'mother_country_of_birth',
+      'mother_nationality',
+      'mother_prev_nationality',
+      'spouse_name',
+      'spouse_place_of_birth',
+      'spouse_country_of_birth',
+      'spouse_nationality',
+      'spouse_prev_nationality',
+      'grandparent_flag',
+      'grandparent_details',
+    ],
+  },
+  {
+    id: 'professionEmployment',
+    title: '6. Profession / Employment',
+    subtitle: 'Present occupation, employer information, and military/security service',
+    iconName: 'Briefcase',
+    fieldKeys: [
+      'occupation',
+      'empname',
+      'empdesignation',
+      'empaddress',
+      'empphone',
+      'previous_occupation',
+      'prev_org',
+      'previous_organization',
+      'previous_designation',
+      'previous_rank',
+      'previous_posting',
+    ],
+  },
+  {
+    id: 'visaDetails',
+    title: '7. Visa Details & References',
+    subtitle: 'Visa duration, port of arrival/exit, and Indian & Bangladesh references',
+    iconName: 'Compass',
+    fieldKeys: [
+      'duration',
+      'visa_entry_id',
+      'journeydate',
+      'appl.journeydate',
+      'entrypoint',
+      'exitpoint',
+      'country_visited',
+      'saarc_flag',
+      'nameofsponsor_ind',
+      'add1ofsponsor_ind',
+      'add2ofsponsor_ind',
+      'phoneofsponsor_ind',
+      'nameofsponsor_msn',
+      'add1ofsponsor_msn',
+      'add2ofsponsor_msn',
+      'phoneofsponsor_msn',
+    ],
+  },
+  {
+    id: 'previousVisitVisa',
+    title: '8. Previous Visit / Visa',
+    subtitle: 'Prior Indian visas, stay addresses, and previously visited cities',
+    iconName: 'History',
+    manualNotices: [
+      {
+        title: 'Visa Refusal Disclosures',
+        message: 'Visa refusal questions are sensitive legal disclosures and must be answered manually on the website.',
+      },
+    ],
+    fieldKeys: [
+      'old_visa_flag',
+      'prv_visit_add1',
+      'prv_visit_add2',
+      'prv_visit_add3',
+      'old_visa_no',
+      'old_visa_type_id',
+      'oldvisaissueplace',
+      'oldvisaissuedate',
+    ],
+  },
+  {
+    id: 'additionalQuestions',
+    title: '9. Additional Questions',
+    subtitle: 'Legal and security questionnaire (Questions 1 to 6)',
+    iconName: 'ShieldAlert',
+    manualNotices: [
+      {
+        title: 'Applicant Declaration',
+        message: 'The final declaration checkbox is a legal acknowledgement and must be confirmed manually by the applicant on the Indian Visa website.',
+      },
+    ],
+    fieldKeys: [
+      'question_1_flag',
+      'answer_1',
+      'question_2_flag',
+      'answer_2',
+      'question_3_flag',
+      'answer_3',
+      'question_4_flag',
+      'answer_4',
+      'question_5_flag',
+      'answer_5',
+      'question_6_flag',
+      'answer_6',
+    ],
+  },
+  {
+    id: 'photoUpload',
+    title: '10. Photo Section',
+    subtitle: 'Applicant photograph management and preview',
+    iconName: 'Camera',
+    manualNotices: [
+      {
+        title: 'Portal Photo Chooser',
+        message: 'On the Indian Visa website, photograph file selection remains manual. Extension manages the photo here in your workspace for verification and preview.',
+      },
+    ],
+    fieldKeys: [],
+  },
+]
 
 export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
   {
@@ -49,6 +394,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'USA', label: 'UNITED STATES OF AMERICA' },
           { value: 'UK', label: 'UNITED KINGDOM' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'appl.missioncode',
@@ -65,6 +411,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'BANGLADESH-SYLHET', label: 'BANGLADESH - SYLHET' },
           { value: 'BANGLADESH-KHULNA', label: 'BANGLADESH - KHULNA' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'appl.nationality',
@@ -82,6 +429,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'SRI LANKA', label: 'SRI LANKA' },
           { value: 'USA', label: 'UNITED STATES OF AMERICA' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'appl.birthdate',
@@ -92,6 +440,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         sourceApplicantPath: 'personalInfo.dateOfBirth',
         requiredInPortal: true,
         placeholder: 'DD/MM/YYYY',
+        visibleByDefault: true,
       },
       {
         key: 'appl.email',
@@ -102,6 +451,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         sourceApplicantPath: 'contact.email',
         requiredInPortal: true,
         placeholder: 'applicant@example.com',
+        visibleByDefault: true,
       },
       {
         key: 'appl.email_re',
@@ -112,6 +462,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         sourceApplicantPath: 'contact.email',
         requiredInPortal: true,
         placeholder: 'applicant@example.com',
+        visibleByDefault: false,
       },
       {
         key: 'appl.journeydate',
@@ -122,6 +473,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         sourceApplicantPath: 'travel.intendedArrivalDate',
         requiredInPortal: true,
         placeholder: 'DD/MM/YYYY',
+        visibleByDefault: false,
       },
     ],
   },
@@ -140,6 +492,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'appl.surname',
         sourceApplicantPath: 'personalInfo.surname',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'appl.applname',
@@ -150,6 +503,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'appl.applname',
         sourceApplicantPath: 'personalInfo.givenNames',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'appl.changedSurnameCheck',
@@ -159,6 +513,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'checkbox',
         targetMappingField: 'appl.changedSurnameCheck',
         sourceApplicantPath: 'personalInfo.hasChangedName',
+        visibleByDefault: false,
       },
       {
         key: 'appl.applsex',
@@ -174,6 +529,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'FEMALE', label: 'FEMALE' },
           { value: 'TRANSGENDER', label: 'TRANSGENDER' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'appl.placbrth',
@@ -184,6 +540,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'appl.placbrth',
         sourceApplicantPath: 'personalInfo.townCityOfBirth',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'appl.country_of_birth',
@@ -199,6 +556,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'appl.nic_no',
@@ -208,6 +566,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'appl.nic_no',
         sourceApplicantPath: 'personalInfo.nationalIdNumber',
+        visibleByDefault: true,
       },
       {
         key: 'appl.religion',
@@ -226,6 +585,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'SIKH', label: 'SIKH' },
           { value: 'OTHERS', label: 'OTHERS' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'appl.visual_mark',
@@ -235,6 +595,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'appl.visual_mark',
         sourceApplicantPath: 'personalInfo.visibleIdentificationMarks',
+        visibleByDefault: true,
       },
       {
         key: 'appl.edu_id',
@@ -255,6 +616,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'ILLITERATE', label: 'ILLITERATE' },
           { value: 'OTHERS', label: 'OTHERS' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'appl.nationality_by',
@@ -269,6 +631,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'Birth', label: 'By Birth' },
           { value: 'Naturalization', label: 'By Naturalization' },
         ],
+        visibleByDefault: true,
       },
 
       // Passport Sub-section
@@ -281,6 +644,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'appl.passport_number',
         sourceApplicantPath: 'passport.passportNumber',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'appl.passport_issue_place',
@@ -291,6 +655,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'appl.passport_issue_place',
         sourceApplicantPath: 'passport.placeOfIssue',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'appl.passport_issue_date',
@@ -302,6 +667,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         sourceApplicantPath: 'passport.issueDate',
         requiredInPortal: true,
         placeholder: 'DD/MM/YYYY',
+        visibleByDefault: true,
       },
       {
         key: 'appl.passport_expiry_date',
@@ -313,6 +679,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         sourceApplicantPath: 'passport.expiryDate',
         requiredInPortal: true,
         placeholder: 'DD/MM/YYYY',
+        visibleByDefault: true,
       },
       {
         key: 'appl.oth_ppt',
@@ -326,6 +693,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'appl.oth_pptno',
@@ -335,6 +703,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'appl.oth_pptno',
         sourceApplicantPath: 'passport.otherPassportDetails.passportNumber',
+        visibleByDefault: true,
       },
       {
         key: 'appl.oth_ppt_issue_place',
@@ -344,6 +713,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'appl.oth_ppt_issue_place',
         sourceApplicantPath: 'passport.otherPassportDetails.placeOfIssue',
+        visibleByDefault: true,
       },
       {
         key: 'appl.prev_passport_country_issue',
@@ -359,6 +729,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'USA', label: 'UNITED STATES OF AMERICA' },
           { value: 'UK', label: 'UNITED KINGDOM' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'appl.other_ppt_nationality',
@@ -374,6 +745,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'USA', label: 'UNITED STATES OF AMERICA' },
           { value: 'UK', label: 'UNITED KINGDOM' },
         ],
+        visibleByDefault: true,
       },
     ],
   },
@@ -399,6 +771,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'pres_addr1',
         sourceApplicantPath: 'presentAddress.addressLine1',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'pres_addr2',
@@ -408,6 +781,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'pres_addr2',
         sourceApplicantPath: 'presentAddress.addressLine2',
+        visibleByDefault: true,
       },
       {
         key: 'state_name',
@@ -418,6 +792,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'state_name',
         sourceApplicantPath: 'presentAddress.villageTownCity',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'pincode',
@@ -427,6 +802,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'pincode',
         sourceApplicantPath: 'presentAddress.postalCode',
+        visibleByDefault: true,
       },
       {
         key: 'pres_phone',
@@ -436,6 +812,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'pres_phone',
         sourceApplicantPath: 'contact.phone',
+        visibleByDefault: true,
       },
       {
         key: 'mobile',
@@ -445,6 +822,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'mobile',
         sourceApplicantPath: 'contact.mobile',
+        visibleByDefault: true,
       },
 
       // Permanent Address
@@ -457,6 +835,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'perm_add1',
         sourceApplicantPath: 'permanentAddress.addressLine1',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'perm_add2',
@@ -466,6 +845,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'perm_add2',
         sourceApplicantPath: 'permanentAddress.addressLine2',
+        visibleByDefault: true,
       },
       {
         key: 'perm_add3',
@@ -476,6 +856,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'perm_add3',
         sourceApplicantPath: 'permanentAddress.villageTownCity',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
 
       // Father Details
@@ -488,6 +869,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'fthrname',
         sourceApplicantPath: 'family.father.name',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'father_place_of_birth',
@@ -497,6 +879,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'father_place_of_birth',
         sourceApplicantPath: 'family.father.placeOfBirth',
+        visibleByDefault: true,
       },
       {
         key: 'father_country_of_birth',
@@ -511,6 +894,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'father_nationality',
@@ -525,6 +909,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'father_prev_nationality',
@@ -539,6 +924,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
 
       // Mother Details
@@ -551,6 +937,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'mother_name',
         sourceApplicantPath: 'family.mother.name',
         requiredInPortal: true,
+        visibleByDefault: true,
       },
       {
         key: 'mother_place_of_birth',
@@ -560,6 +947,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'mother_place_of_birth',
         sourceApplicantPath: 'family.mother.placeOfBirth',
+        visibleByDefault: true,
       },
       {
         key: 'mother_country_of_birth',
@@ -574,6 +962,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'mother_nationality',
@@ -588,6 +977,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'mother_prev_nationality',
@@ -602,6 +992,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
 
       // Marital & Spouse
@@ -619,6 +1010,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'Divorced', label: 'Divorced' },
           { value: 'Widow/Widower', label: 'Widow/Widower' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'spouse_name',
@@ -628,6 +1020,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'spouse_name',
         sourceApplicantPath: 'family.spouse.name',
+        visibleByDefault: true,
       },
       {
         key: 'spouse_place_of_birth',
@@ -637,6 +1030,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'spouse_place_of_birth',
         sourceApplicantPath: 'family.spouse.placeOfBirth',
+        visibleByDefault: true,
       },
       {
         key: 'spouse_country_of_birth',
@@ -651,6 +1045,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'spouse_nationality',
@@ -665,6 +1060,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'spouse_prev_nationality',
@@ -679,6 +1075,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'INDIA', label: 'INDIA' },
           { value: 'PAKISTAN', label: 'PAKISTAN' },
         ],
+        visibleByDefault: true,
       },
 
       // Grandparents / Pakistan Relation
@@ -694,6 +1091,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'grandparent_details',
@@ -703,6 +1101,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'textarea',
         targetMappingField: 'grandparent_details',
         sourceApplicantPath: 'family.pakistanRelationDetails',
+        visibleByDefault: false,
       },
 
       // Employment
@@ -732,6 +1131,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'UN-EMPLOYED', label: 'UN-EMPLOYED' },
           { value: 'OTHERS', label: 'OTHERS' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'empname',
@@ -741,6 +1141,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'empname',
         sourceApplicantPath: 'employment.employerName',
+        visibleByDefault: true,
       },
       {
         key: 'empdesignation',
@@ -750,6 +1151,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'empdesignation',
         sourceApplicantPath: 'employment.designationRank',
+        visibleByDefault: true,
       },
       {
         key: 'empaddress',
@@ -759,6 +1161,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'empaddress',
         sourceApplicantPath: 'employment.employerAddress',
+        visibleByDefault: true,
       },
       {
         key: 'empphone',
@@ -768,6 +1171,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'empphone',
         sourceApplicantPath: 'employment.employerPhone',
+        visibleByDefault: true,
       },
       {
         key: 'previous_occupation',
@@ -783,6 +1187,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'PRIVATE SERVICE', label: 'PRIVATE SERVICE' },
           { value: 'GOVT SERVICE', label: 'GOVERNMENT SERVICE' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'prev_org',
@@ -796,6 +1201,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'previous_organization',
@@ -805,6 +1211,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'previous_organization',
         sourceApplicantPath: 'employment.militaryOrganization',
+        visibleByDefault: false,
       },
       {
         key: 'previous_designation',
@@ -814,6 +1221,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'previous_designation',
         sourceApplicantPath: 'employment.militaryDesignation',
+        visibleByDefault: false,
       },
       {
         key: 'previous_rank',
@@ -823,6 +1231,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'previous_rank',
         sourceApplicantPath: 'employment.militaryRank',
+        visibleByDefault: false,
       },
       {
         key: 'previous_posting',
@@ -832,6 +1241,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'previous_posting',
         sourceApplicantPath: 'employment.militaryPlaceOfPosting',
+        visibleByDefault: false,
       },
     ],
   },
@@ -856,6 +1266,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'duration',
         sourceApplicantPath: 'travel.duration',
         placeholder: 'e.g. 12 or 6',
+        visibleByDefault: true,
       },
       {
         key: 'visa_entry_id',
@@ -871,6 +1282,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'Triple', label: 'Triple Entry' },
           { value: 'Single', label: 'Single Entry' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'journeydate',
@@ -881,6 +1293,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'journeydate',
         sourceApplicantPath: 'travel.intendedArrivalDate',
         placeholder: 'DD/MM/YYYY',
+        visibleByDefault: true,
       },
       {
         key: 'entrypoint',
@@ -902,6 +1315,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'DELHI AIRPORT', label: 'DELHI AIRPORT' },
           { value: 'CHENNAI AIRPORT', label: 'CHENNAI AIRPORT' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'exitpoint',
@@ -920,6 +1334,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'KOLKATA AIRPORT', label: 'KOLKATA AIRPORT' },
           { value: 'DELHI AIRPORT', label: 'DELHI AIRPORT' },
         ],
+        visibleByDefault: true,
       },
 
       // Previous Indian Visa
@@ -935,6 +1350,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'prv_visit_add1',
@@ -944,6 +1360,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'prv_visit_add1',
         sourceApplicantPath: 'previousVisa.visitedAddress1',
+        visibleByDefault: true,
       },
       {
         key: 'prv_visit_add2',
@@ -953,6 +1370,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'prv_visit_add2',
         sourceApplicantPath: 'previousVisa.visitedAddress2',
+        visibleByDefault: true,
       },
       {
         key: 'prv_visit_add3',
@@ -962,6 +1380,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'prv_visit_add3',
         sourceApplicantPath: 'previousVisa.visitedAddress3',
+        visibleByDefault: true,
       },
       {
         key: 'old_visa_no',
@@ -971,6 +1390,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'old_visa_no',
         sourceApplicantPath: 'previousVisa.visaNumber',
+        visibleByDefault: true,
       },
       {
         key: 'old_visa_type_id',
@@ -987,6 +1407,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'ENTRY VISA', label: 'ENTRY VISA' },
           { value: 'STUDENT VISA', label: 'STUDENT VISA' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'oldvisaissueplace',
@@ -996,6 +1417,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'oldvisaissueplace',
         sourceApplicantPath: 'previousVisa.placeOfIssue',
+        visibleByDefault: true,
       },
       {
         key: 'oldvisaissuedate',
@@ -1006,6 +1428,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'oldvisaissuedate',
         sourceApplicantPath: 'previousVisa.dateOfIssue',
         placeholder: 'DD/MM/YYYY',
+        visibleByDefault: true,
       },
 
       // Travel history
@@ -1018,6 +1441,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         targetMappingField: 'country_visited',
         sourceApplicantPath: 'travel.countriesVisited',
         placeholder: 'e.g. INDIA, MALAYSIA, THAILAND',
+        visibleByDefault: true,
       },
       {
         key: 'saarc_flag',
@@ -1031,6 +1455,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
 
       // References
@@ -1042,6 +1467,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'nameofsponsor_ind',
         sourceApplicantPath: 'reference.name',
+        visibleByDefault: true,
       },
       {
         key: 'add1ofsponsor_ind',
@@ -1051,6 +1477,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'add1ofsponsor_ind',
         sourceApplicantPath: 'reference.addressLine1',
+        visibleByDefault: true,
       },
       {
         key: 'add2ofsponsor_ind',
@@ -1060,6 +1487,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'add2ofsponsor_ind',
         sourceApplicantPath: 'reference.addressLine2',
+        visibleByDefault: true,
       },
       {
         key: 'phoneofsponsor_ind',
@@ -1069,6 +1497,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'phoneofsponsor_ind',
         sourceApplicantPath: 'reference.phone',
+        visibleByDefault: true,
       },
       {
         key: 'nameofsponsor_msn',
@@ -1078,6 +1507,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'nameofsponsor_msn',
         sourceApplicantPath: 'sponsorMission.name',
+        visibleByDefault: true,
       },
       {
         key: 'add1ofsponsor_msn',
@@ -1087,6 +1517,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'add1ofsponsor_msn',
         sourceApplicantPath: 'sponsorMission.addressLine1',
+        visibleByDefault: true,
       },
       {
         key: 'add2ofsponsor_msn',
@@ -1096,6 +1527,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'add2ofsponsor_msn',
         sourceApplicantPath: 'sponsorMission.addressLine2',
+        visibleByDefault: true,
       },
       {
         key: 'phoneofsponsor_msn',
@@ -1105,6 +1537,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'phoneofsponsor_msn',
         sourceApplicantPath: 'sponsorMission.phone',
+        visibleByDefault: true,
       },
     ],
   },
@@ -1131,6 +1564,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'answer_1',
@@ -1139,6 +1573,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         subsection: 'Question 1',
         inputType: 'textarea',
         targetMappingField: 'answer_1',
+        visibleByDefault: false,
       },
       {
         key: 'question_2_flag',
@@ -1151,6 +1586,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'answer_2',
@@ -1159,6 +1595,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         subsection: 'Question 2',
         inputType: 'textarea',
         targetMappingField: 'answer_2',
+        visibleByDefault: false,
       },
       {
         key: 'question_3_flag',
@@ -1171,6 +1608,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'answer_3',
@@ -1179,6 +1617,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         subsection: 'Question 3',
         inputType: 'textarea',
         targetMappingField: 'answer_3',
+        visibleByDefault: false,
       },
       {
         key: 'question_4_flag',
@@ -1191,6 +1630,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'answer_4',
@@ -1199,6 +1639,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         subsection: 'Question 4',
         inputType: 'textarea',
         targetMappingField: 'answer_4',
+        visibleByDefault: false,
       },
       {
         key: 'question_5_flag',
@@ -1211,6 +1652,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'answer_5',
@@ -1219,6 +1661,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         subsection: 'Question 5',
         inputType: 'textarea',
         targetMappingField: 'answer_5',
+        visibleByDefault: false,
       },
       {
         key: 'question_6_flag',
@@ -1231,6 +1674,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
           { value: 'No', label: 'No' },
           { value: 'Yes', label: 'Yes' },
         ],
+        visibleByDefault: true,
       },
       {
         key: 'answer_6',
@@ -1239,6 +1683,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         subsection: 'Question 6',
         inputType: 'textarea',
         targetMappingField: 'answer_6',
+        visibleByDefault: false,
       },
     ],
   },
@@ -1259,4 +1704,16 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
 
 export function getAllSchemaFields(): ApplicationFieldDef[] {
   return BANGLADESH_APPLICATION_SCHEMA.flatMap((s) => s.fields)
+}
+
+export function getDefaultVisibleSchemaFields(): ApplicationFieldDef[] {
+  return getAllSchemaFields().filter((f) => f.visibleByDefault !== false)
+}
+
+export function getDefaultHiddenSchemaFields(): ApplicationFieldDef[] {
+  return getAllSchemaFields().filter((f) => f.visibleByDefault === false)
+}
+
+export function getWorkspaceSections(): WorkspaceSectionCardDef[] {
+  return WORKSPACE_SECTIONS
 }
