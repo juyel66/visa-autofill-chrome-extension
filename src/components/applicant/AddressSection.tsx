@@ -81,14 +81,23 @@ export const AddressSection: React.FC<AddressSectionProps> = ({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="block text-[10px] font-semibold mb-0.5">Village/Town/City</label>
           <input
             type="text"
             className="w-full p-1.5 rounded border text-xs bg-white"
-            value={addr.villageTownCity}
+            value={addr.villageTownCity || ''}
             onChange={(e) => update({ villageTownCity: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold mb-0.5">District</label>
+          <input
+            type="text"
+            className="w-full p-1.5 rounded border text-xs bg-white"
+            value={addr.district || ''}
+            onChange={(e) => update({ district: e.target.value })}
           />
         </div>
         <div>
@@ -96,7 +105,7 @@ export const AddressSection: React.FC<AddressSectionProps> = ({
           <input
             type="text"
             className="w-full p-1.5 rounded border text-xs bg-white"
-            value={addr.stateProvince}
+            value={addr.stateProvince || ''}
             onChange={(e) => update({ stateProvince: e.target.value })}
           />
         </div>
@@ -108,7 +117,7 @@ export const AddressSection: React.FC<AddressSectionProps> = ({
           <input
             type="text"
             className="w-full p-1.5 rounded border text-xs bg-white"
-            value={addr.country}
+            value={addr.country || ''}
             onChange={(e) => update({ country: e.target.value })}
           />
         </div>
@@ -117,11 +126,44 @@ export const AddressSection: React.FC<AddressSectionProps> = ({
           <input
             type="text"
             className="w-full p-1.5 rounded border text-xs bg-white"
-            value={addr.postalCode}
+            value={addr.postalCode || ''}
             onChange={(e) => update({ postalCode: e.target.value })}
           />
         </div>
       </div>
+
+      {!isPermanentSection && (
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="block text-[10px] font-semibold mb-0.5">Phone Number</label>
+            <input
+              type="text"
+              className="w-full p-1.5 rounded border text-xs bg-white"
+              value={addr.phone || ''}
+              onChange={(e) => update({ phone: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold mb-0.5">ISD Code</label>
+            <input
+              type="text"
+              placeholder="e.g. 880"
+              className="w-full p-1.5 rounded border text-xs bg-white"
+              value={addr.isdCode || ''}
+              onChange={(e) => update({ isdCode: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold mb-0.5">Mobile Number</label>
+            <input
+              type="text"
+              className="w-full p-1.5 rounded border text-xs bg-white"
+              value={addr.mobile || ''}
+              onChange={(e) => update({ mobile: e.target.value })}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
