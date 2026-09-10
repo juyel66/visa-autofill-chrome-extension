@@ -17,8 +17,18 @@ import { runApplicationWorkspaceTests } from '../src/core/application/__tests__/
 import { runEndToEndWorkflowTests } from '../src/countries/india/__tests__/endToEndWorkflow.test'
 import { runOgdFullFieldExtractionTests } from '../src/core/extraction/__tests__/ogdFullFieldExtraction.test'
 import { runScannedPassportOcrTests } from '../src/core/extraction/__tests__/scannedPassportOcr.test'
+import { runTask062RealPassportUploadWorkspaceTests } from '../src/core/__tests__/task062RealPassportUploadWorkspace.test'
+import { runHighConfidenceReligionTests } from '../src/core/extraction/__tests__/highConfidenceReligionExtraction.test'
+import { runBangladeshiNameNormalizationReligionSafetyTests } from '../src/core/extraction/__tests__/bangladeshiNameNormalizationReligionSafety.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 062: REAL PASSPORT UPLOAD → WORKSPACE VERIFICATION ---')
+  const task062Res = await runTask062RealPassportUploadWorkspaceTests()
+  console.log(`Passed: ${task062Res.passed}, Count: ${task062Res.totalSubtests}`)
+  if (!task062Res.passed) {
+    console.error('Failures:', task062Res.failures)
+  }
+
   console.log('--- RUNNING SCANNED PASSPORT OCR TESTS (TASK 058) ---')
   const passOcrRes = await runScannedPassportOcrTests()
   console.log(`Passed: ${passOcrRes.passed}, Count: ${passOcrRes.totalSubtests}`)
@@ -136,28 +146,50 @@ async function execute() {
     console.error('Stages:', e2eRes.stageResults)
   }
   
-  if (
-    ogdRes.passed &&
-    e2eWorkflowRes.passed &&
-    appWorkspaceRes.passed &&
-    domVerifyRes.passed &&
-    candResolverRes.passed &&
-    compatRes.passed &&
-    bdSelectorRes.passed &&
-    addrFamRes.passed &&
-    travelRes.passed &&
-    autofillRes.passed &&
-    docRes.passed &&
-    workflowRes.passed &&
-    recoveryRes.passed &&
-    validationRes.passed &&
-    runtimeRegRes.passed &&
-    e2eRes.overallPassed
-  ) {
+  console.log('--- RUNNING HIGH-CONFIDENCE RELIGION EXTRACTION TESTS (TASK 068) ---')
+  const religionRes = await runHighConfidenceReligionTests()
+  console.log(`Passed: ${religionRes.passed}, Count: ${religionRes.totalSubtests}`)
+  if (!religionRes.passed) {
+    console.error('Failures:', religionRes.failures)
+  }
+
+  console.log('--- RUNNING BANGLADESHI NAME NORMALIZATION & RELIGION SAFETY TESTS (TASK 069) ---')
+  const nameSafetyRes = await runBangladeshiNameNormalizationReligionSafetyTests()
+  console.log(`Passed: ${nameSafetyRes.passed}, Count: ${nameSafetyRes.totalSubtests}`)
+  if (!nameSafetyRes.passed) {
+    console.error('Failures:', nameSafetyRes.failures)
+  }
+
+  const results = {
+    nameSafety: nameSafetyRes.passed,
+    religion: religionRes.passed,
+    task062: task062Res.passed,
+    passOcr: passOcrRes.passed,
+    ogd: ogdRes.passed,
+    e2eWorkflow: e2eWorkflowRes.passed,
+    appWorkspace: appWorkspaceRes.passed,
+    domVerify: domVerifyRes.passed,
+    candResolver: candResolverRes.passed,
+    compat: compatRes.passed,
+    bdSelector: bdSelectorRes.passed,
+    addrFam: addrFamRes.passed,
+    travel: travelRes.passed,
+    autofill: autofillRes.passed,
+    doc: docRes.passed,
+    workflow: workflowRes.passed,
+    recovery: recoveryRes.passed,
+    validation: validationRes.passed,
+    runtimeReg: runtimeRegRes.passed,
+    e2e: e2eRes.overallPassed,
+  }
+  console.log('Suite results breakdown:', results)
+
+  const allPassed = Object.values(results).every(Boolean)
+  if (allPassed) {
     console.log('✅ ALL TEST SUITES PASSED SUCCESSFULLY!')
     process.exit(0)
   } else {
-    console.error('❌ SOME TEST SUITES FAILED!')
+    console.error('❌ SOME TEST SUITES FAILED!', Object.entries(results).filter(([, v]) => !v))
     process.exit(1)
   }
 }
