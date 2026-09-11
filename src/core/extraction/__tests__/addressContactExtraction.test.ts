@@ -837,13 +837,13 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     Surname: HOSSAIN
     Given Name: MOHAMMAD ARIF
     Nationality: BANGLADESHI
-    Date of Birth: 18 SEP 1993
+    Date of Birth: 01 JAN 1990
     Place of Birth: DHAKA
     Permanent Address: HOUSE 12, ROAD 5, BLOCK B - 1216, DHAKA
     Emergency Contact:
     Name: JANNATUL FERDOUS
     Relationship: SPOUSE
-    Telephone No: +8801744777846
+    Telephone No: +8801711111111
   `
   const extractedAttached = extractFromPdfText(attachedPassportText)
   assert(
@@ -863,10 +863,10 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   )
   const contactAttached = parseApplicantContact(attachedPassportText)
   assert(
-    contactAttached.phone === '+8801744777846' &&
+    contactAttached.phone === '+8801711111111' &&
       contactAttached.isdCode === '880' &&
-      contactAttached.mobile === '1744777846',
-    'TASK 074 Req 1 & 2: Emergency contact telephone +8801744777846 normalized into phone, isdCode=880, and mobile=1744777846'
+      contactAttached.mobile === '1711111111',
+    'TASK 074 Req 1 & 2: Emergency contact telephone +8801711111111 normalized into phone, isdCode=880, and mobile=1711111111'
   )
 
   // 8. Cross-applicant isolation: One applicant's address/contact never leaks into another
@@ -956,24 +956,24 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   // Test Case I: TASK 074 — Force Passport Telephone into Present Phone Fallback
   // =========================================================================
 
-  // 1. Passport containing Telephone No: +8801744777846 produces phone, ISD, mobile
+  // 1. Passport containing Telephone No: +8801711111111 produces phone, ISD, mobile
   const task074Text = `
     PEOPLE'S REPUBLIC OF BANGLADESH
-    PASSPORT NO: A21496961
+    PASSPORT NO: A01234567
     Surname: HOSSAIN
     Given Name: MOHAMMAD ARIF
     Permanent Address: HOUSE 12, ROAD 5, BLOCK B - 1216, DHAKA
     Emergency Contact:
     Name: JANNATUL FERDOUS
     Relationship: SPOUSE
-    Telephone No: +8801744777846
+    Telephone No: +8801711111111
   `
   const ext074 = extractFromPdfText(task074Text)
   assert(
-    ext074.contact?.phone?.value === '+8801744777846' &&
+    ext074.contact?.phone?.value === '+8801711111111' &&
       ext074.contact?.isdCode?.value === '880' &&
-      ext074.contact?.mobile?.value === '1744777846',
-    'TASK 074 Req 1: Extractor normalizes +8801744777846 to phone=+8801744777846, ISD=880, mobile=1744777846'
+      ext074.contact?.mobile?.value === '1711111111',
+    'TASK 074 Req 1: Extractor normalizes +8801711111111 to phone=+8801711111111, ISD=880, mobile=1711111111'
   )
 
   // 2. SavedApplication population from passport telephone
@@ -996,11 +996,11 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     passportDoc: doc074Record,
   })
   assert(
-    app074.fields['pres_phone']?.value === '+8801744777846' &&
+    app074.fields['pres_phone']?.value === '+8801711111111' &&
       app074.fields['pres_phone']?.source === 'passport' &&
       app074.fields['isd_code']?.value === '880' &&
       app074.fields['isd_code']?.source === 'passport' &&
-      app074.fields['mobile']?.value === '1744777846' &&
+      app074.fields['mobile']?.value === '1711111111' &&
       app074.fields['mobile']?.source === 'passport',
     'TASK 074 Req 2: SavedApplication Present Phone, ISD, and Mobile populated with source=passport'
   )
@@ -1008,14 +1008,14 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   // 3. Explicit applicant phone exists -> explicit applicant phone wins over passport telephone
   const docWithExplicitAndPassportTel = `
     PEOPLE'S REPUBLIC OF BANGLADESH
-    PASSPORT NO: A21496961
+    PASSPORT NO: A01234567
     Surname: HOSSAIN
     Given Name: MOHAMMAD ARIF
     Phone: +8801711122233
     Emergency Contact:
     Name: JANNATUL FERDOUS
     Relationship: SPOUSE
-    Telephone No: +8801744777846
+    Telephone No: +8801711111111
   `
   const extExplicitWins = extractFromPdfText(docWithExplicitAndPassportTel)
   assert(
@@ -1027,11 +1027,11 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   // 4. Save -> reload preserves phone/ISD/mobile in ApplicantProfile conversion
   const hydratedProf074 = convertSavedApplicationToApplicantProfile(app074)
   assert(
-    hydratedProf074.presentAddress?.phone === '+8801744777846' &&
+    hydratedProf074.presentAddress?.phone === '+8801711111111' &&
       hydratedProf074.presentAddress?.isdCode === '880' &&
-      hydratedProf074.presentAddress?.mobile === '1744777846' &&
-      hydratedProf074.contact?.phone === '+8801744777846' &&
-      hydratedProf074.contact?.mobile === '1744777846',
+      hydratedProf074.presentAddress?.mobile === '1711111111' &&
+      hydratedProf074.contact?.phone === '+8801711111111' &&
+      hydratedProf074.contact?.mobile === '1711111111',
     'TASK 074 Req 4: Workspace hydration & profile conversion preserves phone/ISD/mobile'
   )
 
@@ -1118,8 +1118,8 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     existingApp: null,
   })
   assert(
-    appIsolated074.fields['pres_phone']?.value === '+8801744777846' &&
-      appIsolated074.fields['mobile']?.value === '1744777846',
+    appIsolated074.fields['pres_phone']?.value === '+8801711111111' &&
+      appIsolated074.fields['mobile']?.value === '1711111111',
     'TASK 074 Req 8: Cross-applicant document does not contaminate target applicant phone/mobile'
   )
 
@@ -1138,12 +1138,12 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   }
   const ext075Ocr = extractFromOcrText(ocrRes075)
   assert(
-    ext075Ocr.contact?.phone?.value === '+8801744777846' &&
+    ext075Ocr.contact?.phone?.value === '+8801711111111' &&
       ext075Ocr.contact?.isdCode?.value === '880' &&
-      ext075Ocr.contact?.mobile?.value === '1744777846' &&
-      ext075Ocr.presentAddress?.phone?.value === '+8801744777846' &&
+      ext075Ocr.contact?.mobile?.value === '1711111111' &&
+      ext075Ocr.presentAddress?.phone?.value === '+8801711111111' &&
       ext075Ocr.presentAddress?.isdCode?.value === '880' &&
-      ext075Ocr.presentAddress?.mobile?.value === '1744777846',
+      ext075Ocr.presentAddress?.mobile?.value === '1711111111',
     'TASK 075 Req 1: Real OCR text extracts phone, isdCode, and mobile in both contact and presentAddress'
   )
 
@@ -1170,10 +1170,10 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   })
 
   assert(
-    app075.fields['pres_phone']?.value === '+8801744777846' &&
+    app075.fields['pres_phone']?.value === '+8801711111111' &&
       app075.fields['pres_phone']?.source === 'passport' &&
       app075.fields['pres_phone']?.isUserEdited === false,
-    'TASK 075 Req 2a: pres_phone is +8801744777846 with source=passport'
+    'TASK 075 Req 2a: pres_phone is +8801711111111 with source=passport'
   )
   assert(
     app075.fields['isd_code']?.value === '880' &&
@@ -1182,10 +1182,10 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     'TASK 075 Req 2b: isd_code is 880 with source=passport'
   )
   assert(
-    app075.fields['mobile']?.value === '1744777846' &&
+    app075.fields['mobile']?.value === '1711111111' &&
       app075.fields['mobile']?.source === 'passport' &&
       app075.fields['mobile']?.isUserEdited === false,
-    'TASK 075 Req 2c: mobile is 1744777846 with source=passport'
+    'TASK 075 Req 2c: mobile is 1711111111 with source=passport'
   )
 
   // 3. Stale SavedApplication with empty manual edits gets cleanly populated on re-sync
@@ -1198,8 +1198,8 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     provenance: { lastSavedAt: new Date().toISOString() },
     sourceDocuments: {},
     fields: {
-      'appl.surname': { value: 'RAY', source: 'passport' },
-      'appl.passport_number': { value: 'A21496961', source: 'passport' },
+      'appl.surname': { value: 'HOSSAIN', source: 'passport' },
+      'appl.passport_number': { value: 'A01234567', source: 'passport' },
       'pres_phone': { value: '', source: 'manual', isUserEdited: true },
       'isd_code': { value: '', source: 'manual', isUserEdited: true },
       'mobile': { value: '', source: 'manual', isUserEdited: true },
@@ -1218,11 +1218,11 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   })
 
   assert(
-    resyncedFromStale.fields['pres_phone']?.value === '+8801744777846' &&
+    resyncedFromStale.fields['pres_phone']?.value === '+8801711111111' &&
       resyncedFromStale.fields['pres_phone']?.source === 'passport' &&
       resyncedFromStale.fields['isd_code']?.value === '880' &&
       resyncedFromStale.fields['isd_code']?.source === 'passport' &&
-      resyncedFromStale.fields['mobile']?.value === '1744777846' &&
+      resyncedFromStale.fields['mobile']?.value === '1711111111' &&
       resyncedFromStale.fields['mobile']?.source === 'passport',
     'TASK 075 Req 3: Stale SavedApplication with empty manual fields is cleanly overwritten by passport on re-sync'
   )
@@ -1252,7 +1252,7 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
       resyncedManual.fields['pres_phone']?.isUserEdited === true &&
       resyncedManual.fields['isd_code']?.value === '880' &&
       resyncedManual.fields['isd_code']?.source === 'passport' &&
-      resyncedManual.fields['mobile']?.value === '1744777846' &&
+      resyncedManual.fields['mobile']?.value === '1711111111' &&
       resyncedManual.fields['mobile']?.source === 'passport',
     'TASK 075 Req 4: Valid user manual phone edit is preserved while untouched ISD/mobile continue from passport'
   )

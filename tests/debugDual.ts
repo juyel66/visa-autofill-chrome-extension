@@ -20,19 +20,19 @@ PEOPLE'S REPUBLIC OF BANGLADESH
 PASSPORT
 Type: P
 Country Code: BGD
-Passport Number: A12345678
+Passport Number: A01234567
 Surname: HOSSAIN
 Given Name: MOHAMMAD ARIF
 Nationality: BANGLADESHI
-Personal No: 8235626051
-Previous Passport No: BK0965579
-Date of Birth: 18 SEP 1993
+Personal No: 1990123456
+Previous Passport No: BK1234567
+Date of Birth: 01 JAN 1990
 Sex: M
 Place of Birth: DHAKA
-Date of Issue: 20 JAN 2026
-Date of Expiry: 19 JAN 2031
+Date of Issue: 10 JAN 2020
+Date of Expiry: 09 JAN 2030
 P<BGDHOSSAIN<<MOHAMMAD<ARIF<<<<<<<<<<<<<<<<<
-A123456780BGD9309186M31011938235626051<<<<48
+A012345678BGD9001011M30010971990123456<<<<84
 `
 
 const ext = extractFromPdfText(sample)

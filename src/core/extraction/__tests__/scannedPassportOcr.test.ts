@@ -28,7 +28,7 @@ LT Relationship: SPOUSE ) _ =-
 VE Address: HOUSE 12, ROAD 5, BLOCK B - 1216, DHAKA
 fesiineciie: SUR HARORGAN Pos IS
 UES SF 7 RA
-aon Telephone No: +8801744777846 Ee EE
+aon Telephone No: +8801711111111 Ee EE
 bes eis EA
 FT SNS INS ms Ge ve We SRE RE RE
 STS isISIISIISI RSE EE a
@@ -38,17 +38,17 @@ PASSPORT
 Surname: HOSSAIN
 Given Name: MOHAMMAD ARIF
 Nationality: BANGLADESHI
-Personal No.: 8235626051
-Date of Birth: 18 SEP 1993
-Previous Passport No.: BK0965579
+Personal No.: 1990123456
+Date of Birth: 01 JAN 1990
+Previous Passport No.: BK1234567
 Sex: M
-Place of Birth: THAKURGAON
-Date of Issue: 20 JAN 2026
+Place of Birth: DHAKA
+Date of Issue: 10 JAN 2020
 Issuing Authority: DIP/DHAKA
-Date of Expiry: 19 JAN 2031
+Date of Expiry: 09 JAN 2030
 
 P<BGDHOSSAIN<<MOHAMMAD<ARIF<<<<<<<<<<<<<<<<<<
-p  A214969610BGD9309186M31011938235626051<<<<48
+p  A012345678BGD9001011M30010971990123456<<<<84
 `
 
 export async function runScannedPassportOcrTests(): Promise<{
@@ -96,12 +96,12 @@ export async function runScannedPassportOcrTests(): Promise<{
   assert(mrzRes.success === true, 'MRZ parsing succeeded on noisy OCR text')
   assert(mrzRes.data?.surname === 'HOSSAIN', `MRZ surname is HOSSAIN (got "${mrzRes.data?.surname}")`)
   assert(mrzRes.data?.givenNames === 'MOHAMMAD ARIF', `MRZ givenNames is MOHAMMAD ARIF (got "${mrzRes.data?.givenNames}")`)
-  assert(mrzRes.data?.passportNumber === 'A21496961', `MRZ passportNumber is A21496961 (got "${mrzRes.data?.passportNumber}")`)
+  assert(mrzRes.data?.passportNumber === 'A01234567', `MRZ passportNumber is A01234567 (got "${mrzRes.data?.passportNumber}")`)
   assert(mrzRes.data?.nationality === 'BGD', `MRZ nationality is BGD (got "${mrzRes.data?.nationality}")`)
-  assert(mrzRes.data?.dateOfBirth === '1993-09-18', `MRZ DOB is 1993-09-18 (got "${mrzRes.data?.dateOfBirth}")`)
+  assert(mrzRes.data?.dateOfBirth === '1990-01-01', `MRZ DOB is 1990-01-01 (got "${mrzRes.data?.dateOfBirth}")`)
   assert(mrzRes.data?.sex === 'male', `MRZ sex is male (got "${mrzRes.data?.sex}")`)
-  assert(mrzRes.data?.passportExpiryDate === '2031-01-19', `MRZ expiry date is 2031-01-19 (got "${mrzRes.data?.passportExpiryDate}")`)
-  assert(mrzRes.data?.personalNumber === '8235626051', `MRZ personal number is 8235626051 (got "${mrzRes.data?.personalNumber}")`)
+  assert(mrzRes.data?.passportExpiryDate === '2030-01-09', `MRZ expiry date is 2030-01-09 (got "${mrzRes.data?.passportExpiryDate}")`)
+  assert(mrzRes.data?.personalNumber === '1990123456', `MRZ personal number is 1990123456 (got "${mrzRes.data?.personalNumber}")`)
 
   // 5. Test Visual & Candidate Extraction from OCR Result
   const mockOcrResult: OcrResult = {
@@ -118,14 +118,14 @@ export async function runScannedPassportOcrTests(): Promise<{
   assert(extracted.personal?.lastName?.value === 'HOSSAIN', `Extracted surname is HOSSAIN (got "${extracted.personal?.lastName?.value}")`)
   assert(extracted.personal?.firstName?.value === 'MOHAMMAD ARIF', `Extracted firstName is MOHAMMAD ARIF (got "${extracted.personal?.firstName?.value}")`)
   assert(extracted.personal?.nationality?.value === 'BANGLADESH', `Extracted nationality is BANGLADESH (got "${extracted.personal?.nationality?.value}")`)
-  assert(extracted.personal?.nationalIdNumber?.value === '8235626051', `Extracted NID is 8235626051 (got "${extracted.personal?.nationalIdNumber?.value}")`)
-  assert(extracted.personal?.townCityOfBirth?.value === 'THAKURGAON', `Extracted townCityOfBirth is THAKURGAON (got "${extracted.personal?.townCityOfBirth?.value}")`)
-  assert(extracted.passport?.passportNumber?.value === 'A21496961', `Extracted passportNumber is A21496961 (got "${extracted.passport?.passportNumber?.value}")`)
-  assert(extracted.passport?.issueDate?.value === '2026-01-20', `Extracted passport issueDate is 2026-01-20 (got "${extracted.passport?.issueDate?.value}")`)
-  assert(extracted.passport?.expiryDate?.value === '2031-01-19', `Extracted passport expiryDate is 2031-01-19 (got "${extracted.passport?.expiryDate?.value}")`)
+  assert(extracted.personal?.nationalIdNumber?.value === '1990123456', `Extracted NID is 1990123456 (got "${extracted.personal?.nationalIdNumber?.value}")`)
+  assert(extracted.personal?.townCityOfBirth?.value === 'DHAKA', `Extracted townCityOfBirth is DHAKA (got "${extracted.personal?.townCityOfBirth?.value}")`)
+  assert(extracted.passport?.passportNumber?.value === 'A01234567', `Extracted passportNumber is A01234567 (got "${extracted.passport?.passportNumber?.value}")`)
+  assert(extracted.passport?.issueDate?.value === '2020-01-10', `Extracted passport issueDate is 2020-01-10 (got "${extracted.passport?.issueDate?.value}")`)
+  assert(extracted.passport?.expiryDate?.value === '2030-01-09', `Extracted passport expiryDate is 2030-01-09 (got "${extracted.passport?.expiryDate?.value}")`)
   assert(extracted.passport?.placeOfIssue?.value === 'DIP/DHAKA', `Extracted passport placeOfIssue is DIP/DHAKA (got "${extracted.passport?.placeOfIssue?.value}")`)
   assert(extracted.passport?.holdsOtherPassport?.value === true, 'Extracted holdsOtherPassport is true')
-  assert(extracted.passport?.otherPassportDetails?.passportNumber?.value === 'BK0965579', `Extracted previous passport number is BK0965579 (got "${extracted.passport?.otherPassportDetails?.passportNumber?.value}")`)
+  assert(extracted.passport?.otherPassportDetails?.passportNumber?.value === 'BK1234567', `Extracted previous passport number is BK1234567 (got "${extracted.passport?.otherPassportDetails?.passportNumber?.value}")`)
   assert(extracted.family?.father?.name?.value === 'MOHAMMAD KHURSHED ALAM', `Extracted father name is MOHAMMAD KHURSHED ALAM (got "${extracted.family?.father?.name?.value}")`)
   assert(extracted.family?.mother?.name?.value === 'PARVIN BEGUM', `Extracted mother name is PARVIN BEGUM (got "${extracted.family?.mother?.name?.value}")`)
   assert(extracted.family?.spouse?.name?.value === 'JANNATUL FERDOUS', `Extracted spouse name is JANNATUL FERDOUS (got "${extracted.family?.spouse?.name?.value}")`)
@@ -141,10 +141,10 @@ export async function runScannedPassportOcrTests(): Promise<{
   )
   // TASK 074: Passport emergency contact telephone falls back into applicant contact phone/isd/mobile
   assert(
-    extracted.contact?.phone?.value === '+8801744777846' &&
+    extracted.contact?.phone?.value === '+8801711111111' &&
       extracted.contact?.isdCode?.value === '880' &&
-      extracted.contact?.mobile?.value === '1744777846',
-    'TASK 074: Passport telephone +8801744777846 extracted and normalized into contact phone, isdCode, and mobile'
+      extracted.contact?.mobile?.value === '1711111111',
+    'TASK 074: Passport telephone +8801711111111 extracted and normalized into contact phone, isdCode, and mobile'
   )
 
   // 7. Test SavedApplication Population (End-to-End Workspace Fields)
@@ -174,17 +174,17 @@ export async function runScannedPassportOcrTests(): Promise<{
     'appl.surname': 'HOSSAIN',
     'appl.applname': 'MOHAMMAD ARIF',
     'appl.applsex': 'MALE',
-    'appl.birthdate': '18/09/1993',
-    'appl.placbrth': 'THAKURGAON',
+    'appl.birthdate': '01/01/1990',
+    'appl.placbrth': 'DHAKA',
     'appl.country_of_birth': 'BANGLADESH',
     'appl.nationality': 'BANGLADESH',
     'appl.countryname': 'BANGLADESH',
     'appl.nationality_by': 'Birth',
-    'appl.nic_no': '8235626051',
-    'appl.passport_number': 'A21496961',
+    'appl.nic_no': '1990123456',
+    'appl.passport_number': 'A01234567',
     'appl.passport_issue_place': 'DIP/DHAKA',
-    'appl.passport_issue_date': '20/01/2026',
-    'appl.passport_expiry_date': '19/01/2031',
+    'appl.passport_issue_date': '10/01/2020',
+    'appl.passport_expiry_date': '09/01/2030',
     'fthrname': 'MOHAMMAD KHURSHED ALAM',
     'father_nationality': 'BANGLADESH',
     'father_prev_nationality': 'BANGLADESH',
@@ -203,16 +203,16 @@ export async function runScannedPassportOcrTests(): Promise<{
     'district': 'DHAKA',
     'present_country': 'BANGLADESH',
     'pincode': '1216',
-    'pres_phone': '+8801744777846',
+    'pres_phone': '+8801711111111',
     'isd_code': '880',
-    'mobile': '1744777846',
+    'mobile': '1711111111',
     'perm_add1': 'HOUSE 12',
     'perm_add2': 'ROAD 5, BLOCK B',
     'permanent_district': 'DHAKA',
     'permanent_country': 'BANGLADESH',
     'permanent_postal_code': '1216',
     'appl.oth_ppt': 'Yes',
-    'appl.oth_pptno': 'BK0965579',
+    'appl.oth_pptno': 'BK1234567',
     'appl.oth_ppt_issue_place': 'DHAKA',
     'appl.prev_passport_country_issue': 'BANGLADESH',
     'appl.other_ppt_nationality': 'BANGLADESH',

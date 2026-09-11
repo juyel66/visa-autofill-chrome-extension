@@ -1106,24 +1106,24 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
       Father: MOHAMMAD KHURSHED ALAM
       Mother: PARVIN BEGUM
       Nationality: BANGLADESHI
-      DOB: 18 SEP 1993
+      DOB: 01 JAN 1990
       Place of Birth: DHAKA
-      Passport No: A21496961
-      Issue Date: 20 JAN 2026
-      Expiry Date: 19 JAN 2031
+      Passport No: A01234567
+      Issue Date: 10 JAN 2020
+      Expiry Date: 09 JAN 2030
       Permanent Address: HOUSE 12, ROAD 5, BLOCK B - 1216, DHAKA
       Emergency Contact:
       Name: JANNATUL FERDOUS
       Relationship: SPOUSE
-      Telephone: +8801744777846
+      Telephone: +8801711111111
     `
 
     const extracted = extractFromPdfText(passportWithPhoneText)
-    if (extracted.contact?.phone?.value !== '+8801744777846' || extracted.presentAddress?.phone?.value !== '+8801744777846') {
+    if (extracted.contact?.phone?.value !== '+8801711111111' || extracted.presentAddress?.phone?.value !== '+8801711111111') {
       failures.push(`Test 32 Failed: Phone extraction failed. Extracted contact: ${JSON.stringify(extracted.contact)}, presentAddress: ${JSON.stringify(extracted.presentAddress)}`)
     }
 
-    if (extracted.contact?.isdCode?.value !== '880' || extracted.contact?.mobile?.value !== '1744777846') {
+    if (extracted.contact?.isdCode?.value !== '880' || extracted.contact?.mobile?.value !== '1711111111') {
       failures.push(`Test 32 Failed: ISD/Mobile decomposition failed. Extracted: isd=${extracted.contact?.isdCode?.value}, mobile=${extracted.contact?.mobile?.value}`)
     }
 
@@ -1134,7 +1134,7 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
     }
     const profile = applyExtractionToApplicant(baseApplicant, extracted)
 
-    if (profile.presentAddress?.phone !== '+8801744777846' || profile.presentAddress?.isdCode !== '880' || profile.presentAddress?.mobile !== '1744777846') {
+    if (profile.presentAddress?.phone !== '+8801711111111' || profile.presentAddress?.isdCode !== '880' || profile.presentAddress?.mobile !== '1711111111') {
       failures.push(`Test 32 Failed: applyExtractionToApplicant did not preserve phone/isd/mobile in presentAddress: ${JSON.stringify(profile.presentAddress)}`)
     }
 
@@ -1159,11 +1159,11 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
     })
 
     if (
-      mergedApplication.fields['pres_phone']?.value !== '+8801744777846' ||
+      mergedApplication.fields['pres_phone']?.value !== '+8801711111111' ||
       mergedApplication.fields['pres_phone']?.source !== 'passport' ||
       mergedApplication.fields['isd_code']?.value !== '880' ||
       mergedApplication.fields['isd_code']?.source !== 'passport' ||
-      mergedApplication.fields['mobile']?.value !== '1744777846' ||
+      mergedApplication.fields['mobile']?.value !== '1711111111' ||
       mergedApplication.fields['mobile']?.source !== 'passport'
     ) {
       failures.push(
