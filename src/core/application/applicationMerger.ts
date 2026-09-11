@@ -256,7 +256,7 @@ export function populateApplicationFromDocuments(options: {
     }
 
     let resolvedValue: string | undefined
-    let source: 'passport' | 'ogd' | 'missing' = 'missing'
+    let source: 'passport' | 'ogd' | 'derived' | 'missing' = 'missing'
     let docId: string | undefined
 
     // Priority 2: Passport Document (Primary authoritative source for identity, passport, address)
@@ -264,7 +264,19 @@ export function populateApplicationFromDocuments(options: {
       const pVal = resolveApplicantValue(passportProfile, fieldDef.sourceApplicantPath)
       if (pVal !== undefined && pVal !== '') {
         resolvedValue = pVal
-        source = 'passport'
+        const isPresentAddressField =
+          fieldDef.sourceApplicantPath.startsWith('presentAddress.addressLine') ||
+          fieldDef.sourceApplicantPath.startsWith('presentAddress.district') ||
+          fieldDef.sourceApplicantPath.startsWith('presentAddress.villageTownCity') ||
+          fieldDef.sourceApplicantPath.startsWith('presentAddress.stateProvince') ||
+          fieldDef.sourceApplicantPath.startsWith('presentAddress.postalCode')
+        const hasExplicitDocPresent = Boolean(
+          passportDoc?.extractedData?.presentAddress?.addressLine1?.value ||
+          passportDoc?.extractedData?.presentAddress?.district?.value ||
+          passportDoc?.extractedData?.presentAddress?.postalCode?.value ||
+          passportDoc?.extractedData?.presentAddress?.villageTownCity?.value
+        )
+        source = isPresentAddressField && !hasExplicitDocPresent ? 'derived' : 'passport'
         docId = passportDoc?.documentId
       }
     }
@@ -500,7 +512,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'father_place_of_birth' || key === 'appl.father_place_of_birth') &&
@@ -515,7 +527,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'father_prev_nationality' || key === 'appl.father_prev_nationality') &&
@@ -523,7 +535,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'mother_nationality' || key === 'appl.mother_nationality') &&
@@ -531,7 +543,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'mother_place_of_birth' || key === 'appl.mother_place_of_birth') &&
@@ -546,7 +558,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'mother_prev_nationality' || key === 'appl.mother_prev_nationality') &&
@@ -554,7 +566,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'spouse_nationality' || key === 'appl.spouse_nationality') &&
@@ -562,7 +574,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'spouse_place_of_birth' || key === 'appl.spouse_place_of_birth') &&
@@ -577,7 +589,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'spouse_prev_nationality' || key === 'appl.spouse_prev_nationality') &&
@@ -585,37 +597,37 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'marital_status' || key === 'appl.marital_status') &&
         activeProfile.family?.spouse?.name
       ) {
         resolvedValue = 'Married'
-        source = activeSource
+        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'appl.oth_ppt_issue_place' || key === 'oth_ppt_issue_place') &&
-        activeProfile.passport?.holdsOtherPassport === true
+        activeProfile.passport?.holdsOtherPassport === true &&
+        activeProfile.passport?.otherPassportDetails?.placeOfIssue
       ) {
-        resolvedValue =
-          activeProfile.passport?.otherPassportDetails?.placeOfIssue ||
-          activeProfile.passport?.placeOfIssue ||
-          'DHAKA'
+        resolvedValue = activeProfile.passport.otherPassportDetails.placeOfIssue
         source = activeSource
         docId = activeDocId
       } else if (
         (key === 'appl.prev_passport_country_issue' || key === 'prev_passport_country_issue') &&
-        activeProfile.passport?.holdsOtherPassport === true
+        activeProfile.passport?.holdsOtherPassport === true &&
+        activeProfile.passport?.otherPassportDetails?.countryOfIssue
       ) {
-        resolvedValue = 'BANGLADESH'
+        resolvedValue = activeProfile.passport.otherPassportDetails.countryOfIssue
         source = activeSource
         docId = activeDocId
       } else if (
         (key === 'appl.other_ppt_nationality' || key === 'other_ppt_nationality') &&
-        activeProfile.passport?.holdsOtherPassport === true
+        activeProfile.passport?.holdsOtherPassport === true &&
+        activeProfile.passport?.otherPassportDetails?.nationalityInPassport
       ) {
-        resolvedValue = 'BANGLADESH'
+        resolvedValue = activeProfile.passport.otherPassportDetails.nationalityInPassport
         source = activeSource
         docId = activeDocId
       } else if (
@@ -645,7 +657,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.presentAddress?.addressLine1 || activeProfile.permanentAddress?.addressLine1)
       ) {
         resolvedValue = activeProfile.presentAddress?.addressLine1 || activeProfile.permanentAddress?.addressLine1
-        source = activeSource
+        source = activeProfile.presentAddress?.addressLine1 ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'pres_addr2' || key === 'appl.pres_add2') &&
@@ -653,7 +665,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.addressLine2)
       ) {
         resolvedValue = activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.addressLine2
-        source = activeSource
+        source = activeProfile.presentAddress?.addressLine2 ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'village_town_city' || key === 'appl.pres_city') &&
@@ -661,7 +673,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity)
       ) {
         resolvedValue = activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity
-        source = activeSource
+        source = activeProfile.presentAddress?.villageTownCity ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'district' || key === 'appl.pres_district') &&
@@ -669,7 +681,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district)
       ) {
         resolvedValue = activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district
-        source = activeSource
+        source = activeProfile.presentAddress?.district ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'state_province' || key === 'appl.pres_state' || key === 'pres_state' || key === 'state_name') &&
@@ -677,7 +689,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.stateProvince)
       ) {
         resolvedValue = activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.stateProvince
-        source = activeSource
+        source = activeProfile.presentAddress?.stateProvince ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'present_country' || key === 'appl.countryname') &&
@@ -685,7 +697,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country)
       ) {
         resolvedValue = activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country
-        source = activeSource
+        source = activeProfile.presentAddress?.country ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'pincode' || key === 'appl.pres_pincode' || key === 'pres_pincode') &&
@@ -693,7 +705,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.presentAddress?.postalCode || activeProfile.permanentAddress?.postalCode)
       ) {
         resolvedValue = activeProfile.presentAddress?.postalCode || activeProfile.permanentAddress?.postalCode
-        source = activeSource
+        source = activeProfile.presentAddress?.postalCode ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'perm_add1' || key === 'appl.perm_add1') &&
@@ -701,7 +713,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.permanentAddress?.addressLine1 || activeProfile.presentAddress?.addressLine1)
       ) {
         resolvedValue = activeProfile.permanentAddress?.addressLine1 || activeProfile.presentAddress?.addressLine1
-        source = activeSource
+        source = activeProfile.permanentAddress?.addressLine1 ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'perm_add2' || key === 'appl.perm_add2') &&
@@ -709,7 +721,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.permanentAddress?.addressLine2 || activeProfile.presentAddress?.addressLine2)
       ) {
         resolvedValue = activeProfile.permanentAddress?.addressLine2 || activeProfile.presentAddress?.addressLine2
-        source = activeSource
+        source = activeProfile.permanentAddress?.addressLine2 ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'permanent_village_town_city' || key === 'appl.perm_city') &&
@@ -717,7 +729,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity)
       ) {
         resolvedValue = activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity
-        source = activeSource
+        source = activeProfile.permanentAddress?.villageTownCity ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'permanent_district' || key === 'appl.perm_district') &&
@@ -725,7 +737,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district)
       ) {
         resolvedValue = activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district
-        source = activeSource
+        source = activeProfile.permanentAddress?.district ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'permanent_state_province' || key === 'perm_add3' || key === 'appl.perm_state') &&
@@ -733,7 +745,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.stateProvince)
       ) {
         resolvedValue = activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.stateProvince
-        source = activeSource
+        source = activeProfile.permanentAddress?.stateProvince ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'permanent_country' || key === 'appl.perm_country') &&
@@ -741,7 +753,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country)
       ) {
         resolvedValue = activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country
-        source = activeSource
+        source = activeProfile.permanentAddress?.country ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'permanent_postal_code' || key === 'appl.perm_pincode' || key === 'perm_pincode') &&
@@ -749,7 +761,7 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.permanentAddress?.postalCode || activeProfile.presentAddress?.postalCode)
       ) {
         resolvedValue = activeProfile.permanentAddress?.postalCode || activeProfile.presentAddress?.postalCode
-        source = activeSource
+        source = activeProfile.permanentAddress?.postalCode ? activeSource : 'derived'
         docId = activeDocId
       }
     }
