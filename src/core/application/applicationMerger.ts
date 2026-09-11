@@ -300,13 +300,26 @@ export function populateApplicationFromDocuments(options: {
       }
     }
 
+    function isBangladeshiValue(val?: string | null): boolean {
+      if (!val) return false
+      const s = val.trim().toUpperCase()
+      return s === 'BANGLADESH' || s === 'BANGLADESHI' || s === 'BGD'
+    }
+
+    const isApplicantBangladeshi =
+      isBangladeshiValue(activeProfile?.personalInfo?.nationality) ||
+      isBangladeshiValue(activeProfile?.passport?.issuingCountry) ||
+      isBangladeshiValue(activeProfile?.presentAddress?.country) ||
+      isBangladeshiValue(activeProfile?.permanentAddress?.country) ||
+      isBangladeshiValue(passportDoc?.extractedData?.personal?.nationality?.value) ||
+      isBangladeshiValue(passportDoc?.extractedData?.passport?.issuingCountry?.value) ||
+      isBangladeshiValue(ogdProfile?.personalInfo?.nationality)
+
     // Derivation pass for fields deterministically tied to confirmed documents
     if (!resolvedValue && activeProfile) {
       if (
         (key === 'appl.countryname' || key === 'present_country') &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' ||
-          activeProfile.passport?.issuingCountry === 'BANGLADESH' ||
-          activeProfile.presentAddress?.country === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
@@ -328,18 +341,15 @@ export function populateApplicationFromDocuments(options: {
         docId = activeDocId
       } else if (
         key === 'appl.country_of_birth' &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || activeProfile.personalInfo?.townCityOfBirth)
+        (isApplicantBangladeshi || activeProfile.personalInfo?.townCityOfBirth)
       ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
       } else if (
         (key === 'appl.nationality_by' || key === 'nationality_by') &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' ||
-          activeProfile.passport?.issuingCountry === 'BANGLADESH' ||
-          activeProfile.personalInfo?.countryOfBirth === 'BANGLADESH' ||
-          passportDoc?.extractedData?.personal?.nationality?.value === 'BANGLADESH' ||
-          passportDoc?.extractedData?.passport?.issuingCountry?.value === 'BANGLADESH')
+        (isApplicantBangladeshi ||
+          isBangladeshiValue(activeProfile.personalInfo?.countryOfBirth))
       ) {
         resolvedValue = 'Birth'
         source = activeSource
@@ -509,7 +519,7 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'father_nationality' || key === 'appl.father_nationality') &&
         activeProfile.family?.father?.name &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = 'derived'
@@ -524,7 +534,7 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'father_country_of_birth' || key === 'appl.father_country_of_birth') &&
         activeProfile.family?.father?.name &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = 'derived'
@@ -532,7 +542,7 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'father_prev_nationality' || key === 'appl.father_prev_nationality') &&
         activeProfile.family?.father?.name &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = 'derived'
@@ -540,7 +550,7 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'mother_nationality' || key === 'appl.mother_nationality') &&
         activeProfile.family?.mother?.name &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = 'derived'
@@ -555,7 +565,7 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'mother_country_of_birth' || key === 'appl.mother_country_of_birth') &&
         activeProfile.family?.mother?.name &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = 'derived'
@@ -563,7 +573,7 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'mother_prev_nationality' || key === 'appl.mother_prev_nationality') &&
         activeProfile.family?.mother?.name &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = 'derived'
@@ -571,7 +581,7 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'spouse_nationality' || key === 'appl.spouse_nationality') &&
         activeProfile.family?.spouse?.name &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = 'derived'
@@ -586,7 +596,7 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'spouse_country_of_birth' || key === 'appl.spouse_country_of_birth') &&
         activeProfile.family?.spouse?.name &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = 'derived'
@@ -594,7 +604,7 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'spouse_prev_nationality' || key === 'appl.spouse_prev_nationality') &&
         activeProfile.family?.spouse?.name &&
-        (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
+        isApplicantBangladeshi
       ) {
         resolvedValue = 'BANGLADESH'
         source = 'derived'
