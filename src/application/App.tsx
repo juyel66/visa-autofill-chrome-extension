@@ -9,8 +9,10 @@ import {
   extractFromOcrText,
   toUint8Array,
   extractEmbeddedJpegFromPdf,
+  applyExtractionToApplicant,
   type ExtractedApplicantData,
 } from '../core/extraction'
+import { saveApplicant } from '../core/storage'
 import {
   getAllSchemaFields,
   WORKSPACE_SECTIONS,
@@ -55,11 +57,12 @@ export const App: React.FC = () => {
       const ogdDoc = getLatestDocument(profileDocs, 'ogd')
       const activeProf = appList.find((a) => a.applicantId === targetId)
 
-      // Auto-heal legacy passport document records that lack contact extraction in storage
+      // Auto-heal legacy passport document records that lack contact or passport number extraction in storage
       if (
         passportDoc &&
         passportDoc.fileDataUrl &&
-        (!passportDoc.extractedData?.contact?.phone && !passportDoc.extractedData?.presentAddress?.phone)
+        ((!passportDoc.extractedData?.contact?.phone && !passportDoc.extractedData?.presentAddress?.phone) ||
+          !passportDoc.extractedData?.passport?.passportNumber?.value)
       ) {
         try {
           let reExtracted: ExtractedApplicantData | undefined = undefined
@@ -84,13 +87,25 @@ export const App: React.FC = () => {
             if (ocrRes.text) reExtracted = extractFromOcrText(ocrRes)
           }
 
-          if (reExtracted && (reExtracted.contact?.phone || reExtracted.presentAddress?.phone)) {
+          if (
+            reExtracted &&
+            (reExtracted.contact?.phone ||
+              reExtracted.presentAddress?.phone ||
+              reExtracted.passport?.passportNumber)
+          ) {
             const updatedDoc: DocumentRecord = {
               ...passportDoc,
               extractedData: {
                 ...passportDoc.extractedData,
                 ...reExtracted,
-                contact: reExtracted.contact || passportDoc.extractedData?.contact,
+                passport: {
+                  ...passportDoc.extractedData?.passport,
+                  ...reExtracted.passport,
+                },
+                contact: {
+                  ...passportDoc.extractedData?.contact,
+                  ...reExtracted.contact,
+                },
                 presentAddress: {
                   ...passportDoc.extractedData?.presentAddress,
                   ...reExtracted.presentAddress,
@@ -114,16 +129,16 @@ export const App: React.FC = () => {
         notes: activeProf?.notes,
       })
 
-      console.group('🌐 [VISA AUTOFILL WORKSPACE] LOADED APPLICATION')
-      console.log('Target Applicant ID:', targetId)
-      console.log('Selected Passport Doc:', passportDoc?.documentId, passportDoc?.extractedData)
-      console.log('Selected OGD Doc:', ogdDoc?.documentId, ogdDoc?.extractedData)
-      console.log('Section 3 Phone:', mergedApp.fields['pres_phone']?.value, 'Badge:', mergedApp.fields['pres_phone']?.source)
-      console.log('Section 3 ISD:', mergedApp.fields['isd_code']?.value, 'Badge:', mergedApp.fields['isd_code']?.source)
-      console.log('Section 3 Mobile:', mergedApp.fields['mobile']?.value, 'Badge:', mergedApp.fields['mobile']?.source)
-      console.log('All Application Fields:', mergedApp.fields)
-      console.groupEnd()
+      if (passportDoc?.extractedData && activeProf) {
+        try {
+          const updatedProf = applyExtractionToApplicant(activeProf, passportDoc.extractedData)
+          await saveApplicant(updatedProf)
+        } catch (pErr) {
+          console.warn('Profile sync warning on load:', pErr)
+        }
+      }
 
+      await saveApplication(mergedApp)
       setApplication(mergedApp)
     },
     []
@@ -331,7 +346,8 @@ export const App: React.FC = () => {
     if (
       passportDoc &&
       passportDoc.fileDataUrl &&
-      (!passportDoc.extractedData?.contact?.phone && !passportDoc.extractedData?.presentAddress?.phone)
+      ((!passportDoc.extractedData?.contact?.phone && !passportDoc.extractedData?.presentAddress?.phone) ||
+        !passportDoc.extractedData?.passport?.passportNumber?.value)
     ) {
       try {
         let reExtracted: ExtractedApplicantData | undefined = undefined
@@ -356,13 +372,25 @@ export const App: React.FC = () => {
           if (ocrRes.text) reExtracted = extractFromOcrText(ocrRes)
         }
 
-        if (reExtracted && (reExtracted.contact?.phone || reExtracted.presentAddress?.phone)) {
+        if (
+          reExtracted &&
+          (reExtracted.contact?.phone ||
+            reExtracted.presentAddress?.phone ||
+            reExtracted.passport?.passportNumber)
+        ) {
           const updatedDoc: DocumentRecord = {
             ...passportDoc,
             extractedData: {
               ...passportDoc.extractedData,
               ...reExtracted,
-              contact: reExtracted.contact || passportDoc.extractedData?.contact,
+              passport: {
+                ...passportDoc.extractedData?.passport,
+                ...reExtracted.passport,
+              },
+              contact: {
+                ...passportDoc.extractedData?.contact,
+                ...reExtracted.contact,
+              },
               presentAddress: {
                 ...passportDoc.extractedData?.presentAddress,
                 ...reExtracted.presentAddress,
@@ -387,6 +415,16 @@ export const App: React.FC = () => {
       notes: activeProf?.notes,
     })
 
+    if (passportDoc?.extractedData && activeProf) {
+      try {
+        const updatedProf = applyExtractionToApplicant(activeProf, passportDoc.extractedData)
+        await saveApplicant(updatedProf)
+      } catch (pErr) {
+        console.warn('Profile sync warning on refresh:', pErr)
+      }
+    }
+
+    await saveApplication(refreshed)
     setApplication(refreshed)
     setLoading(false)
     showToast('Updated workspace fields from latest confirmed documents.', 'info')
