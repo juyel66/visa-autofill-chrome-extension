@@ -185,7 +185,7 @@ export async function runTask079DynamicExtractionTests(): Promise<Task079TestRes
   assert(appA.fields['father_nationality']?.source === 'derived', 'Applicant A: father nationality source is derived')
   assert(appA.fields['appl.email']?.value === '', 'Applicant A: missing email is blank')
   assert(appA.fields['appl.email']?.source === 'missing', 'Applicant A: missing email source is missing')
-  assert(appA.fields['religion']?.value === '', 'Applicant A: missing religion is blank')
+  assert(appA.fields['appl.religion']?.value === '', 'Applicant A: missing religion is blank')
   assert(appA.fields['appl.oth_ppt_issue_place']?.value === '', 'Applicant A: missing previous passport issue place is blank (not DHAKA)')
 
   // =========================================================================
