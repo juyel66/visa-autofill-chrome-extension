@@ -1452,16 +1452,6 @@ function extractFromRawText(
       if (cob === 'BGD' || cob === 'BANGLADESHI') cob = 'BANGLADESH'
       result.personal.countryOfBirth = { value: cob, source, confidence: baseConfidence }
     }
-  } else {
-    // Check known district matches if label was noisy in OCR
-    const knownDistrictMatch = text.match(/\b(THAKURGAON|DHAKA|CHITTAGONG|SYLHET|RAJSHAHI|KHULNA|BARISAL|RANGPUR|MYMENSINGH|COMILLA|GAZIPUR|PANCHAGARH|DINAJPUR)\b/i)
-    if (knownDistrictMatch && !result.personal?.townCityOfBirth) {
-      result.personal = {
-        ...result.personal,
-        townCityOfBirth: { value: knownDistrictMatch[1].toUpperCase(), source, confidence: baseConfidence },
-        countryOfBirth: { value: 'BANGLADESH', source, confidence: baseConfidence },
-      }
-    }
   }
 
   const cobMatch = text.match(
@@ -1557,9 +1547,6 @@ function extractFromRawText(
       holdsOtherPassport: { value: true, source, confidence: baseConfidence },
       otherPassportDetails: {
         passportNumber: { value: prevPptMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
-        countryOfIssue: { value: 'BANGLADESH', source, confidence: baseConfidence },
-        placeOfIssue: { value: 'DHAKA', source, confidence: baseConfidence },
-        nationalityInPassport: { value: 'BANGLADESH', source, confidence: baseConfidence },
       },
     }
   }
