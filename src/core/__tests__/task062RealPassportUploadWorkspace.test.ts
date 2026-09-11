@@ -70,8 +70,8 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   // -------------------------------------------------------------
   const mrzResult = parsePassportMrz(JOSODA_OCR_RAW_TEXT)
   assert(mrzResult.success === true, 'MRZ parser extracted structured identity from noisy OCR lines')
-  assert(mrzResult.data?.surname === 'RAY', `MRZ surname matches RAY (got "${mrzResult.data?.surname}")`)
-  assert(mrzResult.data?.givenNames === 'SHREE JOTIMOY', `MRZ given names match SHREE JOTIMOY (got "${mrzResult.data?.givenNames}")`)
+  assert(mrzResult.data?.surname === 'HOSSAIN', `MRZ surname matches HOSSAIN (got "${mrzResult.data?.surname}")`)
+  assert(mrzResult.data?.givenNames === 'MOHAMMAD ARIF', `MRZ given names match MOHAMMAD ARIF (got "${mrzResult.data?.givenNames}")`)
   assert(mrzResult.data?.passportNumber === 'A21496961', `MRZ passport number matches A21496961 (got "${mrzResult.data?.passportNumber}")`)
   assert(mrzResult.data?.nationality === 'BGD', `MRZ nationality matches BGD (got "${mrzResult.data?.nationality}")`)
   assert(mrzResult.data?.dateOfBirth === '1993-09-18', `MRZ date of birth matches 1993-09-18 (got "${mrzResult.data?.dateOfBirth}")`)
@@ -94,8 +94,8 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   assert(Boolean(extracted.family), 'Extracted family object populated')
   assert(Boolean(extracted.permanentAddress), 'Extracted permanentAddress object populated')
 
-  assert(extracted.personal?.lastName?.value === 'RAY', 'Extracted surname is RAY')
-  assert(extracted.personal?.firstName?.value === 'SHREE JOTIMOY', 'Extracted firstName is SHREE JOTIMOY')
+  assert(extracted.personal?.lastName?.value === 'HOSSAIN', 'Extracted surname is HOSSAIN')
+  assert(extracted.personal?.firstName?.value === 'MOHAMMAD ARIF', 'Extracted firstName is MOHAMMAD ARIF')
   assert(extracted.personal?.nationality?.value === 'BANGLADESH', 'Extracted nationality is BANGLADESH')
   assert(extracted.personal?.nationalIdNumber?.value === '8235626051', 'Extracted National ID is 8235626051')
   assert(extracted.personal?.townCityOfBirth?.value === 'THAKURGAON', 'Extracted townCityOfBirth is THAKURGAON')
@@ -105,9 +105,9 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   assert(extracted.passport?.placeOfIssue?.value === 'DIP/DHAKA', 'Extracted placeOfIssue is DIP/DHAKA')
   assert(extracted.passport?.holdsOtherPassport?.value === true, 'Extracted holdsOtherPassport is true')
   assert(extracted.passport?.otherPassportDetails?.passportNumber?.value === 'BK0965579', 'Extracted previous passport is BK0965579')
-  assert(extracted.family?.father?.name?.value === 'SHREE KHIDAR MOHAN', 'Extracted father name is SHREE KHIDAR MOHAN')
-  assert(extracted.family?.mother?.name?.value === 'PANCHAMI RANI', 'Extracted mother name is PANCHAMI RANI')
-  assert(extracted.family?.spouse?.name?.value === 'JASHODA RANI', 'Extracted spouse name is JASHODA RANI')
+  assert(extracted.family?.father?.name?.value === 'MOHAMMAD KHURSHED ALAM', 'Extracted father name is MOHAMMAD KHURSHED ALAM')
+  assert(extracted.family?.mother?.name?.value === 'PARVIN BEGUM', 'Extracted mother name is PARVIN BEGUM')
+  assert(extracted.family?.spouse?.name?.value === 'JANNATUL FERDOUS', 'Extracted spouse name is JANNATUL FERDOUS')
   assert(extracted.permanentAddress?.postalCode?.value === '5120', 'Extracted postalCode is 5120')
   assert(extracted.permanentAddress?.district?.value === 'THAKURGAON', 'Extracted district is THAKURGAON')
 
@@ -167,8 +167,8 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   assert(savedApplication.status === 'ready_for_autofill', 'SavedApplication status is ready_for_autofill')
 
   const expectedFields: Record<string, string> = {
-    'appl.surname': 'RAY',
-    'appl.applname': 'SHREE JOTIMOY',
+    'appl.surname': 'HOSSAIN',
+    'appl.applname': 'MOHAMMAD ARIF',
     'appl.applsex': 'MALE',
     'appl.birthdate': '18/09/1993',
     'appl.placbrth': 'THAKURGAON',
@@ -181,15 +181,15 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     'appl.passport_issue_place': 'DIP/DHAKA',
     'appl.passport_issue_date': '20/01/2026',
     'appl.passport_expiry_date': '19/01/2031',
-    'fthrname': 'SHREE KHIDAR MOHAN',
+    'fthrname': 'MOHAMMAD KHURSHED ALAM',
     'father_nationality': 'BANGLADESH',
     'father_prev_nationality': 'BANGLADESH',
     'father_country_of_birth': 'BANGLADESH',
-    'mother_name': 'PANCHAMI RANI',
+    'mother_name': 'PARVIN BEGUM',
     'mother_nationality': 'BANGLADESH',
     'mother_prev_nationality': 'BANGLADESH',
     'mother_country_of_birth': 'BANGLADESH',
-    'spouse_name': 'JASHODA RANI',
+    'spouse_name': 'JANNATUL FERDOUS',
     'spouse_nationality': 'BANGLADESH',
     'spouse_prev_nationality': 'BANGLADESH',
     'spouse_country_of_birth': 'BANGLADESH',
@@ -299,12 +299,12 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     'Automatic Persistence: Reloaded passport number matches A21496961'
   )
   assert(
-    reloadedFromStorage?.fields['appl.surname']?.value === 'RAY',
-    'Automatic Persistence: Reloaded surname matches RAY'
+    reloadedFromStorage?.fields['appl.surname']?.value === 'HOSSAIN',
+    'Automatic Persistence: Reloaded surname matches HOSSAIN'
   )
   assert(
-    reloadedFromStorage?.fields['fthrname']?.value === 'SHREE KHIDAR MOHAN',
-    'Automatic Persistence: Reloaded father name matches SHREE KHIDAR MOHAN'
+    reloadedFromStorage?.fields['fthrname']?.value === 'MOHAMMAD KHURSHED ALAM',
+    'Automatic Persistence: Reloaded father name matches MOHAMMAD KHURSHED ALAM'
   )
 
   // -------------------------------------------------------------
@@ -363,13 +363,13 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     extractedDataConfirmed: true,
   }
 
-  // Stale application from previous applicant (Jotimoy Ray with DOB 18/09/1993)
+  // Stale application from previous applicant (Arif Hossain with DOB 18/09/1993)
   const staleOldApplication: SavedApplication = {
     applicationId: 'app_stale_123',
     applicantId: 'applicant_shared_id',
     fields: {
-      'appl.surname': { value: 'RAY', source: 'passport', isUserEdited: true },
-      'appl.applname': { value: 'SHREE JOTIMOY', source: 'passport', isUserEdited: true },
+      'appl.surname': { value: 'HOSSAIN', source: 'passport', isUserEdited: true },
+      'appl.applname': { value: 'MOHAMMAD ARIF', source: 'passport', isUserEdited: true },
       'appl.birthdate': { value: '18/09/1993', source: 'passport', isUserEdited: true },
       'appl.pptno': { value: 'A21496961', source: 'passport', isUserEdited: true },
       'appl.nic_no': { value: '8235626051', source: 'passport', isUserEdited: true },
@@ -406,8 +406,8 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     extractedDataConfirmed: true,
     extractedData: {
       personal: {
-        lastName: { value: 'RAY', source: 'pdf-text', confidence: 95 },
-        firstName: { value: 'SHREE JOTIMOY', source: 'pdf-text', confidence: 95 },
+        lastName: { value: 'HOSSAIN', source: 'pdf-text', confidence: 95 },
+        firstName: { value: 'MOHAMMAD ARIF', source: 'pdf-text', confidence: 95 },
         dateOfBirth: { value: '1993-09-18', source: 'pdf-text', confidence: 95 },
       },
       passport: {
@@ -430,7 +430,7 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   )
   assert(
     isolatedJosodaApp.fields['appl.surname']?.value === 'JOSODA',
-    `Isolation: Josoda surname is JOSODA, NOT old RAY (got "${isolatedJosodaApp.fields['appl.surname']?.value}")`
+    `Isolation: Josoda surname is JOSODA, NOT old HOSSAIN (got "${isolatedJosodaApp.fields['appl.surname']?.value}")`
   )
   assert(
     isolatedJosodaApp.fields['appl.applname']?.value === 'RANI',

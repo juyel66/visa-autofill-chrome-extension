@@ -92,11 +92,11 @@ export async function runBangladeshiNameNormalizationReligionSafetyTests(): Prom
   )
 
   console.log('\n--- 4. NAME SPLITTING & COMPOUND PRESERVATION ---')
-  // Mandatory Test Case from prompt: "SHREE JOTIMOY RAY"
-  const splitShree = splitBangladeshiFullName('SHREE JOTIMOY RAY')
+  // Test Case for title prefix parsing: "SRI ANUP KUMAR"
+  const splitSri = splitBangladeshiFullName('SRI ANUP KUMAR')
   assert(
-    splitShree.givenNames === 'SHREE JOTIMOY' && splitShree.surname === 'RAY' && splitShree.title === 'SHREE',
-    'Passport "SHREE JOTIMOY RAY" -> Given Name = "SHREE JOTIMOY", Surname = "RAY"'
+    splitSri.givenNames === 'SRI ANUP' && splitSri.surname === 'KUMAR' && splitSri.title === 'SRI',
+    'Passport "SRI ANUP KUMAR" -> Given Name = "SRI ANUP", Surname = "KUMAR"'
   )
 
   const splitMd = splitBangladeshiFullName('MD TARIQUL ISLAM')
@@ -127,8 +127,8 @@ export async function runBangladeshiNameNormalizationReligionSafetyTests(): Prom
   // None of the names or tokens can ever assign a religion
   const testNames = [
     'Md Tariqul Islam',
-    'SHREE JOTIMOY RAY',
-    'SHREE ANUP RAY',
+    'SRI ANUP KUMAR',
+    'SRI PRANAB ROY',
     'BIJOY KUMAR DAS',
     'NILOY BISWAS',
     'PATRICK GOMES',

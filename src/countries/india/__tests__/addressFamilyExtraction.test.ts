@@ -1102,18 +1102,18 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
   {
     const passportWithPhoneText = `
       PEOPLE'S REPUBLIC OF BANGLADESH
-      Name: SHREE JOTIMOY RAY
-      Father: SHREE KHIDAR MOHAN
-      Mother: PANCHAMI RANI
+      Name: MOHAMMAD ARIF HOSSAIN
+      Father: MOHAMMAD KHURSHED ALAM
+      Mother: PARVIN BEGUM
       Nationality: BANGLADESHI
       DOB: 18 SEP 1993
-      Place of Birth: THAKURGAON
+      Place of Birth: DHAKA
       Passport No: A21496961
       Issue Date: 20 JAN 2026
       Expiry Date: 19 JAN 2031
-      Permanent Address: KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120, THAKURGAON
+      Permanent Address: HOUSE 12, ROAD 5, BLOCK B - 1216, DHAKA
       Emergency Contact:
-      Name: JASHODA RANI
+      Name: JANNATUL FERDOUS
       Relationship: SPOUSE
       Telephone: +8801744777846
     `

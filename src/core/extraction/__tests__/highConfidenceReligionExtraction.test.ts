@@ -128,20 +128,20 @@ export async function runHighConfidenceReligionTests(): Promise<TestResult> {
     'TEST 4: Name "Md Tariqul Islam" with no religion field must produce blank religion'
   )
 
-  // TEST 5: Name: SHREE XXXXX RAY, No religion field anywhere -> BLANK
-  const pdfTextShree = `
+  // TEST 5: Name: SRI ANUP KUMAR, No religion field anywhere -> BLANK
+  const pdfTextSri = `
     PEOPLE'S REPUBLIC OF BANGLADESH
     PASSPORT
-    Surname: RAY
-    Given Name: SHREE ANUP
+    Surname: KUMAR
+    Given Name: SRI ANUP
     Nationality: BANGLADESHI
     Date of Birth: 20 AUG 1988
     Passport No: B09876543
   `
-  const extShree = extractFromPdfText(pdfTextShree)
+  const extSri = extractFromPdfText(pdfTextSri)
   assert(
-    extShree.personal?.religion?.value === undefined,
-    'TEST 5: Name "Shree Anup Ray" with no religion field must produce blank religion'
+    extSri.personal?.religion?.value === undefined,
+    'TEST 5: Name "Sri Anup Kumar" with no religion field must produce blank religion'
   )
 
   // TEST 6: Name: XXXXX GOMES, No religion field anywhere -> BLANK

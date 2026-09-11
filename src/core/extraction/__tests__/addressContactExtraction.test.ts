@@ -539,16 +539,16 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     `got: phone=${contact5.phone}, mobile=${contact5.mobile}`
   )
 
-  // 6. Passport emergency contact telephone -> Applicant Phone fallback (e.g. Josoda passport.pdf)
+  // 6. Passport emergency contact telephone -> Applicant Phone fallback
   const doc6 = `
     PEOPLE'S REPUBLIC OF BANGLADESH
     PASSPORT NO: A06941198
-    Surname: RAY
-    Given Name: SHREE JOTIMOY
+    Surname: HOSSAIN
+    Given Name: MOHAMMAD ARIF
     Emergency Contact:
-    Name: JASHODA RANI
+    Name: JANNATUL FERDOUS
     Relationship: SPOUSE
-    Address: VILL: KASHIPUR, RANISANKAIL, THAKURGAON
+    Address: HOUSE 12, ROAD 5, BLOCK B, MIRPUR - 1216, DHAKA
     Telephone No: +880174477846
   `
   const contact6 = parseApplicantContact(doc6)
@@ -594,10 +594,10 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
         nationality: { value: 'BANGLADESH', source: 'pdf-text', confidence: 0.95 },
       },
       permanentAddress: {
-        addressLine1: { value: 'VILL: KASHIPUR', source: 'pdf-text', confidence: 0.9 },
-        district: { value: 'THAKURGAON', source: 'pdf-text', confidence: 0.9 },
+        addressLine1: { value: 'HOUSE 12, ROAD 5', source: 'pdf-text', confidence: 0.9 },
+        district: { value: 'DHAKA', source: 'pdf-text', confidence: 0.9 },
         country: { value: 'BANGLADESH', source: 'pdf-text', confidence: 0.95 },
-        postalCode: { value: '5120', source: 'pdf-text', confidence: 0.9 },
+        postalCode: { value: '1216', source: 'pdf-text', confidence: 0.9 },
       },
       contact: {
         mobile: { value: '1712345678', source: 'pdf-text', confidence: 0.9 },
@@ -617,7 +617,7 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
       app8.fields['isd_code']?.value === '880' &&
       app8.fields['appl.email']?.value === 'saiful@example.com' &&
       app8.fields['appl.email_re']?.value === 'saiful@example.com' &&
-      app8.fields['perm_add1']?.value === 'VILL: KASHIPUR',
+      app8.fields['perm_add1']?.value === 'HOUSE 12, ROAD 5',
     'Req 8: Permanent Address + contact mobile/email both populate automatically in SavedApplication',
     `got mobile: ${app8.fields['mobile']?.value}, email: ${app8.fields['appl.email']?.value}`
   )
@@ -703,16 +703,16 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   // -> presentAddress becomes exact deep clone in ApplicantProfile & SavedApplication
   const permOnlyDocData: ExtractedApplicantData = {
     personal: {
-      lastName: { value: 'RAY', source: 'pdf-text', confidence: 0.95 },
-      firstName: { value: 'SHREE JOTIMOY', source: 'pdf-text', confidence: 0.95 },
+      lastName: { value: 'HOSSAIN', source: 'pdf-text', confidence: 0.95 },
+      firstName: { value: 'MOHAMMAD ARIF', source: 'pdf-text', confidence: 0.95 },
       nationality: { value: 'BANGLADESH', source: 'pdf-text', confidence: 0.95 },
     },
     permanentAddress: {
-      addressLine1: { value: 'KASHIPUR', source: 'pdf-text', confidence: 0.9 },
-      addressLine2: { value: 'RANISANKAIL, MUZAHIDABAD COLONI', source: 'pdf-text', confidence: 0.9 },
-      district: { value: 'THAKURGAON', source: 'pdf-text', confidence: 0.9 },
+      addressLine1: { value: 'HOUSE 12, ROAD 5', source: 'pdf-text', confidence: 0.9 },
+      addressLine2: { value: 'BLOCK B, MIRPUR', source: 'pdf-text', confidence: 0.9 },
+      district: { value: 'DHAKA', source: 'pdf-text', confidence: 0.9 },
       country: { value: 'BANGLADESH', source: 'pdf-text', confidence: 0.95 },
-      postalCode: { value: '5120', source: 'pdf-text', confidence: 0.9 },
+      postalCode: { value: '1216', source: 'pdf-text', confidence: 0.9 },
     },
   }
 
@@ -723,11 +723,11 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   }
   const profH = applyExtractionToApplicant(baseProfH, permOnlyDocData)
   assert(
-    profH.presentAddress?.addressLine1 === 'KASHIPUR' &&
-      profH.presentAddress?.addressLine2 === 'RANISANKAIL, MUZAHIDABAD COLONI' &&
-      profH.presentAddress?.district === 'THAKURGAON' &&
+    profH.presentAddress?.addressLine1 === 'HOUSE 12, ROAD 5' &&
+      profH.presentAddress?.addressLine2 === 'BLOCK B, MIRPUR' &&
+      profH.presentAddress?.district === 'DHAKA' &&
       profH.presentAddress?.country === 'BANGLADESH' &&
-      profH.presentAddress?.postalCode === '5120',
+      profH.presentAddress?.postalCode === '1216',
     'TASK 073 Req 1: ApplicantProfile presentAddress is an exact deep clone of permanentAddress when present address is empty'
   )
 
@@ -750,19 +750,19 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     passportDoc: docHRecord,
   })
   assert(
-    appH.fields['pres_addr1']?.value === 'KASHIPUR' &&
-      appH.fields['pres_addr2']?.value === 'RANISANKAIL, MUZAHIDABAD COLONI' &&
-      appH.fields['district']?.value === 'THAKURGAON' &&
+    appH.fields['pres_addr1']?.value === 'HOUSE 12, ROAD 5' &&
+      appH.fields['pres_addr2']?.value === 'BLOCK B, MIRPUR' &&
+      appH.fields['district']?.value === 'DHAKA' &&
       appH.fields['present_country']?.value === 'BANGLADESH' &&
-      appH.fields['pincode']?.value === '5120',
+      appH.fields['pincode']?.value === '1216',
     'TASK 073 Req 1: SavedApplication Present Address fields are populated automatically via fallback'
   )
 
   // 2. Explicit Present + Permanent: explicit Present Address wins
   const dualAddressDocData: ExtractedApplicantData = {
     personal: {
-      lastName: { value: 'RAY', source: 'pdf-text', confidence: 0.95 },
-      firstName: { value: 'SHREE JOTIMOY', source: 'pdf-text', confidence: 0.95 },
+      lastName: { value: 'HOSSAIN', source: 'pdf-text', confidence: 0.95 },
+      firstName: { value: 'MOHAMMAD ARIF', source: 'pdf-text', confidence: 0.95 },
       nationality: { value: 'BANGLADESH', source: 'pdf-text', confidence: 0.95 },
     },
     presentAddress: {
@@ -773,11 +773,11 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
       postalCode: { value: '1213', source: 'pdf-text', confidence: 0.9 },
     },
     permanentAddress: {
-      addressLine1: { value: 'KASHIPUR', source: 'pdf-text', confidence: 0.9 },
-      addressLine2: { value: 'RANISANKAIL', source: 'pdf-text', confidence: 0.9 },
-      district: { value: 'THAKURGAON', source: 'pdf-text', confidence: 0.9 },
+      addressLine1: { value: 'HOUSE 12, ROAD 5', source: 'pdf-text', confidence: 0.9 },
+      addressLine2: { value: 'BLOCK B, MIRPUR', source: 'pdf-text', confidence: 0.9 },
+      district: { value: 'DHAKA', source: 'pdf-text', confidence: 0.9 },
       country: { value: 'BANGLADESH', source: 'pdf-text', confidence: 0.95 },
-      postalCode: { value: '5120', source: 'pdf-text', confidence: 0.9 },
+      postalCode: { value: '1216', source: 'pdf-text', confidence: 0.9 },
     },
   }
   const profDual = applyExtractionToApplicant(baseProfH, dualAddressDocData)
@@ -834,32 +834,32 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   const attachedPassportText = `
     PEOPLE'S REPUBLIC OF BANGLADESH
     PASSPORT NO: A21496961
-    Surname: RAY
-    Given Name: SHREE JOTIMOY
+    Surname: HOSSAIN
+    Given Name: MOHAMMAD ARIF
     Nationality: BANGLADESHI
     Date of Birth: 18 SEP 1993
-    Place of Birth: THAKURGAON
-    Permanent Address: KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120, THAKURGAON
+    Place of Birth: DHAKA
+    Permanent Address: HOUSE 12, ROAD 5, BLOCK B - 1216, DHAKA
     Emergency Contact:
-    Name: JASHODA RANI
+    Name: JANNATUL FERDOUS
     Relationship: SPOUSE
     Telephone No: +8801744777846
   `
   const extractedAttached = extractFromPdfText(attachedPassportText)
   assert(
-    extractedAttached.permanentAddress?.addressLine1?.value === 'KASHIPUR' &&
-      extractedAttached.permanentAddress?.addressLine2?.value === 'RANISANKAIL, MUZAHIDABAD COLONI' &&
-      extractedAttached.permanentAddress?.district?.value === 'THAKURGAON' &&
-      extractedAttached.permanentAddress?.postalCode?.value === '5120',
+    extractedAttached.permanentAddress?.addressLine1?.value === 'HOUSE 12' &&
+      extractedAttached.permanentAddress?.addressLine2?.value === 'ROAD 5, BLOCK B' &&
+      extractedAttached.permanentAddress?.district?.value === 'DHAKA' &&
+      extractedAttached.permanentAddress?.postalCode?.value === '1216',
     'TASK 073 Req 5: Attached passport parses into clean structured Permanent Address fields'
   )
 
-  // 6 & 7. Emergency contact isolation & Telephone fallback: JASHODA RANI never applicant name, telephone falls back to contact
+  // 6 & 7. Emergency contact isolation & Telephone fallback: JANNATUL FERDOUS never applicant name, telephone falls back to contact
   assert(
-    extractedAttached.personal?.lastName?.value === 'RAY' &&
-      extractedAttached.personal?.firstName?.value === 'SHREE JOTIMOY' &&
-      extractedAttached.family?.spouse?.name?.value === 'JASHODA RANI',
-    'TASK 073/074 Req 6: JASHODA RANI is spouse name, never applicant name'
+    extractedAttached.personal?.lastName?.value === 'HOSSAIN' &&
+      extractedAttached.personal?.firstName?.value === 'MOHAMMAD ARIF' &&
+      extractedAttached.family?.spouse?.name?.value === 'JANNATUL FERDOUS',
+    'TASK 073/074 Req 6: JANNATUL FERDOUS is spouse name, never applicant name'
   )
   const contactAttached = parseApplicantContact(attachedPassportText)
   assert(
@@ -907,8 +907,8 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     existingApp: null,
   })
   assert(
-    appIsolated.fields['pres_addr1']?.value === 'KASHIPUR' &&
-      appIsolated.fields['district']?.value === 'THAKURGAON' &&
+    appIsolated.fields['pres_addr1']?.value === 'HOUSE 12, ROAD 5' &&
+      appIsolated.fields['district']?.value === 'DHAKA' &&
       appIsolated.fields['mobile']?.value !== '1888888888' &&
       appIsolated.fields['appl.email']?.value !== 'other@example.com',
     'TASK 073 Req 8: Cross-applicant document does not contaminate target applicant address/contact'
@@ -917,10 +917,10 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   // 9 & 10. SavedApplication persistence: extraction -> merge -> save -> reload preserves Present Address
   const profileHydrated = convertSavedApplicationToApplicantProfile(appH)
   assert(
-    profileHydrated.presentAddress?.addressLine1 === 'KASHIPUR' &&
-      profileHydrated.presentAddress?.addressLine2 === 'RANISANKAIL, MUZAHIDABAD COLONI' &&
-      profileHydrated.presentAddress?.district === 'THAKURGAON' &&
-      profileHydrated.presentAddress?.postalCode === '5120',
+    profileHydrated.presentAddress?.addressLine1 === 'HOUSE 12, ROAD 5' &&
+      profileHydrated.presentAddress?.addressLine2 === 'BLOCK B, MIRPUR' &&
+      profileHydrated.presentAddress?.district === 'DHAKA' &&
+      profileHydrated.presentAddress?.postalCode === '1216',
     'TASK 073 Req 9 & 10: SavedApplication persistence & Workspace hydration cleanly preserves fallback Present Address'
   )
 
@@ -931,9 +931,9 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     existingApp: appH,
   })
   assert(
-    resyncedAppH2.fields['pres_addr1']?.value === 'KASHIPUR' &&
-      resyncedAppH2.fields['district']?.value === 'THAKURGAON' &&
-      resyncedAppH2.fields['pincode']?.value === '5120',
+    resyncedAppH2.fields['pres_addr1']?.value === 'HOUSE 12, ROAD 5' &&
+      resyncedAppH2.fields['district']?.value === 'DHAKA' &&
+      resyncedAppH2.fields['pincode']?.value === '1216',
     'TASK 073 Req 11: Re-syncing preserves populated fallback Present Address'
   )
 
@@ -960,11 +960,11 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   const task074Text = `
     PEOPLE'S REPUBLIC OF BANGLADESH
     PASSPORT NO: A21496961
-    Surname: RAY
-    Given Name: SHREE JOTIMOY
-    Permanent Address: KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120, THAKURGAON
+    Surname: HOSSAIN
+    Given Name: MOHAMMAD ARIF
+    Permanent Address: HOUSE 12, ROAD 5, BLOCK B - 1216, DHAKA
     Emergency Contact:
-    Name: JASHODA RANI
+    Name: JANNATUL FERDOUS
     Relationship: SPOUSE
     Telephone No: +8801744777846
   `
@@ -1009,11 +1009,11 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   const docWithExplicitAndPassportTel = `
     PEOPLE'S REPUBLIC OF BANGLADESH
     PASSPORT NO: A21496961
-    Surname: RAY
-    Given Name: SHREE JOTIMOY
+    Surname: HOSSAIN
+    Given Name: MOHAMMAD ARIF
     Phone: +8801711122233
     Emergency Contact:
-    Name: JASHODA RANI
+    Name: JANNATUL FERDOUS
     Relationship: SPOUSE
     Telephone No: +8801744777846
   `
@@ -1063,10 +1063,10 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
 
   // 6. Emergency contact NAME and relationship remain strictly isolated
   assert(
-    ext074.personal?.firstName?.value === 'SHREE JOTIMOY' &&
-      ext074.personal?.lastName?.value === 'RAY' &&
-      ext074.family?.spouse?.name?.value === 'JASHODA RANI',
-    'TASK 074 Req 6: JASHODA RANI remains isolated to spouse name, never applicant identity'
+    ext074.personal?.firstName?.value === 'MOHAMMAD ARIF' &&
+      ext074.personal?.lastName?.value === 'HOSSAIN' &&
+      ext074.family?.spouse?.name?.value === 'JANNATUL FERDOUS',
+    'TASK 074 Req 6: JANNATUL FERDOUS remains isolated to spouse name, never applicant identity'
   )
 
   // 7. Dynamic extraction test: different passport telephone is parsed dynamically (no hardcoding)
