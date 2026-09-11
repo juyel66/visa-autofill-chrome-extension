@@ -279,16 +279,24 @@ function hasAnyFields(cand?: ExtractedApplicantData): boolean {
     cand.personal?.dateOfBirth?.value ||
     cand.personal?.nationalIdNumber?.value ||
     cand.personal?.townCityOfBirth?.value ||
+    cand.personal?.religion?.value ||
     cand.passport?.passportNumber?.value ||
     cand.passport?.issueDate?.value ||
     cand.passport?.expiryDate?.value ||
     cand.contact?.phone?.value ||
     cand.contact?.mobile?.value ||
+    cand.contact?.email?.value ||
     cand.presentAddress?.phone?.value ||
     cand.presentAddress?.addressLine1?.value ||
     cand.permanentAddress?.addressLine1?.value ||
     cand.family?.father?.name?.value ||
     cand.family?.mother?.name?.value ||
-    cand.family?.spouse?.name?.value
+    cand.family?.spouse?.name?.value ||
+    cand.employment?.presentOccupation?.value ||
+    cand.employment?.employerName?.value ||
+    cand.travel?.purposeOfVisit?.value ||
+    cand.previousVisa?.visaNumber?.value ||
+    cand.sponsorIndia?.name?.value ||
+    cand.sponsorMission?.name?.value
   )
 }
