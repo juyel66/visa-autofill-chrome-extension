@@ -33,6 +33,7 @@
     {
       "resources": [
         "tesseract/*",
+        "pdfjs/*",
         "assets/*"
       ],
       "matches": [

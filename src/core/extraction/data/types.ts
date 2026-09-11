@@ -1,6 +1,6 @@
 import type { Gender } from '../../applicant/types'
 
-export type ExtractionSource = 'mrz' | 'pdf-text' | 'ocr' | 'manual-review'
+export type ExtractionSource = 'ai' | 'mrz' | 'pdf-text' | 'ocr' | 'manual-review'
 
 export interface ExtractedField<T> {
   value: T

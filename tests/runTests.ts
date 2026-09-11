@@ -21,8 +21,16 @@ import { runTask062RealPassportUploadWorkspaceTests } from '../src/core/__tests_
 import { runHighConfidenceReligionTests } from '../src/core/extraction/__tests__/highConfidenceReligionExtraction.test'
 import { runBangladeshiNameNormalizationReligionSafetyTests } from '../src/core/extraction/__tests__/bangladeshiNameNormalizationReligionSafety.test'
 import { runAddressContactExtractionTests } from '../src/core/extraction/__tests__/addressContactExtraction.test'
+import { runTask077HardcodeAuditTests } from '../src/core/__tests__/task077HardcodeAudit.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 077: STATIC PRODUCTION HARDCODE AUDIT & APPLICANT ISOLATION TESTS ---')
+  const task077Res = await runTask077HardcodeAuditTests()
+  console.log(`Passed: ${task077Res.passed}, Count: ${task077Res.totalSubtests}`)
+  if (!task077Res.passed) {
+    console.error('Failures:', task077Res.failures)
+  }
+
   console.log('--- RUNNING TASK 062: REAL PASSPORT UPLOAD → WORKSPACE VERIFICATION ---')
   const task062Res = await runTask062RealPassportUploadWorkspaceTests()
   console.log(`Passed: ${task062Res.passed}, Count: ${task062Res.totalSubtests}`)
@@ -169,6 +177,7 @@ async function execute() {
   }
 
   const results = {
+    task077: task077Res.passed,
     addrContact: addrContactRes.passed,
     nameSafety: nameSafetyRes.passed,
     religion: religionRes.passed,

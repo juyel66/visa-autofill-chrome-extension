@@ -83,9 +83,9 @@ export function applyExtractionToApplicant(
     perm.postalCode?.value
   )
 
-  const rawContactPhone = pres.phone?.value || c.phone?.value || perm.phone?.value
+  const rawContactPhone = pres.phone?.value || c.phone?.value
   const rawContactIsd = pres.isdCode?.value || c.isdCode?.value
-  const rawContactMob = pres.mobile?.value || c.mobile?.value || perm.mobile?.value
+  const rawContactMob = pres.mobile?.value || c.mobile?.value
 
   let derivedPhone: string | undefined = rawContactPhone
   let derivedIsd: string | undefined = rawContactIsd
@@ -111,7 +111,6 @@ export function applyExtractionToApplicant(
     } else if (cleanDigits.startsWith('01') && cleanDigits.length >= 10) {
       if (!derivedIsd) derivedIsd = '880'
       if (!derivedMob) derivedMob = cleanDigits.slice(1)
-      if (!derivedPhone.startsWith('+')) derivedPhone = `+880${cleanDigits.slice(1)}`
     }
   } else if (derivedMob && derivedIsd) {
     derivedPhone = `+${derivedIsd}${derivedMob.replace(/^0+/, '')}`

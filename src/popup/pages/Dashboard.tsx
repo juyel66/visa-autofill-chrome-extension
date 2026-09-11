@@ -16,16 +16,9 @@ import type {
 import { sendToBackground } from '../../core/messaging'
 import type { CountryPageDetectionResult } from '../../countries/india/types'
 import {
-  extractFromPdfText,
-  extractPdfText,
-  extractFromOcrText,
-  recognizeText,
   applyExtractionToApplicant,
+  processUploadedDocumentPayload,
 } from '../../core/extraction'
-import {
-  toUint8Array,
-  extractEmbeddedJpegFromPdf,
-} from '../../core/extraction/pdf/pdfTextExtractor'
 import {
   getSavedApplicationByApplicantId,
   saveApplication,
@@ -196,118 +189,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
           extractedDataConfirmed: false,
         }
 
-        let extractedApplicant = null
+        const pipelineResult = await processUploadedDocumentPayload(
+          dataUrl,
+          file.name,
+          file.type
+        )
+
+        const extractedApplicant = pipelineResult.hasExtractedFields ? pipelineResult.extractedData : null
         const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-        const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|bmp)$/i.test(file.name)
 
-        let diagPdfStatus = 'NO TEXT'
-        let diagImgStatus = 'MISSING'
-        let diagImgMime = file.type || 'application/octet-stream'
-        let diagImgBytes = file.size
-        let diagOcrStatus = 'NOT EXECUTED'
-        let diagOcrChars = 0
-        let diagOcrError: string | undefined = undefined
-        let diagMrzStatus = 'NOT FOUND'
-        let diagWorkerInit = 'NO'
-        let diagLangLoaded = 'NO'
-        let diagOcrExecuted = 'NO'
-
-        let workerUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract/worker.min.js') : 'default'
-        let coreUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
-        let langUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
-
-        if (isPdf) {
-          try {
-            // First check if raw JPEG is directly embedded in PDF bytes (instant & avoids pdfjs worker)
-            const rawBytes = await toUint8Array(dataUrl)
-            const embeddedJpeg = extractEmbeddedJpegFromPdf(rawBytes)
-            if (embeddedJpeg) {
-              diagImgStatus = `FOUND (${(embeddedJpeg.byteLength / 1024).toFixed(0)} KB JPEG)`
-              diagImgMime = 'image/jpeg'
-              diagImgBytes = embeddedJpeg.byteLength
-              diagOcrStatus = 'EXECUTING'
-              const ocrRes = await recognizeText(embeddedJpeg, { language: 'eng' })
-              diagOcrStatus = ocrRes.success ? 'SUCCESS' : 'FAILED'
-              diagOcrChars = ocrRes.text?.length || 0
-              diagOcrError = ocrRes.error
-              if (ocrRes.diagnostics) {
-                diagWorkerInit = ocrRes.diagnostics.workerInitialized ? 'YES' : 'NO'
-                diagLangLoaded = ocrRes.diagnostics.languageLoaded ? 'YES' : 'NO'
-                diagOcrExecuted = ocrRes.diagnostics.ocrExecuted ? 'YES' : 'NO'
-                if (ocrRes.diagnostics.workerUrl) workerUrl = ocrRes.diagnostics.workerUrl
-                if (ocrRes.diagnostics.coreUrl) coreUrl = ocrRes.diagnostics.coreUrl
-                if (ocrRes.diagnostics.langUrl) langUrl = ocrRes.diagnostics.langUrl
-              }
-              if (ocrRes.text) {
-                if (/P[<A-Z0-9]{2}[A-Z<]{3,}/.test(ocrRes.text)) {
-                  diagMrzStatus = 'FOUND'
-                }
-                extractedApplicant = extractFromOcrText(ocrRes)
-              }
-            } else {
-              // Try text extraction via pdfjs
-              const pdfExtract = await extractPdfText(dataUrl)
-              if (pdfExtract.fullText && pdfExtract.fullText.trim().length >= 50) {
-                diagPdfStatus = 'FOUND'
-                extractedApplicant = extractFromPdfText(pdfExtract.fullText)
-              } else if (pdfExtract.imagePayload) {
-                diagImgStatus = 'RENDERED CANVAS'
-                diagImgMime = 'image/png'
-                diagOcrStatus = 'EXECUTING'
-                const ocrRes = await recognizeText(pdfExtract.imagePayload, { language: 'eng' })
-                diagOcrStatus = ocrRes.success ? 'SUCCESS' : 'FAILED'
-                diagOcrChars = ocrRes.text?.length || 0
-                diagOcrError = ocrRes.error
-                if (ocrRes.diagnostics) {
-                  diagWorkerInit = ocrRes.diagnostics.workerInitialized ? 'YES' : 'NO'
-                  diagLangLoaded = ocrRes.diagnostics.languageLoaded ? 'YES' : 'NO'
-                  diagOcrExecuted = ocrRes.diagnostics.ocrExecuted ? 'YES' : 'NO'
-                  if (ocrRes.diagnostics.workerUrl) workerUrl = ocrRes.diagnostics.workerUrl
-                  if (ocrRes.diagnostics.coreUrl) coreUrl = ocrRes.diagnostics.coreUrl
-                  if (ocrRes.diagnostics.langUrl) langUrl = ocrRes.diagnostics.langUrl
-                }
-                if (ocrRes.text) {
-                  if (/P[<A-Z0-9]{2}[A-Z<]{3,}/.test(ocrRes.text)) {
-                    diagMrzStatus = 'FOUND'
-                  }
-                  extractedApplicant = extractFromOcrText(ocrRes)
-                }
-              }
-            }
-          } catch (extErr) {
-            console.error('PDF extraction error:', extErr)
-            diagPdfStatus = `ERROR: ${extErr instanceof Error ? extErr.message : String(extErr)}`
-          }
-        } else if (isImage) {
-          try {
-            diagImgStatus = 'IMAGE FILE'
-            diagImgMime = file.type || 'image/jpeg'
-            diagImgBytes = file.size
-            diagOcrStatus = 'EXECUTING'
-            const ocrRes = await recognizeText(dataUrl, { language: 'eng' })
-            diagOcrStatus = ocrRes.success ? 'SUCCESS' : 'FAILED'
-            diagOcrChars = ocrRes.text?.length || 0
-            diagOcrError = ocrRes.error
-            if (ocrRes.diagnostics) {
-              diagWorkerInit = ocrRes.diagnostics.workerInitialized ? 'YES' : 'NO'
-              diagLangLoaded = ocrRes.diagnostics.languageLoaded ? 'YES' : 'NO'
-              diagOcrExecuted = ocrRes.diagnostics.ocrExecuted ? 'YES' : 'NO'
-              if (ocrRes.diagnostics.workerUrl) workerUrl = ocrRes.diagnostics.workerUrl
-              if (ocrRes.diagnostics.coreUrl) coreUrl = ocrRes.diagnostics.coreUrl
-              if (ocrRes.diagnostics.langUrl) langUrl = ocrRes.diagnostics.langUrl
-            }
-            if (ocrRes.text) {
-              if (/P[<A-Z0-9]{2}[A-Z<]{3,}/.test(ocrRes.text)) {
-                diagMrzStatus = 'FOUND'
-              }
-              extractedApplicant = extractFromOcrText(ocrRes)
-            }
-          } catch (imgErr) {
-            console.error('Image OCR error:', imgErr)
-            diagOcrStatus = 'FAILED'
-            diagOcrError = imgErr instanceof Error ? imgErr.message : String(imgErr)
-          }
-        }
+        const diagPdfStatus = pipelineResult.diagnostics.pdfTextFound ? 'FOUND' : 'NO TEXT'
+        const diagImgStatus = isPdf ? 'RENDERED CANVAS' : 'IMAGE FILE'
+        const diagImgMime = isPdf ? 'image/png' : file.type || 'image/jpeg'
+        const diagImgBytes = file.size
+        const diagOcrStatus = pipelineResult.diagnostics.ocrExecutedCount > 0 ? 'SUCCESS' : 'NOT EXECUTED'
+        const diagOcrChars = pipelineResult.diagnostics.pdfTextChars
+        const diagOcrError: string | undefined = pipelineResult.diagnostics.errors.length > 0 ? pipelineResult.diagnostics.errors.join('; ') : undefined
+        const diagMrzStatus = pipelineResult.diagnostics.mrzFound ? 'FOUND' : 'NOT FOUND'
+        const diagWorkerInit = 'YES'
+        const diagLangLoaded = 'YES'
+        const diagOcrExecuted = pipelineResult.diagnostics.ocrExecutedCount > 0 ? 'YES' : 'NO'
+        const workerUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract/worker.min.js') : 'default'
+        const coreUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
+        const langUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
 
         const hasFields = Boolean(
           extractedApplicant &&

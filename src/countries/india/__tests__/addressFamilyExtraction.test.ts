@@ -1144,6 +1144,7 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
       documentType: 'passport',
       fileName: 'Josoda passport.pdf',
       fileSize: 1024,
+      mimeType: 'application/pdf',
       createdAt: '2026-09-10T00:00:00Z',
       updatedAt: '2026-09-10T00:00:00Z',
       status: 'processed',

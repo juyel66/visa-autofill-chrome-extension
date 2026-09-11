@@ -320,35 +320,19 @@ export function populateApplicationFromDocuments(options: {
       } else if (key === 'appl.passport_number' || key === 'passport_number') {
         const pNo =
           activeProfile.passport?.passportNumber ||
-          passportDoc?.extractedData?.passport?.passportNumber?.value ||
-          (passportDoc?.fileName?.toLowerCase().includes('josoda') ||
-          activeProfile.personalInfo?.nationalIdNumber === '8235626051' ||
-          passportDoc?.extractedData?.personal?.nationalIdNumber?.value === '8235626051' ||
-          activeProfile.passport?.otherPassportDetails?.passportNumber === 'BK0965579'
-            ? 'A21496961'
-            : undefined)
+          passportDoc?.extractedData?.passport?.passportNumber?.value
         if (pNo) {
           resolvedValue = pNo
           source = activeSource
           docId = activeDocId
         }
       } else if (key === 'pres_phone' || key === 'appl.pres_phone') {
-        let rawPhone =
+        const rawPhone =
           activeProfile.presentAddress?.phone ||
           activeProfile.contact?.phone ||
           activeProfile.permanentAddress?.phone ||
           passportDoc?.extractedData?.presentAddress?.phone?.value ||
           passportDoc?.extractedData?.contact?.phone?.value
-
-        if (
-          !rawPhone &&
-          (passportDoc?.fileName?.toLowerCase().includes('josoda') ||
-            activeProfile.personalInfo?.nationalIdNumber === '8235626051' ||
-            passportDoc?.extractedData?.personal?.nationalIdNumber?.value === '8235626051' ||
-            activeProfile.passport?.otherPassportDetails?.passportNumber === 'BK0965579')
-        ) {
-          rawPhone = '+8801744777846'
-        }
 
         if (rawPhone) {
           resolvedValue = rawPhone
@@ -428,21 +412,11 @@ export function populateApplicationFromDocuments(options: {
           }
         }
       } else if (key === 'mobile' || key === 'appl.mobile') {
-        let rawMob =
+        const rawMob =
           activeProfile.presentAddress?.mobile ||
           activeProfile.contact?.mobile ||
           passportDoc?.extractedData?.presentAddress?.mobile?.value ||
           passportDoc?.extractedData?.contact?.mobile?.value
-
-        if (
-          !rawMob &&
-          (passportDoc?.fileName?.toLowerCase().includes('josoda') ||
-            activeProfile.personalInfo?.nationalIdNumber === '8235626051' ||
-            passportDoc?.extractedData?.personal?.nationalIdNumber?.value === '8235626051' ||
-            activeProfile.passport?.otherPassportDetails?.passportNumber === 'BK0965579')
-        ) {
-          rawMob = '1744777846'
-        }
 
         if (rawMob) {
           resolvedValue = rawMob
@@ -500,6 +474,13 @@ export function populateApplicationFromDocuments(options: {
         source = activeSource
         docId = activeDocId
       } else if (
+        (key === 'father_place_of_birth' || key === 'appl.father_place_of_birth') &&
+        activeProfile.family?.father?.placeOfBirth
+      ) {
+        resolvedValue = activeProfile.family.father.placeOfBirth
+        source = activeSource
+        docId = activeDocId
+      } else if (
         (key === 'father_country_of_birth' || key === 'appl.father_country_of_birth') &&
         activeProfile.family?.father?.name &&
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
@@ -521,6 +502,13 @@ export function populateApplicationFromDocuments(options: {
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'mother_place_of_birth' || key === 'appl.mother_place_of_birth') &&
+        activeProfile.family?.mother?.placeOfBirth
+      ) {
+        resolvedValue = activeProfile.family.mother.placeOfBirth
         source = activeSource
         docId = activeDocId
       } else if (
@@ -548,6 +536,13 @@ export function populateApplicationFromDocuments(options: {
         source = activeSource
         docId = activeDocId
       } else if (
+        (key === 'spouse_place_of_birth' || key === 'appl.spouse_place_of_birth') &&
+        activeProfile.family?.spouse?.placeOfBirth
+      ) {
+        resolvedValue = activeProfile.family.spouse.placeOfBirth
+        source = activeSource
+        docId = activeDocId
+      } else if (
         (key === 'spouse_country_of_birth' || key === 'appl.spouse_country_of_birth') &&
         activeProfile.family?.spouse?.name &&
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' || ogdProfile?.personalInfo?.nationality === 'BANGLADESH')
@@ -568,6 +563,16 @@ export function populateApplicationFromDocuments(options: {
         activeProfile.family?.spouse?.name
       ) {
         resolvedValue = 'Married'
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'appl.oth_ppt_issue_place' || key === 'oth_ppt_issue_place') &&
+        activeProfile.passport?.holdsOtherPassport === true
+      ) {
+        resolvedValue =
+          activeProfile.passport?.otherPassportDetails?.placeOfIssue ||
+          activeProfile.passport?.placeOfIssue ||
+          'DHAKA'
         source = activeSource
         docId = activeDocId
       } else if (
@@ -608,57 +613,113 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'pres_addr1' || key === 'appl.pres_add1') &&
         !resolvedValue &&
-        activeProfile.permanentAddress?.addressLine1
+        (activeProfile.presentAddress?.addressLine1 || activeProfile.permanentAddress?.addressLine1)
       ) {
-        resolvedValue = activeProfile.permanentAddress.addressLine1
+        resolvedValue = activeProfile.presentAddress?.addressLine1 || activeProfile.permanentAddress?.addressLine1
         source = activeSource
         docId = activeDocId
       } else if (
-        key === 'pres_addr2' &&
+        (key === 'pres_addr2' || key === 'appl.pres_add2') &&
         !resolvedValue &&
-        activeProfile.permanentAddress?.addressLine2
+        (activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.addressLine2)
       ) {
-        resolvedValue = activeProfile.permanentAddress.addressLine2
+        resolvedValue = activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.addressLine2
         source = activeSource
         docId = activeDocId
       } else if (
-        key === 'village_town_city' &&
+        (key === 'village_town_city' || key === 'appl.pres_city') &&
         !resolvedValue &&
-        activeProfile.permanentAddress?.villageTownCity
+        (activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity)
       ) {
-        resolvedValue = activeProfile.permanentAddress.villageTownCity
+        resolvedValue = activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity
         source = activeSource
         docId = activeDocId
       } else if (
-        key === 'district' &&
+        (key === 'district' || key === 'appl.pres_district') &&
         !resolvedValue &&
-        activeProfile.permanentAddress?.district
+        (activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district)
       ) {
-        resolvedValue = activeProfile.permanentAddress.district
+        resolvedValue = activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district
         source = activeSource
         docId = activeDocId
       } else if (
-        (key === 'state_province' || key === 'appl.pres_state' || key === 'pres_state') &&
+        (key === 'state_province' || key === 'appl.pres_state' || key === 'pres_state' || key === 'state_name') &&
         !resolvedValue &&
-        activeProfile.permanentAddress?.stateProvince
+        (activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.stateProvince)
       ) {
-        resolvedValue = activeProfile.permanentAddress.stateProvince
+        resolvedValue = activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.stateProvince
         source = activeSource
         docId = activeDocId
       } else if (
-        key === 'present_country' &&
+        (key === 'present_country' || key === 'appl.countryname') &&
         !resolvedValue &&
-        activeProfile.permanentAddress?.country
+        (activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country)
       ) {
-        resolvedValue = activeProfile.permanentAddress.country
+        resolvedValue = activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country
         source = activeSource
         docId = activeDocId
       } else if (
         (key === 'pincode' || key === 'appl.pres_pincode' || key === 'pres_pincode') &&
         !resolvedValue &&
-        activeProfile.permanentAddress?.postalCode
+        (activeProfile.presentAddress?.postalCode || activeProfile.permanentAddress?.postalCode)
       ) {
-        resolvedValue = activeProfile.permanentAddress.postalCode
+        resolvedValue = activeProfile.presentAddress?.postalCode || activeProfile.permanentAddress?.postalCode
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'perm_add1' || key === 'appl.perm_add1') &&
+        !resolvedValue &&
+        (activeProfile.permanentAddress?.addressLine1 || activeProfile.presentAddress?.addressLine1)
+      ) {
+        resolvedValue = activeProfile.permanentAddress?.addressLine1 || activeProfile.presentAddress?.addressLine1
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'perm_add2' || key === 'appl.perm_add2') &&
+        !resolvedValue &&
+        (activeProfile.permanentAddress?.addressLine2 || activeProfile.presentAddress?.addressLine2)
+      ) {
+        resolvedValue = activeProfile.permanentAddress?.addressLine2 || activeProfile.presentAddress?.addressLine2
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'permanent_village_town_city' || key === 'appl.perm_city') &&
+        !resolvedValue &&
+        (activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity)
+      ) {
+        resolvedValue = activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'permanent_district' || key === 'appl.perm_district') &&
+        !resolvedValue &&
+        (activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district)
+      ) {
+        resolvedValue = activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'permanent_state_province' || key === 'perm_add3' || key === 'appl.perm_state') &&
+        !resolvedValue &&
+        (activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.stateProvince)
+      ) {
+        resolvedValue = activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.stateProvince
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'permanent_country' || key === 'appl.perm_country') &&
+        !resolvedValue &&
+        (activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country)
+      ) {
+        resolvedValue = activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'permanent_postal_code' || key === 'appl.perm_pincode' || key === 'perm_pincode') &&
+        !resolvedValue &&
+        (activeProfile.permanentAddress?.postalCode || activeProfile.presentAddress?.postalCode)
+      ) {
+        resolvedValue = activeProfile.permanentAddress?.postalCode || activeProfile.presentAddress?.postalCode
         source = activeSource
         docId = activeDocId
       }
@@ -707,7 +768,12 @@ export function populateApplicationFromDocuments(options: {
 
       // Special field value normalizations
       if (typeof finalVal === 'string') {
-        if (key === 'marital_status') {
+        if (key === 'appl.applsex' || key === 'gender') {
+          const g = finalVal.toUpperCase().trim()
+          if (g === 'M' || g === 'MALE') finalVal = 'MALE'
+          else if (g === 'F' || g === 'FEMALE') finalVal = 'FEMALE'
+          else if (g === 'T' || g === 'TRANSGENDER') finalVal = 'TRANSGENDER'
+        } else if (key === 'marital_status') {
           if (finalVal === '0' || finalVal.toUpperCase() === 'MARRIED') finalVal = 'Married'
           else if (finalVal === '1' || finalVal.toUpperCase() === 'SINGLE' || finalVal.toUpperCase() === 'UNMARRIED') finalVal = 'Single'
         } else if (key === 'duration') {

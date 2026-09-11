@@ -8,12 +8,7 @@ import type { DocumentRecord, GenericDocumentCategory } from '../../core/documen
 import { Button } from '../ui'
 
 import {
-  extractFromPdfText,
-  extractPdfText,
-  extractFromOcrText,
-  recognizeText,
-  toUint8Array,
-  extractEmbeddedJpegFromPdf,
+  processUploadedDocumentPayload,
 } from '../../core/extraction'
 
 export interface DocumentUploadModalProps {
@@ -33,6 +28,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState<boolean>(false)
+  const [uploadStatusText, setUploadStatusText] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -67,6 +63,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     }
 
     setIsUploading(true)
+    setUploadStatusText('Reading document...')
     setErrorMessage(null)
 
     try {
@@ -77,60 +74,19 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         reader.readAsDataURL(selectedFile)
       })
 
-      let extractedApplicant = undefined
-      const isPdf = selectedFile.type === 'application/pdf' || selectedFile.name.toLowerCase().endsWith('.pdf')
-      const isImage = selectedFile.type.startsWith('image/') || /\.(jpe?g|png|webp|bmp)$/i.test(selectedFile.name)
-
-      if (isPdf) {
-        try {
-          const rawBytes = await toUint8Array(dataUrl)
-          const embeddedJpeg = extractEmbeddedJpegFromPdf(rawBytes)
-          if (embeddedJpeg) {
-            const ocrRes = await recognizeText(embeddedJpeg, { language: 'eng' })
-            if (ocrRes.text) {
-              extractedApplicant = extractFromOcrText(ocrRes)
-            }
-          } else {
-            const pdfExtract = await extractPdfText(dataUrl)
-            if (pdfExtract.fullText && pdfExtract.fullText.trim().length >= 50) {
-              extractedApplicant = extractFromPdfText(pdfExtract.fullText)
-            } else {
-              const imgTarget = pdfExtract.imagePayload || dataUrl
-              const ocrRes = await recognizeText(imgTarget, { language: 'eng' })
-              if (ocrRes.text) {
-                extractedApplicant = extractFromOcrText(ocrRes)
-              }
-            }
-          }
-        } catch (extErr) {
-          console.warn('PDF extraction warning:', extErr)
-          try {
-            const ocrRes = await recognizeText(dataUrl, { language: 'eng' })
-            if (ocrRes.text) {
-              extractedApplicant = extractFromOcrText(ocrRes)
-            }
-          } catch (ocrErr) {
-            console.warn('OCR fallback warning:', ocrErr)
-          }
+      const pipelineResult = await processUploadedDocumentPayload(
+        dataUrl,
+        selectedFile.name,
+        selectedFile.type,
+        {
+          onProgress: (p) => {
+            setUploadStatusText(p.text)
+          },
         }
-      } else if (isImage) {
-        try {
-          const ocrRes = await recognizeText(dataUrl, { language: 'eng' })
-          if (ocrRes.text) {
-            extractedApplicant = extractFromOcrText(ocrRes)
-          }
-        } catch (imgErr) {
-          console.warn('Image OCR warning:', imgErr)
-        }
-      }
-
-      const hasFields = Boolean(
-        extractedApplicant &&
-        (extractedApplicant.personal?.lastName?.value ||
-         extractedApplicant.personal?.firstName?.value ||
-         extractedApplicant.passport?.passportNumber?.value ||
-         extractedApplicant.family?.father?.name?.value)
       )
+
+      const extractedApplicant = pipelineResult.hasExtractedFields ? pipelineResult.extractedData : undefined
+      const hasFields = pipelineResult.hasExtractedFields
 
       const now = new Date().toISOString()
       const newDoc: DocumentRecord = {
@@ -147,7 +103,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         description: description.trim() || undefined,
         expiryDate: expiryDate || undefined,
         fileDataUrl: dataUrl,
-        extractedData: hasFields ? extractedApplicant : undefined,
+        extractedData: extractedApplicant,
         extractedDataConfirmed: hasFields,
       }
 
@@ -271,7 +227,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             Cancel
           </Button>
           <Button variant="primary" size="sm" fullWidth type="submit" disabled={isUploading || !selectedFile}>
-            {isUploading ? 'Saving...' : 'Save Document'}
+            {isUploading ? uploadStatusText || 'Saving...' : 'Save Document'}
           </Button>
         </div>
       </form>

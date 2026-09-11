@@ -151,6 +151,32 @@ export async function recognizeText(
           const base64Str = input.substring(commaIdx + 1).replace(/\s/g, '')
           const mimeMatch = header.match(/data:([^;]+)/)
           inputMime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+
+          if (inputMime === 'application/pdf') {
+            const { renderPdfPageToImage } = await import('../pdf/pdfTextExtractor')
+            const rendered = await renderPdfPageToImage(input, 1, 2.5)
+            if (rendered) {
+              return recognizeText(rendered, options)
+            } else {
+              return {
+                success: false,
+                text: '',
+                language,
+                status: 'processing-failed',
+                error: 'Cannot perform OCR on raw PDF: Rendering PDF page to image failed.',
+                processingTimeMs: Date.now() - startTime,
+                diagnostics: {
+                  workerInitialized,
+                  languageLoaded,
+                  ocrExecuted: false,
+                  workerUrl,
+                  coreUrl,
+                  langUrl,
+                },
+              }
+            }
+          }
+
           const binaryStr = typeof atob === 'function' ? atob(base64Str) : Buffer.from(base64Str, 'base64').toString('binary')
           inputBytes = binaryStr.length
           const bytes = new Uint8Array(binaryStr.length)
@@ -171,6 +197,31 @@ export async function recognizeText(
         processedInput = input as unknown as WorkerRecognizeInput
       }
     } else if (input instanceof Uint8Array) {
+      if (input.length >= 4 && input[0] === 0x25 && input[1] === 0x50 && input[2] === 0x44 && input[3] === 0x46) {
+        // Raw PDF binary
+        const { renderPdfPageToImage } = await import('../pdf/pdfTextExtractor')
+        const rendered = await renderPdfPageToImage(input, 1, 2.5)
+        if (rendered) {
+          return recognizeText(rendered, options)
+        } else {
+          return {
+            success: false,
+            text: '',
+            language,
+            status: 'processing-failed',
+            error: 'Cannot perform OCR on raw PDF binary: Rendering PDF page to image failed.',
+            processingTimeMs: Date.now() - startTime,
+            diagnostics: {
+              workerInitialized,
+              languageLoaded,
+              ocrExecuted: false,
+              workerUrl,
+              coreUrl,
+              langUrl,
+            },
+          }
+        }
+      }
       inputMime = 'image/jpeg'
       inputBytes = input.byteLength
       if (isNodeEnv) {

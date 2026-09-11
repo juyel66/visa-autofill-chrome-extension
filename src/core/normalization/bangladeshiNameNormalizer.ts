@@ -259,10 +259,10 @@ export interface SplitNameResult {
  * Intelligently separates a full Bangladeshi name into Given Name and Surname.
  * 
  * Rules:
- * 1. Honors explicit title prefixes (e.g. "SHREE JOTIMOY RAY" -> Given: "SHREE JOTIMOY", Surname: "RAY").
+ * 1. Honors explicit title prefixes (e.g. "MD RAHIM UDDIN" -> Given: "MD RAHIM", Surname: "UDDIN").
  * 2. Recognizes multi-token compound surnames (e.g. "D'COSTA", "D'SOUZA", "CHANDRA ROY", "UD DIN").
  * 3. Identifies known surname tokens at the end of the name.
- * 4. For single-word names (e.g. "JOSODA"), populates both or marks given name.
+ * 4. For single-word names (e.g. "RAHIM"), populates both or marks given name.
  * 
  * STRICT RELIGION SAFETY:
  * NEVER assigns or returns religion.
@@ -309,7 +309,7 @@ export function splitBangladeshiFullName(fullName: string): SplitNameResult {
     }
   }
 
-  // Case B: Standard last token is surname (e.g. "SHREE JOTIMOY RAY" -> given: "SHREE JOTIMOY", surname: "RAY")
+  // Case B: Standard last token is surname (e.g. "MD ABDUL KARIM" -> given: "MD ABDUL", surname: "KARIM")
   const surname = tokens[tokens.length - 1]
   const givenNames = tokens.slice(0, -1).join(' ')
 

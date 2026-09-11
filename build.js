@@ -47,8 +47,26 @@ function ensureTesseractAssets() {
   }
 }
 
+function ensurePdfjsAssets() {
+  const publicPdfjsDir = join(__dirname, 'public', 'pdfjs')
+  if (!fs.existsSync(publicPdfjsDir)) {
+    fs.mkdirSync(publicPdfjsDir, { recursive: true })
+  }
+
+  const pdfjsBuildDir = join(__dirname, 'node_modules', 'pdfjs-dist', 'build')
+  if (fs.existsSync(pdfjsBuildDir)) {
+    const files = fs.readdirSync(pdfjsBuildDir)
+    for (const f of files) {
+      if (f.startsWith('pdf.worker')) {
+        fs.copyFileSync(join(pdfjsBuildDir, f), join(publicPdfjsDir, f))
+      }
+    }
+  }
+}
+
 async function runBuild() {
   ensureTesseractAssets()
+  ensurePdfjsAssets()
   console.log('--- STEP 1: Building Extension Popup and Background Service Worker (ES modules) ---')
   await build({
     configFile: false,

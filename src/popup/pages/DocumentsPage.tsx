@@ -29,7 +29,6 @@ import type {
 } from '../../core/extraction'
 
 import {
-  extractEmbeddedJpegFromPdf,
   extractFromMrz,
   extractFromOcrText,
   extractFromPdfText,
@@ -39,7 +38,6 @@ import {
   recognizeText,
   renderPdfPageToImage,
   toUint8Array,
-  uint8ArrayToDataUrl,
 } from '../../core/extraction'
 import { ExtractionReviewModal } from './ExtractionReviewModal'
 
@@ -252,13 +250,8 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
       const isPdf = doc.mimeType === 'application/pdf' || doc.fileName.toLowerCase().endsWith('.pdf')
       if (isPdf) {
         const rawBytes = await toUint8Array(doc.fileDataUrl)
-        const embeddedJpeg = extractEmbeddedJpegFromPdf(rawBytes)
-        if (embeddedJpeg) {
-          targetPayload = uint8ArrayToDataUrl(embeddedJpeg, 'image/jpeg')
-        } else {
-          const rendered = await renderPdfPageToImage(rawBytes, 1)
-          if (rendered) targetPayload = rendered
-        }
+        const rendered = await renderPdfPageToImage(rawBytes, 1, 2.5)
+        if (rendered) targetPayload = rendered
       }
 
       const result = await recognizeText(targetPayload, {

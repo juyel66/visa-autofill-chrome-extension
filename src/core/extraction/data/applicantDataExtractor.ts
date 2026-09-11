@@ -573,7 +573,7 @@ export function extractFromOgdVisaApplication(
   }
 
   // Permanent Address Block
-  const permBlockMatch = text.match(/(?:permanent\s*address)[:\s]+([\s\S]+?)(?=(?:family\s*details|father|mother|marital|profession|occupation|employer|details\s*of|reference|$))/i)
+  const permBlockMatch = text.match(/(?:permanent\s*address)[:\s]+([\s\S]+?)(?=(?:emergency(?:\s*contact)?|family\s*details|father|mother|marital|profession|occupation|employer|details\s*of|reference|$))/i)
   if (permBlockMatch) {
     const parsedPerm = parseStructuredAddress(permBlockMatch[1], { nationality: result.personal?.nationality?.value })
     if (parsedPerm.addressLine1) result.permanentAddress!.addressLine1 = { value: parsedPerm.addressLine1, source, confidence: baseConfidence }
@@ -1014,6 +1014,7 @@ export function parseStructuredAddress(
     }
   }
 
+
   // Country resolution: only set if address components actually exist
   if (!result.country && (result.addressLine1 || result.district || result.postalCode || result.villageTownCity)) {
     if (context?.nationality === 'BANGLADESH' || !context?.nationality) {
@@ -1255,22 +1256,20 @@ export function parseApplicantContact(text: string): ParsedContactResult {
     }
   }
 
-  // 6. Global Fallback: Detect standalone Bangladeshi or international phone numbers in text
-  if (!result.phone && !result.mobile) {
+  // 6. Global Fallback: Detect standalone Bangladeshi or international phone numbers in text (when not in employer/sponsor sections)
+  if (!result.phone && !result.mobile && !inEmployerSection && !inSponsorSection) {
     const bdPhoneMatch = text.match(/(?:\+?880|0)?\s*(1[3-9]\d{2}[\s-]?\d{3}[\s-]?\d{3})\b/)
     if (bdPhoneMatch && bdPhoneMatch[1]) {
       const cleanLocal = bdPhoneMatch[1].replace(/[^\d]/g, '')
       if (cleanLocal.length === 10) {
-        result.isdCode = '880'
         result.mobile = cleanLocal
         result.phone = `+880${cleanLocal}`
       }
     }
   }
 
-  // 7. Auto-derive Bangladesh ISD code 880 for Bangladesh documents
-  if (!result.isdCode && /(?:BANGLADESH|BANGLADESHI|BGD|DHAKA|THAKURGAON|CHITTAGONG|SYLHET|RAJSHAHI)/i.test(text)) {
-    result.isdCode = '880'
+  if (result.mobile && !result.phone) {
+    result.phone = result.mobile
   }
 
   return result
@@ -1349,7 +1348,7 @@ function extractFromRawText(
     }
   }
 
-  // Fallback 1: Extract passport number from MRZ Line 2 pattern in text (e.g. A214969610BGD9309186M...)
+  // Fallback 1: Extract passport number from MRZ Line 2 pattern in text (e.g. A123456780BGD9309186M...)
   if (!result.passport?.passportNumber) {
     const mrzL2Match = text.match(/\b([A-PR-WY][0-9]{7,8})\d(?:BGD|IND|USA|GBR|PAK|[A-Z]{3})\d{6}/i)
     if (mrzL2Match && mrzL2Match[1]) {
@@ -1695,7 +1694,7 @@ function extractFromRawText(
 
   // Check Permanent Address Block (excluding line-labeled fields)
   const permAddrBlock = text.match(
-    /(?:permanent\s*address)(?!\s*(?:line\s*\d|city|town|village|district|state|country|pincode|postal\s*code|phone|mobile|isd))[:\s]+([\s\S]+?)(?=(?:permanent\s*(?:postal|country|phone|mobile)|postal\s*code|pin\s*code|country[:\s]|emergency|legal\s*guardian|telephone|tel\s*no|present|father|mother|marital|occupation|employer|previous|passport|$))/i
+    /(?:permanent\s*address)(?!\s*(?:line\s*\d|city|town|village|district|state|country|pincode|postal\s*code|phone|mobile|isd))[:\s]+([\s\S]+?)(?=(?:emergency(?:\s*contact)?|permanent\s*(?:postal|country|phone|mobile)|postal\s*code|pin\s*code|country[:\s]|legal\s*guardian|telephone|tel\s*no|present|father|mother|marital|occupation|employer|previous|passport|$))/i
   )
   if (permAddrBlock && permAddrBlock[1]) {
     const parsedPerm = parseStructuredAddress(permAddrBlock[1], { nationality: result.personal?.nationality?.value })
@@ -1737,6 +1736,28 @@ function extractFromRawText(
   const permCountryMatch = text.match(/permanent\s*(?:address\s*)?country[:\s]+([A-Za-z .'-]{2,50})/i)
   if (permCountryMatch && permCountryMatch[1] && !result.permanentAddress?.country) {
     result.permanentAddress = { ...result.permanentAddress, country: { value: permCountryMatch[1].trim(), source, confidence: baseConfidence } }
+  }
+
+  // Fallback: If no structured address was extracted yet, check for generic "Address:" line
+  if (!result.permanentAddress?.addressLine1 && !result.presentAddress?.addressLine1) {
+    const genericAddrMatch = text.match(
+      /\baddress[:\s]+([^\r\n]+(?:\r?\n[^\r\n]+){0,3})(?=(?:telephone|tel\s*no|phone|emergency|mobile|email|father|mother|marital|$))/i
+    )
+    if (genericAddrMatch && genericAddrMatch[1]) {
+      const parsedGeneric = parseStructuredAddress(genericAddrMatch[1], { nationality: result.personal?.nationality?.value })
+      if (parsedGeneric.addressLine1) {
+        result.permanentAddress = {
+          ...result.permanentAddress,
+          addressLine1: { value: parsedGeneric.addressLine1, source, confidence: baseConfidence },
+          addressLine2: parsedGeneric.addressLine2 ? { value: parsedGeneric.addressLine2, source, confidence: baseConfidence } : undefined,
+          villageTownCity: parsedGeneric.villageTownCity ? { value: parsedGeneric.villageTownCity, source, confidence: baseConfidence } : undefined,
+          district: parsedGeneric.district ? { value: parsedGeneric.district, source, confidence: baseConfidence } : undefined,
+          stateProvince: parsedGeneric.stateProvince ? { value: parsedGeneric.stateProvince, source, confidence: baseConfidence } : undefined,
+          postalCode: parsedGeneric.postalCode ? { value: parsedGeneric.postalCode, source, confidence: baseConfidence } : undefined,
+          country: parsedGeneric.country ? { value: parsedGeneric.country, source, confidence: baseConfidence } : undefined,
+        }
+      }
+    }
   }
 
   // 6. FAMILY INFORMATION
@@ -1855,7 +1876,9 @@ function extractFromRawText(
   }
 
   // Emergency Contact & Spouse Extraction
-  const emergMatch = text.match(/emergency\s*contact[\s\S]{0,400}/i)
+  // Target the actual Emergency Contact block, avoiding header "PERSONAL DATA AND EMERGENCY CONTACT"
+  const cleanEmergText = text.replace(/personal\s*data\s*(?:and|&)\s*emergency\s*contact/gi, 'PERSONAL DATA SECTION')
+  const emergMatch = cleanEmergText.match(/emergency\s*contact\s*:?[\s\S]{0,400}/i)
   if (emergMatch) {
     const emergBlock = emergMatch[0]
     const eNameMatch = emergBlock.match(/(?:name|ame)[:\s=]+([A-Za-z .'-]{2,60})/i)
@@ -2532,10 +2555,11 @@ export function extractApplicantDataFromDocuments(
 }
 
 const SOURCE_PRIORITY: Record<ExtractionSource, number> = {
-  mrz: 1,
-  'pdf-text': 2,
-  ocr: 3,
-  'manual-review': 4,
+  ai: 1,
+  mrz: 2,
+  'pdf-text': 3,
+  ocr: 4,
+  'manual-review': 5,
 }
 
 /**
