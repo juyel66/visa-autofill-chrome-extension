@@ -1,4 +1,4 @@
-import { build } from 'vite'
+import { build, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve, join } from 'path'
@@ -67,10 +67,14 @@ function ensurePdfjsAssets() {
 async function runBuild() {
   ensureTesseractAssets()
   ensurePdfjsAssets()
+  const env = loadEnv('production', process.cwd(), '')
   console.log('--- STEP 1: Building Extension Popup and Background Service Worker (ES modules) ---')
   await build({
     configFile: false,
     base: './',
+    define: {
+      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || ''),
+    },
     plugins: [react(), tailwindcss()],
     build: {
       outDir: 'dist',

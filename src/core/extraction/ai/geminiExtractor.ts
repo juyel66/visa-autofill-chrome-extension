@@ -195,6 +195,7 @@ export async function extractApplicantDataWithGemini(
 
   const apiKey = (options?.apiKey || (await getGeminiApiKey())).trim()
   if (!apiKey) {
+    console.warn('⚠️ [GEMINI AI] No API key provided or found in .env / storage.')
     return null
   }
 
@@ -240,6 +241,8 @@ export async function extractApplicantDataWithGemini(
     'gemini-3.1-flash-lite',
   ]
 
+  console.log(`🤖 [GEMINI AI] Calling Gemini Vision API with ${imagesBase64.length} image(s)...`)
+
   for (const model of modelsToTry) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
     try {
@@ -252,6 +255,8 @@ export async function extractApplicantDataWithGemini(
       })
 
       if (!response.ok) {
+        const errText = await response.text()
+        console.warn(`⚠️ [GEMINI AI] Model ${model} returned HTTP ${response.status}:`, errText)
         continue
       }
 
@@ -270,7 +275,8 @@ export async function extractApplicantDataWithGemini(
       console.log('gemini extracted data:', mappedData)
 
       return mappedData
-    } catch {
+    } catch (err) {
+      console.warn(`⚠️ [GEMINI AI] Error calling model ${model}:`, err)
       // Cascade to next model if error occurs
     }
   }
