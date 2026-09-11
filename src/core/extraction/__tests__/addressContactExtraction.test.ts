@@ -63,7 +63,7 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
     `got: ${extractedA.presentAddress?.addressLine2?.value}`
   )
   assert(
-    extractedA.presentAddress?.villageTownCity?.value === 'VILL: KACHUBARI',
+    extractedA.presentAddress?.villageTownCity?.value === 'THAKURGAON',
     'Test Case A: Village/Town/City extracted from single-line OCR',
     `got: ${extractedA.presentAddress?.villageTownCity?.value}`
   )
@@ -146,12 +146,12 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   `
   const extractedB = extractFromPdfText(ogdMultiLineText)
   assert(
-    extractedB.presentAddress?.addressLine1?.value === 'House 12, Road 5',
+    extractedB.presentAddress?.addressLine1?.value === 'House 12',
     'Test Case B: OGD Multi-line Address Line 1 extracted',
     `got: ${extractedB.presentAddress?.addressLine1?.value}`
   )
   assert(
-    extractedB.presentAddress?.addressLine2?.value === 'Dhanmondi',
+    extractedB.presentAddress?.addressLine2?.value === 'Road 5, Dhanmondi',
     'Test Case B: OGD Multi-line Address Line 2 extracted',
     `got: ${extractedB.presentAddress?.addressLine2?.value}`
   )
@@ -418,12 +418,12 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
   // Dynamic Multi-District Verification (No Hardcoding)
   // =========================================================================
   const districts = [
-    { text: 'VILL: GULSHAN-2, PO: GULSHAN, DHAKA', expectedDist: 'DHAKA', expectedVill: 'VILL: GULSHAN-2' },
-    { text: 'VILL: CHANDGAON, PO: CHANDGAON, CHITTAGONG', expectedDist: 'CHITTAGONG', expectedVill: 'VILL: CHANDGAON' },
-    { text: 'VILL: AMBARKHANA, PO: SYLHET, SYLHET', expectedDist: 'SYLHET', expectedVill: 'VILL: AMBARKHANA' },
-    { text: 'VILL: MOTIHAR, PO: RAJSHAHI UNIVERSITY, RAJSHAHI', expectedDist: 'RAJSHAHI', expectedVill: 'VILL: MOTIHAR' },
-    { text: 'VILL: KHALISHPUR, PO: KHALISHPUR, KHULNA', expectedDist: 'KHULNA', expectedVill: 'VILL: KHALISHPUR' },
-    { text: 'VILL: SADAR, PO: BARISAL, BARISAL', expectedDist: 'BARISAL', expectedVill: 'VILL: SADAR' },
+    { text: 'VILL: GULSHAN-2, PO: GULSHAN, DHAKA', expectedDist: 'DHAKA', expectedCity: 'DHAKA', expectedLine1: 'VILL: GULSHAN-2', expectedLine2: 'PO: GULSHAN' },
+    { text: 'VILL: CHANDGAON, PO: CHANDGAON, CHITTAGONG', expectedDist: 'CHITTAGONG', expectedCity: 'CHITTAGONG', expectedLine1: 'VILL: CHANDGAON', expectedLine2: 'PO: CHANDGAON' },
+    { text: 'VILL: AMBARKHANA, PO: SYLHET, SYLHET', expectedDist: 'SYLHET', expectedCity: 'SYLHET', expectedLine1: 'VILL: AMBARKHANA', expectedLine2: 'PO: SYLHET' },
+    { text: 'VILL: MOTIHAR, PO: RAJSHAHI UNIVERSITY, RAJSHAHI', expectedDist: 'RAJSHAHI', expectedCity: 'RAJSHAHI', expectedLine1: 'VILL: MOTIHAR', expectedLine2: 'PO: RAJSHAHI UNIVERSITY' },
+    { text: 'VILL: KHALISHPUR, PO: KHALISHPUR, KHULNA', expectedDist: 'KHULNA', expectedCity: 'KHULNA', expectedLine1: 'VILL: KHALISHPUR', expectedLine2: 'PO: KHALISHPUR' },
+    { text: 'VILL: SADAR, PO: BARISAL, BARISAL', expectedDist: 'BARISAL', expectedCity: 'BARISAL', expectedLine1: 'VILL: SADAR', expectedLine2: 'PO: BARISAL' },
   ]
 
   for (const d of districts) {
@@ -439,8 +439,18 @@ export async function runAddressContactExtractionTests(): Promise<AddressContact
       `got: ${parsed.stateProvince}`
     )
     assert(
-      parsed.villageTownCity === d.expectedVill,
-      `Dynamic District Test: Village resolved for ${d.expectedDist}`,
+      parsed.addressLine1 === d.expectedLine1,
+      `Dynamic District Test: Address Line 1 resolved for ${d.expectedDist}`,
+      `got: ${parsed.addressLine1}`
+    )
+    assert(
+      parsed.addressLine2 === d.expectedLine2,
+      `Dynamic District Test: Address Line 2 resolved for ${d.expectedDist}`,
+      `got: ${parsed.addressLine2}`
+    )
+    assert(
+      parsed.villageTownCity === d.expectedCity,
+      `Dynamic District Test: City/Town resolved for ${d.expectedDist}`,
       `got: ${parsed.villageTownCity}`
     )
   }
