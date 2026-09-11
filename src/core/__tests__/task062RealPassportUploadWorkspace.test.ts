@@ -72,12 +72,12 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   assert(mrzResult.success === true, 'MRZ parser extracted structured identity from noisy OCR lines')
   assert(mrzResult.data?.surname === 'HOSSAIN', `MRZ surname matches HOSSAIN (got "${mrzResult.data?.surname}")`)
   assert(mrzResult.data?.givenNames === 'MOHAMMAD ARIF', `MRZ given names match MOHAMMAD ARIF (got "${mrzResult.data?.givenNames}")`)
-  assert(mrzResult.data?.passportNumber === 'A21496961', `MRZ passport number matches A21496961 (got "${mrzResult.data?.passportNumber}")`)
+  assert(mrzResult.data?.passportNumber === 'A01234567', `MRZ passport number matches A01234567 (got "${mrzResult.data?.passportNumber}")`)
   assert(mrzResult.data?.nationality === 'BGD', `MRZ nationality matches BGD (got "${mrzResult.data?.nationality}")`)
-  assert(mrzResult.data?.dateOfBirth === '1993-09-18', `MRZ date of birth matches 1993-09-18 (got "${mrzResult.data?.dateOfBirth}")`)
+  assert(mrzResult.data?.dateOfBirth === '1990-01-01', `MRZ date of birth matches 1990-01-01 (got "${mrzResult.data?.dateOfBirth}")`)
   assert(mrzResult.data?.sex === 'male', `MRZ gender matches male (got "${mrzResult.data?.sex}")`)
-  assert(mrzResult.data?.passportExpiryDate === '2031-01-19', `MRZ expiry date matches 2031-01-19 (got "${mrzResult.data?.passportExpiryDate}")`)
-  assert(mrzResult.data?.personalNumber === '8235626051', `MRZ personal ID matches 8235626051 (got "${mrzResult.data?.personalNumber}")`)
+  assert(mrzResult.data?.passportExpiryDate === '2030-01-09', `MRZ expiry date matches 2030-01-09 (got "${mrzResult.data?.passportExpiryDate}")`)
+  assert(mrzResult.data?.personalNumber === '1990123456', `MRZ personal ID matches 1990123456 (got "${mrzResult.data?.personalNumber}")`)
 
   const mockOcrResult: OcrResult = {
     success: true,
@@ -97,14 +97,14 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   assert(extracted.personal?.lastName?.value === 'HOSSAIN', 'Extracted surname is HOSSAIN')
   assert(extracted.personal?.firstName?.value === 'MOHAMMAD ARIF', 'Extracted firstName is MOHAMMAD ARIF')
   assert(extracted.personal?.nationality?.value === 'BANGLADESH', 'Extracted nationality is BANGLADESH')
-  assert(extracted.personal?.nationalIdNumber?.value === '8235626051', 'Extracted National ID is 8235626051')
-  assert(extracted.personal?.townCityOfBirth?.value === 'THAKURGAON', 'Extracted townCityOfBirth is THAKURGAON')
-  assert(extracted.passport?.passportNumber?.value === 'A21496961', 'Extracted passportNumber is A21496961')
-  assert(extracted.passport?.issueDate?.value === '2026-01-20', 'Extracted passport issueDate is 2026-01-20')
-  assert(extracted.passport?.expiryDate?.value === '2031-01-19', 'Extracted passport expiryDate is 2031-01-19')
+  assert(extracted.personal?.nationalIdNumber?.value === '1990123456', 'Extracted National ID is 1990123456')
+  assert(extracted.personal?.townCityOfBirth?.value === 'DHAKA', 'Extracted townCityOfBirth is DHAKA')
+  assert(extracted.passport?.passportNumber?.value === 'A01234567', 'Extracted passportNumber is A01234567')
+  assert(extracted.passport?.issueDate?.value === '2020-01-10', 'Extracted passport issueDate is 2020-01-10')
+  assert(extracted.passport?.expiryDate?.value === '2030-01-09', 'Extracted passport expiryDate is 2030-01-09')
   assert(extracted.passport?.placeOfIssue?.value === 'DIP/DHAKA', 'Extracted placeOfIssue is DIP/DHAKA')
   assert(extracted.passport?.holdsOtherPassport?.value === true, 'Extracted holdsOtherPassport is true')
-  assert(extracted.passport?.otherPassportDetails?.passportNumber?.value === 'BK0965579', 'Extracted previous passport is BK0965579')
+  assert(extracted.passport?.otherPassportDetails?.passportNumber?.value === 'BK1234567', 'Extracted previous passport is BK1234567')
   assert(extracted.family?.father?.name?.value === 'MOHAMMAD KHURSHED ALAM', 'Extracted father name is MOHAMMAD KHURSHED ALAM')
   assert(extracted.family?.mother?.name?.value === 'PARVIN BEGUM', 'Extracted mother name is PARVIN BEGUM')
   assert(extracted.family?.spouse?.name?.value === 'JANNATUL FERDOUS', 'Extracted spouse name is JANNATUL FERDOUS')
@@ -120,9 +120,9 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     'Zero Contamination: Nationality does not appear in Visible Identification Marks'
   )
   assert(
-    extracted.contact?.phone?.value === '+8801744777846' &&
+    extracted.contact?.phone?.value === '+8801711111111' &&
       extracted.contact?.isdCode?.value === '880' &&
-      extracted.contact?.mobile?.value === '1744777846',
+      extracted.contact?.mobile?.value === '1711111111',
     'TASK 074: Passport emergency contact telephone falls back into applicant contact phone, isdCode, and mobile'
   )
   assert(
@@ -170,17 +170,17 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     'appl.surname': 'HOSSAIN',
     'appl.applname': 'MOHAMMAD ARIF',
     'appl.applsex': 'MALE',
-    'appl.birthdate': '18/09/1993',
-    'appl.placbrth': 'THAKURGAON',
+    'appl.birthdate': '01/01/1990',
+    'appl.placbrth': 'DHAKA',
     'appl.country_of_birth': 'BANGLADESH',
     'appl.nationality': 'BANGLADESH',
     'appl.countryname': 'BANGLADESH',
     'appl.nationality_by': 'Birth',
-    'appl.nic_no': '8235626051',
-    'appl.passport_number': 'A21496961',
+    'appl.nic_no': '1990123456',
+    'appl.passport_number': 'A01234567',
     'appl.passport_issue_place': 'DIP/DHAKA',
-    'appl.passport_issue_date': '20/01/2026',
-    'appl.passport_expiry_date': '19/01/2031',
+    'appl.passport_issue_date': '10/01/2020',
+    'appl.passport_expiry_date': '09/01/2030',
     'fthrname': 'MOHAMMAD KHURSHED ALAM',
     'father_nationality': 'BANGLADESH',
     'father_prev_nationality': 'BANGLADESH',
@@ -199,16 +199,16 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     'district': 'DHAKA',
     'present_country': 'BANGLADESH',
     'pincode': '1216',
-    'pres_phone': '+8801744777846',
+    'pres_phone': '+8801711111111',
     'isd_code': '880',
-    'mobile': '1744777846',
+    'mobile': '1711111111',
     'perm_add1': 'HOUSE 12',
     'perm_add2': 'ROAD 5, BLOCK B',
     'permanent_district': 'DHAKA',
     'permanent_country': 'BANGLADESH',
     'permanent_postal_code': '1216',
     'appl.oth_ppt': 'Yes',
-    'appl.oth_pptno': 'BK0965579',
+    'appl.oth_pptno': 'BK1234567',
     'appl.oth_ppt_issue_place': 'DHAKA',
     'appl.prev_passport_country_issue': 'BANGLADESH',
     'appl.other_ppt_nationality': 'BANGLADESH',
@@ -295,8 +295,8 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
 
   assert(reloadedFromStorage !== null, 'Automatic Persistence: Application reloaded from storage')
   assert(
-    reloadedFromStorage?.fields['appl.passport_number']?.value === 'A21496961',
-    'Automatic Persistence: Reloaded passport number matches A21496961'
+    reloadedFromStorage?.fields['appl.passport_number']?.value === 'A01234567',
+    'Automatic Persistence: Reloaded passport number matches A01234567'
   )
   assert(
     reloadedFromStorage?.fields['appl.surname']?.value === 'HOSSAIN',
@@ -363,16 +363,16 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     extractedDataConfirmed: true,
   }
 
-  // Stale application from previous applicant (Arif Hossain with DOB 18/09/1993)
+  // Stale application from previous applicant (Arif Hossain with DOB 01/01/1990)
   const staleOldApplication: SavedApplication = {
     applicationId: 'app_stale_123',
     applicantId: 'applicant_shared_id',
     fields: {
       'appl.surname': { value: 'HOSSAIN', source: 'passport', isUserEdited: true },
       'appl.applname': { value: 'MOHAMMAD ARIF', source: 'passport', isUserEdited: true },
-      'appl.birthdate': { value: '18/09/1993', source: 'passport', isUserEdited: true },
-      'appl.pptno': { value: 'A21496961', source: 'passport', isUserEdited: true },
-      'appl.nic_no': { value: '8235626051', source: 'passport', isUserEdited: true },
+      'appl.birthdate': { value: '01/01/1990', source: 'passport', isUserEdited: true },
+      'appl.pptno': { value: 'A01234567', source: 'passport', isUserEdited: true },
+      'appl.nic_no': { value: '1990123456', source: 'passport', isUserEdited: true },
       'appl.applsex': { value: 'MALE', source: 'passport' },
     },
     manualEdits: {
@@ -408,10 +408,10 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
       personal: {
         lastName: { value: 'HOSSAIN', source: 'pdf-text', confidence: 95 },
         firstName: { value: 'MOHAMMAD ARIF', source: 'pdf-text', confidence: 95 },
-        dateOfBirth: { value: '1993-09-18', source: 'pdf-text', confidence: 95 },
+        dateOfBirth: { value: '1990-01-01', source: 'pdf-text', confidence: 95 },
       },
       passport: {
-        passportNumber: { value: 'A21496961', source: 'pdf-text', confidence: 95 },
+        passportNumber: { value: 'A01234567', source: 'pdf-text', confidence: 95 },
       },
     },
   }
@@ -426,7 +426,7 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
 
   assert(
     isolatedJosodaApp.fields['appl.birthdate']?.value === '20/04/1987',
-    `Isolation: Josoda DOB is 20/04/1987, NOT old 18/09/1993 (got "${isolatedJosodaApp.fields['appl.birthdate']?.value}")`
+    `Isolation: Josoda DOB is 20/04/1987, NOT old 01/01/1990 (got "${isolatedJosodaApp.fields['appl.birthdate']?.value}")`
   )
   assert(
     isolatedJosodaApp.fields['appl.surname']?.value === 'JOSODA',

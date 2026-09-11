@@ -405,7 +405,7 @@ Emergency Contact:
 Name: JANNATUL FERDOUS
 Relationship: SPOUSE
 Address: HOUSE 12, ROAD 5, BLOCK B, MIRPUR - 1216, DHAKA
-Telephone No: +8801744777866
+Telephone No: +8801711111111
 
 --- PAGE 2 ---
 PEOPLE'S REPUBLIC OF BANGLADESH
@@ -416,15 +416,15 @@ Passport Number: A12345678
 Surname: HOSSAIN
 Given Name: MOHAMMAD ARIF
 Nationality: BANGLADESHI
-Personal No: 8235626051
-Previous Passport No: BK0965579
-Date of Birth: 18 SEP 1993
+Personal No: 1990123456
+Previous Passport No: BK1234567
+Date of Birth: 01 JAN 1990
 Sex: M
 Place of Birth: DHAKA
-Date of Issue: 20 JAN 2026
-Date of Expiry: 19 JAN 2031
+Date of Issue: 10 JAN 2020
+Date of Expiry: 09 JAN 2030
 P<BGDHOSSAIN<<MOHAMMAD<ARIF<<<<<<<<<<<<<<<<<
-A123456780BGD9309186M31011938235626051<<<<48
+A123456780BGD9001011M30010971990123456<<<<84
   `
 
   const dualExtracted = extractFromPdfText(dualPageSample)
@@ -432,9 +432,9 @@ A123456780BGD9309186M31011938235626051<<<<48
   assert(dualExtracted.family?.father?.name?.value === 'MOHAMMAD KHURSHED ALAM', 'TEST 12: Father name extracted from page 1')
   assert(dualExtracted.family?.mother?.name?.value === 'PARVIN BEGUM', 'TEST 12: Mother name extracted from page 1')
   assert(dualExtracted.family?.spouse?.name?.value === 'JANNATUL FERDOUS', 'TEST 12: Spouse name extracted from page 1 emergency contact')
-  assert(dualExtracted.contact?.phone?.value === '+8801744777866', 'TEST 12: Contact phone +8801744777866 extracted from page 1')
+  assert(dualExtracted.contact?.phone?.value === '+8801711111111', 'TEST 12: Contact phone +8801711111111 extracted from page 1')
   assert(dualExtracted.contact?.isdCode?.value === '880', 'TEST 12: ISD code 880 normalized from phone')
-  assert(dualExtracted.contact?.mobile?.value === '1744777866', 'TEST 12: Mobile 1744777866 extracted without leading 0/880')
+  assert(dualExtracted.contact?.mobile?.value === '1711111111', 'TEST 12: Mobile 1711111111 extracted without leading 0/880')
   assert(Boolean(dualExtracted.permanentAddress?.addressLine1?.value), 'TEST 12: Permanent address line 1 extracted')
   assert(dualExtracted.permanentAddress?.postalCode?.value === '1216', 'TEST 12: Permanent postal code 1216 extracted')
   assert(dualExtracted.permanentAddress?.district?.value === 'DHAKA', 'TEST 12: Permanent district DHAKA extracted')
@@ -464,9 +464,9 @@ A123456780BGD9309186M31011938235626051<<<<48
   assert(dualApp.fields['mother_name']?.value === 'PARVIN BEGUM', 'TEST 12: Application field mother_name is PARVIN BEGUM')
   assert(dualApp.fields['spouse_name']?.value === 'JANNATUL FERDOUS', 'TEST 12: Application field spouse_name is JANNATUL FERDOUS')
   assert(dualApp.fields['marital_status']?.value === 'Married', 'TEST 12: Application field marital_status is Married')
-  assert(dualApp.fields['pres_phone']?.value === '+8801744777866', 'TEST 12: Application field pres_phone is +8801744777866')
+  assert(dualApp.fields['pres_phone']?.value === '+8801711111111', 'TEST 12: Application field pres_phone is +8801711111111')
   assert(dualApp.fields['isd_code']?.value === '880', 'TEST 12: Application field isd_code is 880')
-  assert(dualApp.fields['mobile']?.value === '1744777866', 'TEST 12: Application field mobile is 1744777866')
+  assert(dualApp.fields['mobile']?.value === '1711111111', 'TEST 12: Application field mobile is 1711111111')
   assert(Boolean(dualApp.fields['perm_add1']?.value), 'TEST 12: Application field perm_add1 is populated from document')
   assert(dualApp.fields['permanent_postal_code']?.value === '1216', 'TEST 12: Application field permanent_postal_code is 1216')
   assert(dualApp.fields['permanent_district']?.value === 'DHAKA', 'TEST 12: Application field permanent_district is DHAKA')
