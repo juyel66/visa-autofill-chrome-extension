@@ -167,7 +167,7 @@ export async function runOgdFullFieldExtractionTests(): Promise<{
 
   // Present Address & Contact
   assert(extracted.presentAddress?.addressLine1?.value === 'DANDAPAL MAREA', 'Present Address Line 1: DANDAPAL MAREA')
-  assert(extracted.presentAddress?.addressLine2?.value === 'KAMALAPUKHURI', 'Present Address Line 2: KAMALAPUKHURI')
+  assert(extracted.presentAddress?.addressLine2?.value === 'KAMALAPUKHURI, DANDAPAL DEBIGANJ', 'Present Address Line 2: KAMALAPUKHURI, DANDAPAL DEBIGANJ')
   assert(extracted.presentAddress?.postalCode?.value === '5020', 'Present Postal Code: 5020')
   assert(extracted.contact?.phone?.value === '01740572545', 'Contact Phone: 01740572545')
   assert(extracted.contact?.mobile?.value === '1740572545', 'Contact Mobile: 1740572545')
@@ -175,8 +175,8 @@ export async function runOgdFullFieldExtractionTests(): Promise<{
   assert(extracted.contact?.email?.value?.toUpperCase() === 'KHOKONROY866@GMAIL.COM', 'Contact Email: KHOKONROY866@GMAIL.COM')
 
   // Permanent Address
-  assert(extracted.permanentAddress?.addressLine1?.value === 'SONDHANI PARA, BENGHARI, 04', 'Permanent Address Line 1')
-  assert(extracted.permanentAddress?.addressLine2?.value === 'DEBIGANJ, KALIGANJ- 5020' || extracted.permanentAddress?.addressLine2?.value === 'DEBIGANJ, KALIGANJ', 'Permanent Address Line 2')
+  assert(extracted.permanentAddress?.addressLine1?.value === 'SONDHANI PARA', 'Permanent Address Line 1')
+  assert(extracted.permanentAddress?.addressLine2?.value === 'BENGHARI, 04, DEBIGANJ, KALIGANJ', 'Permanent Address Line 2')
   assert(extracted.permanentAddress?.district?.value === 'PANCHAGARH' || extracted.permanentAddress?.stateProvince?.value === 'PANCHAGARH' || extracted.permanentAddress?.villageTownCity?.value === 'PANCHAGARH' || extracted.permanentAddress?.villageTownCity?.value === 'DEBIGANJ, KALIGANJ', 'Permanent Address City')
 
   // Family
@@ -285,7 +285,7 @@ export async function runOgdFullFieldExtractionTests(): Promise<{
     { field: 'appl.passport_expiry_date', pdfVal: '26-MAR-2033', extractedVal: '2033-03-26', normalizedVal: '2033-03-26', expectedWorkspaceVal: '26/03/2033' },
     { field: 'appl.oth_ppt', pdfVal: 'NO', extractedVal: 'false', normalizedVal: 'false', expectedWorkspaceVal: 'No' },
     { field: 'pres_addr1', pdfVal: 'DANDAPAL MAREA', extractedVal: 'DANDAPAL MAREA', normalizedVal: 'DANDAPAL MAREA', expectedWorkspaceVal: 'DANDAPAL MAREA' },
-    { field: 'pres_addr2', pdfVal: 'KAMALAPUKHURI', extractedVal: 'KAMALAPUKHURI', normalizedVal: 'KAMALAPUKHURI', expectedWorkspaceVal: 'KAMALAPUKHURI' },
+    { field: 'pres_addr2', pdfVal: 'KAMALAPUKHURI', extractedVal: 'KAMALAPUKHURI, DANDAPAL DEBIGANJ', normalizedVal: 'KAMALAPUKHURI, DANDAPAL DEBIGANJ', expectedWorkspaceVal: 'KAMALAPUKHURI, DANDAPAL DEBIGANJ' },
     { field: 'district', pdfVal: 'PANCHAGARH', extractedVal: 'PANCHAGARH', normalizedVal: 'PANCHAGARH', expectedWorkspaceVal: 'PANCHAGARH' },
     { field: 'pincode', pdfVal: '5020', extractedVal: '5020', normalizedVal: '5020', expectedWorkspaceVal: '5020' },
     { field: 'pres_phone', pdfVal: '01740572545', extractedVal: '01740572545', normalizedVal: '01740572545', expectedWorkspaceVal: '01740572545' },
@@ -293,8 +293,8 @@ export async function runOgdFullFieldExtractionTests(): Promise<{
     { field: 'isd_code', pdfVal: '880', extractedVal: '880', normalizedVal: '880', expectedWorkspaceVal: '880' },
     { field: 'appl.email', pdfVal: 'KHOKONROY866@GMAIL.COM', extractedVal: 'KHOKONROY866@GMAIL.COM', normalizedVal: 'khokonroy866@gmail.com', expectedWorkspaceVal: 'KHOKONROY866@GMAIL.COM' },
     { field: 'appl.email_re', pdfVal: 'KHOKONROY866@GMAIL.COM', extractedVal: 'KHOKONROY866@GMAIL.COM', normalizedVal: 'khokonroy866@gmail.com', expectedWorkspaceVal: 'KHOKONROY866@GMAIL.COM' },
-    { field: 'perm_add1', pdfVal: 'SONDHANI PARA, BENGHARI, 04', extractedVal: 'SONDHANI PARA, BENGHARI, 04', normalizedVal: 'SONDHANI PARA, BENGHARI, 04', expectedWorkspaceVal: 'SONDHANI PARA, BENGHARI, 04' },
-    { field: 'perm_add2', pdfVal: 'DEBIGANJ, KALIGANJ- 5020', extractedVal: 'DEBIGANJ, KALIGANJ', normalizedVal: 'DEBIGANJ, KALIGANJ', expectedWorkspaceVal: 'DEBIGANJ, KALIGANJ' },
+    { field: 'perm_add1', pdfVal: 'SONDHANI PARA, BENGHARI, 04', extractedVal: 'SONDHANI PARA', normalizedVal: 'SONDHANI PARA', expectedWorkspaceVal: 'SONDHANI PARA' },
+    { field: 'perm_add2', pdfVal: 'DEBIGANJ, KALIGANJ- 5020', extractedVal: 'BENGHARI, 04, DEBIGANJ, KALIGANJ', normalizedVal: 'BENGHARI, 04, DEBIGANJ, KALIGANJ', expectedWorkspaceVal: 'BENGHARI, 04, DEBIGANJ, KALIGANJ' },
     { field: 'permanent_district', pdfVal: 'PANCHAGARH', extractedVal: 'PANCHAGARH', normalizedVal: 'PANCHAGARH', expectedWorkspaceVal: 'PANCHAGARH' },
     { field: 'fthrname', pdfVal: 'POBETRA KUMER', extractedVal: 'POBETRA KUMER', normalizedVal: 'POBETRA KUMER', expectedWorkspaceVal: 'POBETRA KUMER' },
     { field: 'father_nationality', pdfVal: 'BANGLADESH', extractedVal: 'BANGLADESH', normalizedVal: 'BANGLADESH', expectedWorkspaceVal: 'BANGLADESH' },
