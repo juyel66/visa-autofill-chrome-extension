@@ -1255,6 +1255,24 @@ export function parseApplicantContact(text: string): ParsedContactResult {
     }
   }
 
+  // 6. Global Fallback: Detect standalone Bangladeshi or international phone numbers in text
+  if (!result.phone && !result.mobile) {
+    const bdPhoneMatch = text.match(/(?:\+?880|0)?\s*(1[3-9]\d{2}[\s-]?\d{3}[\s-]?\d{3})\b/)
+    if (bdPhoneMatch && bdPhoneMatch[1]) {
+      const cleanLocal = bdPhoneMatch[1].replace(/[^\d]/g, '')
+      if (cleanLocal.length === 10) {
+        result.isdCode = '880'
+        result.mobile = cleanLocal
+        result.phone = `+880${cleanLocal}`
+      }
+    }
+  }
+
+  // 7. Auto-derive Bangladesh ISD code 880 for Bangladesh documents
+  if (!result.isdCode && /(?:BANGLADESH|BANGLADESHI|BGD|DHAKA|THAKURGAON|CHITTAGONG|SYLHET|RAJSHAHI)/i.test(text)) {
+    result.isdCode = '880'
+  }
+
   return result
 }
 
@@ -1317,14 +1335,49 @@ function extractFromRawText(
     }
   }
 
-  // 2. Passport Number: "Passport No: XXXXXX" or "Passport Number: XXXXXX" or "Passport No. / N° du passeport"
-  const pptMatch = text.match(
-    /(?:passport\s*(?:no|number|num|\.|\/|\s*n°\s*du\s*passeport)?|doc\s*(?:no|number)|pass\s*no)[:\s]+([A-Z0-9]{6,12})/i
-  ) || text.match(/(?:passport|passeport)\s*[:\s]+([A-Z0-9]{7,10})/i)
+  // 2. Passport Number: "Passport No: XXXXXX", "Passport Number: XXXXXX", Bengali "পাসপোর্ট নং / Passport Number" or MRZ line 2
+  const pptMatch =
+    text.match(
+      /(?:passport\s*(?:no|number|num|\.|\/|\s*n°\s*du\s*passeport)?|doc\s*(?:no|number)|pass\s*no|পাসপোর্ট\s*(?:নং|নম্বর)?(?:\s*\/\s*passport\s*(?:no|number)?)?)[:\s]+([A-Z]\s*[0-9]{7,8}|[A-Z0-9]{6,12})/i
+    ) || text.match(/(?:passport|passeport|পাসপোর্ট)\s*[:\s]+([A-Z]\s*[0-9]{7,8}|[A-Z0-9]{7,10})/i)
+
   if (pptMatch && pptMatch[1]) {
+    const cleanPpt = pptMatch[1].replace(/\s+/g, '').trim().toUpperCase()
     result.passport = {
       ...result.passport,
-      passportNumber: { value: pptMatch[1].trim().toUpperCase(), source, confidence: baseConfidence },
+      passportNumber: { value: cleanPpt, source, confidence: baseConfidence },
+    }
+  }
+
+  // Fallback 1: Extract passport number from MRZ Line 2 pattern in text (e.g. A214969610BGD9309186M...)
+  if (!result.passport?.passportNumber) {
+    const mrzL2Match = text.match(/\b([A-PR-WY][0-9]{7,8})\d(?:BGD|IND|USA|GBR|PAK|[A-Z]{3})\d{6}/i)
+    if (mrzL2Match && mrzL2Match[1]) {
+      result.passport = {
+        ...result.passport,
+        passportNumber: { value: mrzL2Match[1].toUpperCase(), source, confidence: baseConfidence },
+      }
+    }
+  }
+
+  // Fallback 2: Extract standalone passport number format in passport document
+  if (!result.passport?.passportNumber) {
+    const isPassportDoc = /(?:PEOPLE'S REPUBLIC OF BANGLADESH|PASSPORT|REPUBLIC|MRZ|EMERGENCY CONTACT|DIP\/DHAKA)/i.test(text)
+    if (isPassportDoc) {
+      const candMatches = Array.from(text.matchAll(/\b([A-PR-WY][0-9]{7,8})\b/g))
+      for (const m of candMatches) {
+        const val = m[1].toUpperCase()
+        if (
+          val !== result.passport?.otherPassportDetails?.passportNumber?.value &&
+          val !== result.personal?.nationalIdNumber?.value
+        ) {
+          result.passport = {
+            ...result.passport,
+            passportNumber: { value: val, source, confidence: Math.max(70, baseConfidence - 5) },
+          }
+          break
+        }
+      }
     }
   }
 
