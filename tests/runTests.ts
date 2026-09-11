@@ -22,8 +22,16 @@ import { runHighConfidenceReligionTests } from '../src/core/extraction/__tests__
 import { runBangladeshiNameNormalizationReligionSafetyTests } from '../src/core/extraction/__tests__/bangladeshiNameNormalizationReligionSafety.test'
 import { runAddressContactExtractionTests } from '../src/core/extraction/__tests__/addressContactExtraction.test'
 import { runTask077HardcodeAuditTests } from '../src/core/__tests__/task077HardcodeAudit.test'
+import { runTask079DynamicExtractionTests } from '../src/core/__tests__/task079DynamicExtraction.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 079: DYNAMIC GEMINI EXTRACTION & ISOLATION TESTS ---')
+  const task079Res = await runTask079DynamicExtractionTests()
+  console.log(`Passed: ${task079Res.passed}, Count: ${task079Res.totalSubtests}`)
+  if (!task079Res.passed) {
+    console.error('Failures:', task079Res.failures)
+  }
+
   console.log('--- RUNNING TASK 077: STATIC PRODUCTION HARDCODE AUDIT & APPLICANT ISOLATION TESTS ---')
   const task077Res = await runTask077HardcodeAuditTests()
   console.log(`Passed: ${task077Res.passed}, Count: ${task077Res.totalSubtests}`)
