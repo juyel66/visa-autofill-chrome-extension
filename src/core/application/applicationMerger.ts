@@ -291,12 +291,27 @@ export function populateApplicationFromDocuments(options: {
     // Derivation pass for fields deterministically tied to confirmed documents
     if (!resolvedValue && activeProfile) {
       if (
-        key === 'appl.countryname' &&
+        (key === 'appl.countryname' || key === 'present_country') &&
         (activeProfile.personalInfo?.nationality === 'BANGLADESH' ||
           activeProfile.passport?.issuingCountry === 'BANGLADESH' ||
           activeProfile.presentAddress?.country === 'BANGLADESH')
       ) {
         resolvedValue = 'BANGLADESH'
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'appl.nationality' || key === 'nationality') &&
+        (activeProfile.personalInfo?.nationality ||
+          activeProfile.passport?.issuingCountry ||
+          passportDoc?.extractedData?.personal?.nationality?.value ||
+          passportDoc?.extractedData?.passport?.issuingCountry?.value)
+      ) {
+        resolvedValue =
+          activeProfile.personalInfo?.nationality ||
+          activeProfile.passport?.issuingCountry ||
+          passportDoc?.extractedData?.personal?.nationality?.value ||
+          passportDoc?.extractedData?.passport?.issuingCountry?.value ||
+          'BANGLADESH'
         source = activeSource
         docId = activeDocId
       } else if (
@@ -306,8 +321,22 @@ export function populateApplicationFromDocuments(options: {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
-      } else if (key === 'appl.nationality_by' && activeProfile.personalInfo?.nationality === 'BANGLADESH') {
+      } else if (
+        (key === 'appl.nationality_by' || key === 'nationality_by') &&
+        (activeProfile.personalInfo?.nationality === 'BANGLADESH' ||
+          activeProfile.passport?.issuingCountry === 'BANGLADESH' ||
+          activeProfile.personalInfo?.countryOfBirth === 'BANGLADESH' ||
+          passportDoc?.extractedData?.personal?.nationality?.value === 'BANGLADESH' ||
+          passportDoc?.extractedData?.passport?.issuingCountry?.value === 'BANGLADESH')
+      ) {
         resolvedValue = 'Birth'
+        source = activeSource
+        docId = activeDocId
+      } else if (
+        (key === 'appl.visual_mark' || key === 'visual_mark') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.personalInfo?.visibleIdentificationMarks || passportDoc?.extractedData?.personal?.visibleIdentificationMarks?.value || 'NA'
         source = activeSource
         docId = activeDocId
       } else if (
