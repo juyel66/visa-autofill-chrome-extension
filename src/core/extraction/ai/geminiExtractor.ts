@@ -1,5 +1,5 @@
 import type { ExtractedApplicantData } from '../data/types'
-import { parseStandardIsoDate } from '../data/applicantDataExtractor'
+import { parseStandardIsoDate, parseStructuredAddress } from '../data/applicantDataExtractor'
 
 export const DEFAULT_GEMINI_API_KEY =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) ||
@@ -98,18 +98,18 @@ Return ONLY a valid JSON object matching the following structure:
     "isdCode": "Country dialing code if present or null"
   },
   "presentAddress": {
-    "addressLine1": "House / Street / Village name or null",
-    "addressLine2": "Road / Thana / Area / Colony or null",
-    "villageTownCity": "Village, Town or City or null",
+    "addressLine1": "First address component only (e.g. Village / House / Street name / Flat number) or null",
+    "addressLine2": "Remaining secondary local-area components (e.g. Area / Union / Upazila / Colony / Road / Thana) before city/town or null",
+    "villageTownCity": "City or Town name or null",
     "district": "District name or null",
     "stateProvince": "State or Province name or null",
     "postalCode": "Postal code or Pincode or null",
     "country": "Country or null"
   },
   "permanentAddress": {
-    "addressLine1": "Permanent House / Street / Village name or null",
-    "addressLine2": "Permanent Road / Thana / Area / Colony or null",
-    "villageTownCity": "Village, Town or City or null",
+    "addressLine1": "First address component only (e.g. Permanent Village / House / Street name / Flat number) or null",
+    "addressLine2": "Remaining secondary local-area components (e.g. Area / Union / Upazila / Colony / Road / Thana) before city/town or null",
+    "villageTownCity": "City or Town name or null",
     "district": "District name or null",
     "stateProvince": "State or Province name or null",
     "postalCode": "Postal code or Pincode or null",
@@ -384,23 +384,61 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
 
   // 4. Present Address
   const pres = (raw.presentAddress || {}) as Record<string, unknown>
-  if (pres.addressLine1) result.presentAddress!.addressLine1 = { value: String(pres.addressLine1).trim(), source }
-  if (pres.addressLine2) result.presentAddress!.addressLine2 = { value: String(pres.addressLine2).trim(), source }
-  if (pres.villageTownCity) result.presentAddress!.villageTownCity = { value: String(pres.villageTownCity).trim(), source }
-  if (pres.district) result.presentAddress!.district = { value: String(pres.district).trim().toUpperCase(), source }
-  if (pres.stateProvince) result.presentAddress!.stateProvince = { value: String(pres.stateProvince).trim().toUpperCase(), source }
-  if (pres.postalCode) result.presentAddress!.postalCode = { value: String(pres.postalCode).trim(), source }
-  if (pres.country) result.presentAddress!.country = { value: String(pres.country).trim().toUpperCase(), source }
+  let presLine1 = pres.addressLine1 ? String(pres.addressLine1).trim() : undefined
+  let presLine2 = pres.addressLine2 ? String(pres.addressLine2).trim() : undefined
+  let presCity = pres.villageTownCity ? String(pres.villageTownCity).trim() : undefined
+  let presDist = pres.district ? String(pres.district).trim().toUpperCase() : undefined
+  const presState = pres.stateProvince ? String(pres.stateProvince).trim().toUpperCase() : undefined
+  let presPin = pres.postalCode ? String(pres.postalCode).trim() : undefined
+  let presCountry = pres.country ? String(pres.country).trim().toUpperCase() : undefined
+
+  if (presLine1 && (!presLine2 || presLine1.includes(','))) {
+    const combinedPres = [presLine1, presLine2, presCity, presPin, presDist].filter(Boolean).join(', ')
+    const reParsed = parseStructuredAddress(combinedPres, { nationality: p.nationality ? String(p.nationality) : undefined })
+    if (reParsed.addressLine1) presLine1 = reParsed.addressLine1
+    if (reParsed.addressLine2) presLine2 = reParsed.addressLine2
+    if (reParsed.villageTownCity) presCity = reParsed.villageTownCity
+    if (reParsed.district) presDist = reParsed.district
+    if (reParsed.postalCode && !presPin) presPin = reParsed.postalCode
+    if (reParsed.country && !presCountry) presCountry = reParsed.country
+  }
+
+  if (presLine1) result.presentAddress!.addressLine1 = { value: presLine1, source }
+  if (presLine2) result.presentAddress!.addressLine2 = { value: presLine2, source }
+  if (presCity) result.presentAddress!.villageTownCity = { value: presCity, source }
+  if (presDist) result.presentAddress!.district = { value: presDist, source }
+  if (presState) result.presentAddress!.stateProvince = { value: presState, source }
+  if (presPin) result.presentAddress!.postalCode = { value: presPin, source }
+  if (presCountry) result.presentAddress!.country = { value: presCountry, source }
 
   // 5. Permanent Address
   const perm = (raw.permanentAddress || {}) as Record<string, unknown>
-  if (perm.addressLine1) result.permanentAddress!.addressLine1 = { value: String(perm.addressLine1).trim(), source }
-  if (perm.addressLine2) result.permanentAddress!.addressLine2 = { value: String(perm.addressLine2).trim(), source }
-  if (perm.villageTownCity) result.permanentAddress!.villageTownCity = { value: String(perm.villageTownCity).trim(), source }
-  if (perm.district) result.permanentAddress!.district = { value: String(perm.district).trim().toUpperCase(), source }
-  if (perm.stateProvince) result.permanentAddress!.stateProvince = { value: String(perm.stateProvince).trim().toUpperCase(), source }
-  if (perm.postalCode) result.permanentAddress!.postalCode = { value: String(perm.postalCode).trim(), source }
-  if (perm.country) result.permanentAddress!.country = { value: String(perm.country).trim().toUpperCase(), source }
+  let permLine1 = perm.addressLine1 ? String(perm.addressLine1).trim() : undefined
+  let permLine2 = perm.addressLine2 ? String(perm.addressLine2).trim() : undefined
+  let permCity = perm.villageTownCity ? String(perm.villageTownCity).trim() : undefined
+  let permDist = perm.district ? String(perm.district).trim().toUpperCase() : undefined
+  const permState = perm.stateProvince ? String(perm.stateProvince).trim().toUpperCase() : undefined
+  let permPin = perm.postalCode ? String(perm.postalCode).trim() : undefined
+  let permCountry = perm.country ? String(perm.country).trim().toUpperCase() : undefined
+
+  if (permLine1 && (!permLine2 || permLine1.includes(','))) {
+    const combinedPerm = [permLine1, permLine2, permCity, permPin, permDist].filter(Boolean).join(', ')
+    const reParsed = parseStructuredAddress(combinedPerm, { nationality: p.nationality ? String(p.nationality) : undefined })
+    if (reParsed.addressLine1) permLine1 = reParsed.addressLine1
+    if (reParsed.addressLine2) permLine2 = reParsed.addressLine2
+    if (reParsed.villageTownCity) permCity = reParsed.villageTownCity
+    if (reParsed.district) permDist = reParsed.district
+    if (reParsed.postalCode && !permPin) permPin = reParsed.postalCode
+    if (reParsed.country && !permCountry) permCountry = reParsed.country
+  }
+
+  if (permLine1) result.permanentAddress!.addressLine1 = { value: permLine1, source }
+  if (permLine2) result.permanentAddress!.addressLine2 = { value: permLine2, source }
+  if (permCity) result.permanentAddress!.villageTownCity = { value: permCity, source }
+  if (permDist) result.permanentAddress!.district = { value: permDist, source }
+  if (permState) result.permanentAddress!.stateProvince = { value: permState, source }
+  if (permPin) result.permanentAddress!.postalCode = { value: permPin, source }
+  if (permCountry) result.permanentAddress!.country = { value: permCountry, source }
 
   // 6. Family
   const fam = (raw.family || {}) as Record<string, unknown>
