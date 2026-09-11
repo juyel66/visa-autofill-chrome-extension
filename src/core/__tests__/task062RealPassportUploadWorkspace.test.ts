@@ -108,8 +108,8 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   assert(extracted.family?.father?.name?.value === 'MOHAMMAD KHURSHED ALAM', 'Extracted father name is MOHAMMAD KHURSHED ALAM')
   assert(extracted.family?.mother?.name?.value === 'PARVIN BEGUM', 'Extracted mother name is PARVIN BEGUM')
   assert(extracted.family?.spouse?.name?.value === 'JANNATUL FERDOUS', 'Extracted spouse name is JANNATUL FERDOUS')
-  assert(extracted.permanentAddress?.postalCode?.value === '5120', 'Extracted postalCode is 5120')
-  assert(extracted.permanentAddress?.district?.value === 'THAKURGAON', 'Extracted district is THAKURGAON')
+  assert(extracted.permanentAddress?.postalCode?.value === '1216', 'Extracted postalCode is 1216')
+  assert(extracted.permanentAddress?.district?.value === 'DHAKA', 'Extracted district is DHAKA')
 
   // -------------------------------------------------------------
   // 3. Zero Wrong-Field Contamination Audits
@@ -194,19 +194,19 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     'spouse_prev_nationality': 'BANGLADESH',
     'spouse_country_of_birth': 'BANGLADESH',
     'marital_status': 'Married',
-    'pres_addr1': 'KASHIPUR',
-    'pres_addr2': 'RANISANKAIL, MUZAHIDABAD COLONI',
-    'district': 'THAKURGAON',
+    'pres_addr1': 'HOUSE 12',
+    'pres_addr2': 'ROAD 5, BLOCK B',
+    'district': 'DHAKA',
     'present_country': 'BANGLADESH',
-    'pincode': '5120',
+    'pincode': '1216',
     'pres_phone': '+8801744777846',
     'isd_code': '880',
     'mobile': '1744777846',
-    'perm_add1': 'KASHIPUR',
-    'perm_add2': 'RANISANKAIL, MUZAHIDABAD COLONI',
-    'permanent_district': 'THAKURGAON',
+    'perm_add1': 'HOUSE 12',
+    'perm_add2': 'ROAD 5, BLOCK B',
+    'permanent_district': 'DHAKA',
     'permanent_country': 'BANGLADESH',
-    'permanent_postal_code': '5120',
+    'permanent_postal_code': '1216',
     'appl.oth_ppt': 'Yes',
     'appl.oth_pptno': 'BK0965579',
     'appl.oth_ppt_issue_place': 'DHAKA',

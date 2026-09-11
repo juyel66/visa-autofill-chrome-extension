@@ -19,13 +19,13 @@ ITD pathers Name: MOHAMMAD KHURSHED ALAM 7 = Some
 ehh Mother's Name: PARVIN BEGUM 5 IN
 
 |. Legal Guardian's Name: cl A
-2.5.5 Permanent Address: KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120, THAKURGAON = aa]
+2.5.5 Permanent Address: HOUSE 12, ROAD 5, BLOCK B - 1216, DHAKA = aa]
 ety - 3
 NE sea 3 A m—
 He . Emergency Contact: S Se
 THU ame: JANNATUL FERDOUS
 LT Relationship: SPOUSE ) _ =-
-VE Address: KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120, THAKURGAON
+VE Address: HOUSE 12, ROAD 5, BLOCK B - 1216, DHAKA
 fesiineciie: SUR HARORGAN Pos IS
 UES SF 7 RA
 aon Telephone No: +8801744777846 Ee EE
@@ -129,8 +129,8 @@ export async function runScannedPassportOcrTests(): Promise<{
   assert(extracted.family?.father?.name?.value === 'MOHAMMAD KHURSHED ALAM', `Extracted father name is MOHAMMAD KHURSHED ALAM (got "${extracted.family?.father?.name?.value}")`)
   assert(extracted.family?.mother?.name?.value === 'PARVIN BEGUM', `Extracted mother name is PARVIN BEGUM (got "${extracted.family?.mother?.name?.value}")`)
   assert(extracted.family?.spouse?.name?.value === 'JANNATUL FERDOUS', `Extracted spouse name is JANNATUL FERDOUS (got "${extracted.family?.spouse?.name?.value}")`)
-  assert(extracted.permanentAddress?.postalCode?.value === '5120', `Extracted permanent postalCode is 5120 (got "${extracted.permanentAddress?.postalCode?.value}")`)
-  assert(extracted.permanentAddress?.district?.value === 'THAKURGAON', `Extracted permanent district is THAKURGAON (got "${extracted.permanentAddress?.district?.value}")`)
+  assert(extracted.permanentAddress?.postalCode?.value === '1216', `Extracted permanent postalCode is 1216 (got "${extracted.permanentAddress?.postalCode?.value}")`)
+  assert(extracted.permanentAddress?.district?.value === 'DHAKA', `Extracted permanent district is DHAKA (got "${extracted.permanentAddress?.district?.value}")`)
 
   // 6. Test Zero Cross-Field Contamination:
   // Visible Identification Marks must NOT contain nationality
@@ -198,19 +198,19 @@ export async function runScannedPassportOcrTests(): Promise<{
     'spouse_prev_nationality': 'BANGLADESH',
     'spouse_country_of_birth': 'BANGLADESH',
     'marital_status': 'Married',
-    'pres_addr1': 'KASHIPUR',
-    'pres_addr2': 'RANISANKAIL, MUZAHIDABAD COLONI',
-    'district': 'THAKURGAON',
+    'pres_addr1': 'HOUSE 12',
+    'pres_addr2': 'ROAD 5, BLOCK B',
+    'district': 'DHAKA',
     'present_country': 'BANGLADESH',
-    'pincode': '5120',
+    'pincode': '1216',
     'pres_phone': '+8801744777846',
     'isd_code': '880',
     'mobile': '1744777846',
-    'perm_add1': 'KASHIPUR',
-    'perm_add2': 'RANISANKAIL, MUZAHIDABAD COLONI',
-    'permanent_district': 'THAKURGAON',
+    'perm_add1': 'HOUSE 12',
+    'perm_add2': 'ROAD 5, BLOCK B',
+    'permanent_district': 'DHAKA',
     'permanent_country': 'BANGLADESH',
-    'permanent_postal_code': '5120',
+    'permanent_postal_code': '1216',
     'appl.oth_ppt': 'Yes',
     'appl.oth_pptno': 'BK0965579',
     'appl.oth_ppt_issue_place': 'DHAKA',
