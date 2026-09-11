@@ -855,6 +855,14 @@ export interface ParsedContactResult {
 /**
  * Dynamically parses structured address components (Line 1, Line 2, Village/City, District, State, Pincode, Country)
  * from text blocks or raw passport OCR without hardcoded district names.
+ * 
+ * Semantic Component Hierarchy:
+ * - Address Line 1: FIRST logical address component (e.g. Village / House / Street / Flat)
+ * - Address Line 2: SECOND and subsequent local components before city/town (e.g. Thana / Upazila / Union / Road / Colony)
+ * - City / Town: Separate City / Town (e.g. THAKURGAON, DHAKA, CHITTAGONG)
+ * - District: Separate District
+ * - Postal / Pincode: Separate Postal / Pincode
+ * - Country: Country (e.g. BANGLADESH)
  */
 export function parseStructuredAddress(
   rawText?: string,
@@ -863,24 +871,37 @@ export function parseStructuredAddress(
   const result: ParsedAddressResult = {}
   if (!rawText) return result
 
-  // 1. Initial cleanup of text
+  // 1. Initial cleanup of OCR debris and broken lines
   let text = rawText.trim()
-  // Clean OCR trailing artifacts like "= aa]" and everything thereafter
+
+  // Remove OCR trailing artifacts and debug dumps
   text = text.replace(/=\s*aa\][\s\S]*$/i, '')
-  // Clean OCR trailing line noise patterns
   text = text.replace(/\s*[-=]\s*(?:pres\s*\d*|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/gim, '')
   text = text.replace(/\s*-\s*=n.*$/gim, '')
 
-  // Reconstruct broken words across linebreaks / OCR boundaries (e.g. COLON + \n + I or COLON before pin/district)
+  // Strip leading list/bullet noise like "i.", "ii.", "1.", "*", etc.
+  text = text.replace(/^(?:i\.|ii\.|iii\.|\*|\d+\.|\d+\))\s*/gim, '')
+
+  // Reconstruct broken words across linebreaks / OCR boundaries (e.g. COLON before pin/district or broken COLON I)
   text = text.replace(/\bCOLON\b(?:\s*-\s*pres\s*\d*\s*;)?\s*(?:\r?\n\s*)?(?:WE\s+|I\s+)?(?=\d{4,6}|[A-Z]+)/gi, 'COLONI, ')
   text = text.replace(/\bCOLON\s*-\s*pres\b/gi, 'COLONI')
   text = text.replace(/\bCOLON\s*-\s*=n\b/gi, 'COLONI')
+  text = text.replace(/\bCOLON\b(?=\s*[-—]\s*\d{4})/gi, 'COLONI')
+  text = text.replace(/\bCOLON\s*I\b/gi, 'COLONI')
+  text = text.replace(/\bCOLON\b(?=\s*,\s*[A-Z])/gi, 'COLONI')
+  text = text.replace(/\bCOLON\b(?=\s+[A-Z]{3,})/gi, 'COLONI')
 
-  // Strip leading noise prefixes on continuation lines (WE, VE, NE, ETY, 2.5.5, numbers, etc.)
-  text = text.replace(/^(?:WE|VE|NE|ETY|HE|U0|LT|THU|P\d|2\.5\.5|\d+\.\d+|\d+\.)\s+/gim, '')
+  // Clean OCR noise words like "ME, " before district or trailing dashes/symbols (e.g. "ME, THAKURGAON —" -> "THAKURGAON")
+  text = text.replace(/\bME\s*,\s*(?=[A-Za-z]+)/gi, '')
+  text = text.replace(/[—_~=]+$/g, '')
+
+  // Strip leading noise prefixes on continuation lines (WE, VE, NE, ETY, HE., U0, LT, THU, P\d, 2.5.5, etc.)
+  text = text.replace(/^(?:WE|VE|NE|ETY|HE\.?|U0|LT|THU|P\d|2\.5\.5|\d+\.\d+|\d+\.)\s+/gim, '')
 
   // 2. Extract Postal Code / Pincode: "- 5120" or "PIN: 5120" or standalone 4-6 digits
-  const pinMatch = text.match(/(?:pincode|postal\s*code|post\s*code|pin|zip(?:\s*code)?|[-:])\s*([0-9]{4,6})\b/i) || text.match(/\b(\d{4,6})\b/)
+  const pinMatch =
+    text.match(/(?:pincode|postal\s*code|post\s*code|pin|zip(?:\s*code)?|[-:])\s*([0-9]{4,6})\b/i) ||
+    text.match(/\b(\d{4,6})\b/)
   if (pinMatch && pinMatch[1]) {
     result.postalCode = pinMatch[1].trim()
     text = text.replace(pinMatch[0], ' ')
@@ -901,63 +922,7 @@ export function parseStructuredAddress(
   if (stateMatch && stateMatch[1]) result.stateProvince = stateMatch[1].trim()
   if (countryMatch && countryMatch[1]) result.country = countryMatch[1].trim().toUpperCase()
 
-  // 4. Check if text has clean multi-line format (e.g. OGD or form multi-line address blocks)
-  const cleanLines = text
-    .split(/\r?\n/)
-    .map((l) =>
-      l
-        .replace(/^(?:\d+\.|\d+\)|\(\d+\))\s*/, '')
-        .replace(/\s*[-=]\s*(?:pres|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/i, '')
-        .replace(/^(?:(?:present|permanent)?\s*(?:address\s*line\s*[12]|address|country|district|state(?:\/province)?|province|village(?:\/town\/city)?|town|city|postal\s*code|pin|zip|phone|mobile|telephone|email))\s*[:=]\s*/i, '')
-        .replace(/^(?:WE|VE|NE|ETY|HE|U0|LT|THU|P\d|2\.5\.5)\s+/i, '')
-        .trim()
-    )
-    .filter((l) => {
-      if (l.length < 2) return false
-      if (/^(ety|NE\s*sea|He\s*\.|pres|aa|bb|cc|dd|WE|VE)$/i.test(l)) return false
-      if (/^[0-9\s\-—_+=./\\]+$/.test(l)) return false
-      if (/^(?:present|permanent|address|residential|emergency|telephone|phone|email|country|district|state|province|pin|zip)$/i.test(l)) return false
-      if (/[—_+=]/.test(l) && l.length < 15) return false
-      return true
-    })
-
-  if (
-    !result.addressLine1 &&
-    cleanLines.length >= 3
-  ) {
-    result.addressLine1 = cleanLines[0]
-    result.addressLine2 = cleanLines[1]
-    const rawLastLine = cleanLines[cleanLines.length - 1]
-    const lastLine = rawLastLine.replace(/,\s*(?:BANGLADESH|INDIA|USA)\b.*$/i, '').trim()
-    if (cleanLines.length === 3) {
-      if (!result.villageTownCity) {
-        if (/^(?:vill(?:age)?)\b/i.test(cleanLines[0])) {
-          result.villageTownCity = cleanLines[0]
-        } else {
-          result.villageTownCity = lastLine
-        }
-      }
-      if (!result.district) result.district = lastLine
-    } else if (cleanLines.length >= 4) {
-      if (!result.villageTownCity) result.villageTownCity = cleanLines[2]
-      if (!result.district) result.district = lastLine
-    }
-  } else if (
-    !result.addressLine1 &&
-    cleanLines.length === 2 &&
-    cleanLines[0].split(',').length <= 2 &&
-    cleanLines[1].split(',').length <= 2 &&
-    cleanLines[1].includes(',')
-  ) {
-    result.addressLine1 = cleanLines[0]
-    result.addressLine2 = cleanLines[1]
-    const p2 = cleanLines[1].split(',').map((s) => s.trim())
-    if (p2.length === 2 && !result.district) {
-      result.district = p2[1]
-    }
-  }
-
-  // 5. Process segments (lines or comma-separated)
+  // 4. Split raw text by commas or newlines into clean segments
   const rawSegments = text
     .split(/[\r\n,]+/)
     .map((s) =>
@@ -965,13 +930,14 @@ export function parseStructuredAddress(
         .replace(/^(?:\d+\.|\d+\)|\(\d+\))\s*/, '')
         .replace(/\s*[-=]\s*(?:pres|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/i, '')
         .replace(/^(?:(?:present|permanent)?\s*(?:address\s*line\s*[12]|address|country|district|state(?:\/province)?|province|village(?:\/town\/city)?|town|city|postal\s*code|pin|zip|phone|mobile|telephone|email))\s*[:=]\s*/i, '')
-        .replace(/^(?:WE|VE|NE|ETY|HE|U0|LT|THU|P\d|2\.5\.5)\s+/i, '')
+        .replace(/^(?:WE|VE|NE|ETY|HE\.?|U0|LT|THU|P\d|2\.5\.5)\s+/i, '')
+        .replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '')
         .trim()
     )
     .filter((s) => {
       if (s.length < 2) return false
-      if (/^(ety|NE\s*sea|He\s*\.|pres|aa|bb|cc|dd|WE|VE)$/i.test(s)) return false
-      if (/^[0-9\s\-—_+=./\\]+$/.test(s)) return false
+      if (/^[\s\-—_+=./\\,;]+$/.test(s)) return false
+      if (/^\d{4,}$/.test(s)) return false
       if (/^(?:present|permanent|address|residential|emergency|telephone|phone|email|country|district|state|province|pin|zip)$/i.test(s)) return false
       if (/[—_+=]/.test(s) && s.length < 15) return false
       return true
@@ -982,7 +948,6 @@ export function parseStructuredAddress(
       if (!result.country) result.country = s.toUpperCase()
       return false
     }
-    // Check explicit division/state token (e.g. DHAKA DIVISION)
     const divMatch = s.match(/^([A-Za-z]+)\s*(?:division|state|province)$/i)
     if (divMatch) {
       if (!result.stateProvince) result.stateProvince = divMatch[1].trim()
@@ -991,31 +956,38 @@ export function parseStructuredAddress(
     return true
   })
 
+  // 5. Semantic Assignment based on reference structure:
+  // Address Line 1 = FIRST logical address component
+  // Address Line 2 = SECOND and subsequent local components before city/town
+  // City/Town = LAST component (City/Town)
+  // District = LAST component (if not explicitly set)
   if (segments.length > 0) {
-    if (!result.addressLine1) result.addressLine1 = segments[0]
-
-    // If segment 0 explicitly has VILL: or Village: or Vill:, extract it as villageTownCity
-    if (!result.villageTownCity && /^(?:vill(?:age)?)\b/i.test(segments[0])) {
-      result.villageTownCity = segments[0]
+    if (!result.addressLine1) {
+      result.addressLine1 = segments[0]
     }
 
-    if (segments.length === 2) {
+    if (segments.length === 1) {
+      if (!result.villageTownCity) result.villageTownCity = segments[0]
+      if (!result.district) result.district = segments[0]
+    } else if (segments.length === 2) {
+      if (!result.villageTownCity) result.villageTownCity = segments[1]
       if (!result.district) result.district = segments[1]
     } else if (segments.length === 3) {
       if (!result.addressLine2) result.addressLine2 = segments[1]
+      if (!result.villageTownCity) result.villageTownCity = segments[2]
       if (!result.district) result.district = segments[2]
     } else if (segments.length === 4) {
       if (!result.addressLine2) result.addressLine2 = `${segments[1]}, ${segments[2]}`
+      if (!result.villageTownCity) result.villageTownCity = segments[3]
       if (!result.district) result.district = segments[3]
     } else if (segments.length >= 5) {
-      if (!result.addressLine1) result.addressLine1 = `${segments[0]}, ${segments[1]}`
       if (!result.addressLine2) result.addressLine2 = segments.slice(1, -1).join(', ')
+      if (!result.villageTownCity) result.villageTownCity = segments[segments.length - 1]
       if (!result.district) result.district = segments[segments.length - 1]
     }
   }
 
-
-  // Country resolution: only set if address components actually exist
+  // Country resolution
   if (!result.country && (result.addressLine1 || result.district || result.postalCode || result.villageTownCity)) {
     if (context?.nationality === 'BANGLADESH' || !context?.nationality) {
       result.country = 'BANGLADESH'
@@ -1023,6 +995,12 @@ export function parseStructuredAddress(
       result.country = context.nationality
     }
   }
+
+  // Clean trailing/leading spaces or punctuation from all parsed fields
+  if (result.addressLine1) result.addressLine1 = result.addressLine1.replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '').trim()
+  if (result.addressLine2) result.addressLine2 = result.addressLine2.replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '').trim()
+  if (result.villageTownCity) result.villageTownCity = result.villageTownCity.replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '').trim()
+  if (result.district) result.district = result.district.replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '').trim()
 
   return result
 }
