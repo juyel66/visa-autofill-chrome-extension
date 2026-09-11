@@ -537,6 +537,14 @@ export const App: React.FC = () => {
       )
     }
 
+    if (f.source === 'derived') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-blue-950/80 text-blue-300 border border-blue-700/60">
+          <span>⚙</span> Derived Rule
+        </span>
+      )
+    }
+
     if (f.source === 'passport') {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-700/60">
