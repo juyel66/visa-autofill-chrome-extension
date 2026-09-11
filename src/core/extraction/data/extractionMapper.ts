@@ -91,6 +91,12 @@ export function applyExtractionToApplicant(
   let derivedIsd: string | undefined = rawContactIsd
   let derivedMob: string | undefined = rawContactMob
 
+  const isBd =
+    p.nationality?.value === 'BANGLADESH' ||
+    pres.country?.value === 'BANGLADESH' ||
+    perm.country?.value === 'BANGLADESH' ||
+    pass.issuingCountry?.value === 'BANGLADESH'
+
   if (derivedPhone) {
     const cleanDigits = derivedPhone.replace(/[^\d]/g, '')
     if (derivedPhone.startsWith('+880') || cleanDigits.startsWith('880')) {
@@ -108,10 +114,14 @@ export function applyExtractionToApplicant(
       if (!derivedPhone.startsWith('+')) derivedPhone = `+880${cleanDigits.slice(1)}`
     }
   } else if (derivedMob && derivedIsd) {
-    derivedPhone = `+${derivedIsd}${derivedMob}`
-  } else if (derivedMob && (p.nationality?.value === 'BANGLADESH' || pres.country?.value === 'BANGLADESH' || perm.country?.value === 'BANGLADESH')) {
+    derivedPhone = `+${derivedIsd}${derivedMob.replace(/^0+/, '')}`
+  } else if (derivedMob && isBd) {
     derivedIsd = '880'
-    derivedPhone = `+880${derivedMob}`
+    derivedPhone = `+880${derivedMob.replace(/^0+/, '')}`
+  }
+
+  if (!derivedIsd && isBd) {
+    derivedIsd = '880'
   }
 
   const hasContact = Boolean(
