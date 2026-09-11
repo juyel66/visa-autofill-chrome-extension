@@ -1,6 +1,6 @@
 import type { DocumentRecord } from '../document/types'
 
-export type ApplicationFieldSource = 'passport' | 'official_document' | 'ogd' | 'manual' | 'missing'
+export type ApplicationFieldSource = 'passport' | 'official_document' | 'ogd' | 'manual' | 'derived' | 'missing'
 
 export type SavedApplicationStatus = 'draft' | 'ready_for_autofill'
 
