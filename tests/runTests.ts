@@ -23,8 +23,16 @@ import { runBangladeshiNameNormalizationReligionSafetyTests } from '../src/core/
 import { runAddressContactExtractionTests } from '../src/core/extraction/__tests__/addressContactExtraction.test'
 import { runTask077HardcodeAuditTests } from '../src/core/__tests__/task077HardcodeAudit.test'
 import { runTask079DynamicExtractionTests } from '../src/core/__tests__/task079DynamicExtraction.test'
+import { runTask081AddressSplittingTests } from '../src/core/__tests__/task081AddressSplitting.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 081: DYNAMIC ADDRESS SPLITTING & EXTRACTION TESTS ---')
+  const task081Res = await runTask081AddressSplittingTests()
+  console.log(`Passed: ${task081Res.passed}, Count: ${task081Res.totalSubtests}`)
+  if (!task081Res.passed) {
+    console.error('Failures:', task081Res.failures)
+  }
+
   console.log('--- RUNNING TASK 079: DYNAMIC GEMINI EXTRACTION & ISOLATION TESTS ---')
   const task079Res = await runTask079DynamicExtractionTests()
   console.log(`Passed: ${task079Res.passed}, Count: ${task079Res.totalSubtests}`)
@@ -185,6 +193,8 @@ async function execute() {
   }
 
   const results = {
+    task081: task081Res.passed,
+    task079: task079Res.passed,
     task077: task077Res.passed,
     addrContact: addrContactRes.passed,
     nameSafety: nameSafetyRes.passed,
