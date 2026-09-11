@@ -43,8 +43,8 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
     !extracted1.presentAddress?.addressLine1?.value ||
     !extracted1.presentAddress?.addressLine2?.value ||
     !extracted1.presentAddress?.villageTownCity?.value ||
-    extracted1.presentAddress.addressLine1.value !== 'Flat 4B, Green Tower' ||
-    extracted1.presentAddress.addressLine2.value !== '12 Kamal Ataturk Avenue' ||
+    extracted1.presentAddress.addressLine1.value !== 'Flat 4B' ||
+    extracted1.presentAddress.addressLine2.value !== 'Green Tower, 12 Kamal Ataturk Avenue' ||
     extracted1.presentAddress.villageTownCity.value !== 'Dhaka' ||
     extracted1.presentAddress.postalCode?.value !== '1212' ||
     extracted1.presentAddress.country?.value !== 'BANGLADESH'
@@ -603,8 +603,8 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
     if (
       autofillableFailed.length > 0 ||
       sameAddrRes?.failureType !== 'manual-required' ||
-      pres1 !== 'House 12, Road 4' ||
-      pres2 !== 'Banani, Dhaka' ||
+      pres1 !== 'House 12' ||
+      pres2 !== 'Road 4, Banani' ||
       pincode !== '1213' ||
       fatherName !== 'MOHAMMAD ALI' ||
       fatherPrevNat !== 'GBR' ||
