@@ -166,65 +166,65 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   assert(savedApplication.applicantId === 'applicant_josoda_real', 'SavedApplication applicantId matches')
   assert(savedApplication.status === 'ready_for_autofill', 'SavedApplication status is ready_for_autofill')
 
-  const expectedFields: Record<string, string> = {
-    'appl.surname': 'HOSSAIN',
-    'appl.applname': 'MOHAMMAD ARIF',
-    'appl.applsex': 'MALE',
-    'appl.birthdate': '01/01/1990',
-    'appl.placbrth': 'DHAKA',
-    'appl.country_of_birth': 'BANGLADESH',
-    'appl.nationality': 'BANGLADESH',
-    'appl.countryname': 'BANGLADESH',
-    'appl.nationality_by': 'Birth',
-    'appl.nic_no': '1990123456',
-    'appl.passport_number': 'A01234567',
-    'appl.passport_issue_place': 'DIP/DHAKA',
-    'appl.passport_issue_date': '10/01/2020',
-    'appl.passport_expiry_date': '09/01/2030',
-    'fthrname': 'MOHAMMAD KHURSHED ALAM',
-    'father_nationality': 'BANGLADESH',
-    'father_prev_nationality': 'BANGLADESH',
-    'father_country_of_birth': 'BANGLADESH',
-    'mother_name': 'PARVIN BEGUM',
-    'mother_nationality': 'BANGLADESH',
-    'mother_prev_nationality': 'BANGLADESH',
-    'mother_country_of_birth': 'BANGLADESH',
-    'spouse_name': 'JANNATUL FERDOUS',
-    'spouse_nationality': 'BANGLADESH',
-    'spouse_prev_nationality': 'BANGLADESH',
-    'spouse_country_of_birth': 'BANGLADESH',
-    'marital_status': 'Married',
-    'pres_addr1': 'HOUSE 12',
-    'pres_addr2': 'ROAD 5, BLOCK B',
-    'district': 'DHAKA',
-    'present_country': 'BANGLADESH',
-    'pincode': '1216',
-    'pres_phone': '+8801711111111',
-    'isd_code': '880',
-    'mobile': '1711111111',
-    'perm_add1': 'HOUSE 12',
-    'perm_add2': 'ROAD 5, BLOCK B',
-    'permanent_district': 'DHAKA',
-    'permanent_country': 'BANGLADESH',
-    'permanent_postal_code': '1216',
-    'appl.oth_ppt': 'Yes',
-    'appl.oth_pptno': 'BK1234567',
-    'appl.oth_ppt_issue_place': 'DHAKA',
-    'appl.prev_passport_country_issue': 'BANGLADESH',
-    'appl.other_ppt_nationality': 'BANGLADESH',
+  const expectedPassportFields: Record<string, { value: string; source: 'passport' | 'derived' }> = {
+    'appl.surname': { value: 'HOSSAIN', source: 'passport' },
+    'appl.applname': { value: 'MOHAMMAD ARIF', source: 'passport' },
+    'appl.applsex': { value: 'MALE', source: 'passport' },
+    'appl.birthdate': { value: '01/01/1990', source: 'passport' },
+    'appl.placbrth': { value: 'DHAKA', source: 'passport' },
+    'appl.country_of_birth': { value: 'BANGLADESH', source: 'passport' },
+    'appl.nationality': { value: 'BANGLADESH', source: 'passport' },
+    'appl.countryname': { value: 'BANGLADESH', source: 'passport' },
+    'appl.nationality_by': { value: 'Birth', source: 'passport' },
+    'appl.nic_no': { value: '1990123456', source: 'passport' },
+    'appl.passport_number': { value: 'A01234567', source: 'passport' },
+    'appl.passport_issue_place': { value: 'DIP/DHAKA', source: 'passport' },
+    'appl.passport_issue_date': { value: '10/01/2020', source: 'passport' },
+    'appl.passport_expiry_date': { value: '09/01/2030', source: 'passport' },
+    'fthrname': { value: 'MOHAMMAD KHURSHED ALAM', source: 'passport' },
+    'father_nationality': { value: 'BANGLADESH', source: 'derived' },
+    'father_prev_nationality': { value: 'BANGLADESH', source: 'derived' },
+    'father_country_of_birth': { value: 'BANGLADESH', source: 'derived' },
+    'mother_name': { value: 'PARVIN BEGUM', source: 'passport' },
+    'mother_nationality': { value: 'BANGLADESH', source: 'derived' },
+    'mother_prev_nationality': { value: 'BANGLADESH', source: 'derived' },
+    'mother_country_of_birth': { value: 'BANGLADESH', source: 'derived' },
+    'spouse_name': { value: 'JANNATUL FERDOUS', source: 'passport' },
+    'spouse_nationality': { value: 'BANGLADESH', source: 'derived' },
+    'spouse_prev_nationality': { value: 'BANGLADESH', source: 'derived' },
+    'spouse_country_of_birth': { value: 'BANGLADESH', source: 'derived' },
+    'marital_status': { value: 'Married', source: 'passport' },
+    'pres_addr1': { value: 'HOUSE 12', source: 'derived' },
+    'pres_addr2': { value: 'ROAD 5, BLOCK B', source: 'derived' },
+    'district': { value: 'DHAKA', source: 'derived' },
+    'present_country': { value: 'BANGLADESH', source: 'passport' },
+    'pincode': { value: '1216', source: 'derived' },
+    'pres_phone': { value: '+8801711111111', source: 'passport' },
+    'isd_code': { value: '880', source: 'passport' },
+    'mobile': { value: '1711111111', source: 'passport' },
+    'perm_add1': { value: 'HOUSE 12', source: 'passport' },
+    'perm_add2': { value: 'ROAD 5, BLOCK B', source: 'passport' },
+    'permanent_district': { value: 'DHAKA', source: 'passport' },
+    'permanent_country': { value: 'BANGLADESH', source: 'passport' },
+    'permanent_postal_code': { value: '1216', source: 'passport' },
+    'appl.oth_ppt': { value: 'Yes', source: 'passport' },
+    'appl.oth_pptno': { value: 'BK1234567', source: 'passport' },
   }
 
   const populatedKeys: string[] = []
-  for (const [k, expectedVal] of Object.entries(expectedFields)) {
+  for (const [k, expectedObj] of Object.entries(expectedPassportFields)) {
     const actualVal = String(savedApplication.fields[k]?.value || '')
-    const isMatch = actualVal.toUpperCase() === expectedVal.toUpperCase()
-    assert(isMatch, `Mandatory field "${k}" matches "${expectedVal}" (got "${actualVal}")`)
-    assert(savedApplication.fields[k]?.source === 'passport', `Field "${k}" source provenance is passport`)
+    const isMatch = actualVal.toUpperCase() === expectedObj.value.toUpperCase()
+    assert(isMatch, `Mandatory field "${k}" matches "${expectedObj.value}" (got "${actualVal}")`)
+    assert(savedApplication.fields[k]?.source === expectedObj.source, `Field "${k}" source provenance is ${expectedObj.source} (got "${savedApplication.fields[k]?.source}")`)
     if (isMatch) populatedKeys.push(k)
   }
 
   // Genuinely missing fields
   const expectedGenuinelyMissing = [
+    'appl.oth_ppt_issue_place',
+    'appl.prev_passport_country_issue',
+    'appl.other_ppt_nationality',
     'permanent_village_town_city',
     'permanent_state_province',
     'perm_add3',
