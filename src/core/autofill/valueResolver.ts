@@ -44,5 +44,29 @@ export function resolveApplicantValue(
   }
 
   const strVal = String(current).trim()
-  return strVal !== '' ? strVal : undefined
+  if (strVal !== '') {
+    return strVal
+  }
+
+  // Cross-lookup fallback for phone, mobile, isdCode between contact and presentAddress
+  if (path === 'presentAddress.isdCode' && applicant.contact?.isdCode) {
+    return applicant.contact.isdCode
+  }
+  if (path === 'contact.isdCode' && applicant.presentAddress?.isdCode) {
+    return applicant.presentAddress.isdCode
+  }
+  if (path === 'presentAddress.phone' && applicant.contact?.phone) {
+    return applicant.contact.phone
+  }
+  if (path === 'contact.phone' && applicant.presentAddress?.phone) {
+    return applicant.presentAddress.phone
+  }
+  if (path === 'presentAddress.mobile' && applicant.contact?.mobile) {
+    return applicant.contact.mobile
+  }
+  if (path === 'contact.mobile' && applicant.presentAddress?.mobile) {
+    return applicant.presentAddress.mobile
+  }
+
+  return undefined
 }
