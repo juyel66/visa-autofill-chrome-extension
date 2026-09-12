@@ -261,7 +261,7 @@ export function populateApplicationFromDocuments(options: {
 
     // Priority 2: Passport Document (Primary authoritative source for identity, passport, address)
     if (passportProfile && fieldDef.sourceApplicantPath) {
-      const pVal = resolveApplicantValue(passportProfile, fieldDef.sourceApplicantPath)
+      const pVal = resolveApplicantValue(passportProfile, fieldDef.sourceApplicantPath, { disableTemporaryEmail: true })
       if (pVal !== undefined && pVal !== '') {
         resolvedValue = pVal
         const isPresentAddressField =
@@ -289,7 +289,7 @@ export function populateApplicationFromDocuments(options: {
       // (a) It's a historical field, OR
       // (b) Passport document did not provide a value for this field AND OGD is not a different applicant
       if (isHistorical || (!resolvedValue && (!isPassportIdentityField || !ogdIsDifferentApplicant))) {
-        const ogdVal = resolveApplicantValue(ogdProfile, fieldDef.sourceApplicantPath)
+        const ogdVal = resolveApplicantValue(ogdProfile, fieldDef.sourceApplicantPath, { disableTemporaryEmail: true })
         if (ogdVal !== undefined && ogdVal !== '') {
           if (!resolvedValue || isHistorical) {
             resolvedValue = ogdVal
@@ -1100,6 +1100,7 @@ export function convertSavedApplicationToApplicantProfile(
     travel: {
       duration: getFieldStr('duration'),
       visaEntryType: getFieldStr('visa_entry_id'),
+      purposeOfVisit: getFieldStr('purpose') || getFieldStr('appl.purpose') || getFieldStr('travel.purposeOfVisit'),
       intendedArrivalDate: getFieldDate('journeydate') || getFieldDate('appl.journeydate') || getFieldStr('journeydate') || getFieldStr('appl.journeydate'),
       entryPoint: getFieldStr('entrypoint'),
       exitPoint: getFieldStr('exitpoint'),
