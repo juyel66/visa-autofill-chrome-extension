@@ -26,8 +26,24 @@ import { runTask079DynamicExtractionTests } from '../src/core/__tests__/task079D
 import { runTask081AddressSplittingTests } from '../src/core/__tests__/task081AddressSplitting.test'
 import { runRegistrationAutofillTests } from '../src/countries/india/__tests__/registrationAutofill.test'
 import { runContentScriptInjectionTests } from '../src/core/messaging/__tests__/contentScriptInjection.test'
+import { runTask083PurposeOfVisitTests } from '../src/core/__tests__/task083PurposeOfVisit.test'
+import { runTask084PurposeDebugTests } from '../src/core/__tests__/task084PurposeDebug.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 084: PURPOSE OF VISIT END-TO-END DEBUG TESTS ---')
+  const task084Res = await runTask084PurposeDebugTests()
+  console.log(`Passed: ${task084Res.passed}, Count: ${task084Res.totalSubtests}`)
+  if (!task084Res.passed) {
+    console.error('Failures:', task084Res.failures)
+  }
+
+  console.log('--- RUNNING TASK 083: PURPOSE OF VISIT & REGISTRATION AUTOFILL TESTS ---')
+  const task083Res = await runTask083PurposeOfVisitTests()
+  console.log(`Passed: ${task083Res.passed}, Count: ${task083Res.totalSubtests}`)
+  if (!task083Res.passed) {
+    console.error('Failures:', task083Res.failures)
+  }
+
   console.log('--- RUNNING TASK 082-FIX: CONTENT SCRIPT INJECTION & READINESS TESTS ---')
   const task082FixRes = await runContentScriptInjectionTests()
   console.log(`Passed: ${task082FixRes.passed}, Count: ${task082FixRes.totalSubtests}`)
@@ -209,6 +225,8 @@ async function execute() {
   }
 
   const results = {
+    task084: task084Res.passed,
+    task083: task083Res.passed,
     task082Fix: task082FixRes.passed,
     task082: task082Res.passed,
     task081: task081Res.passed,
