@@ -468,20 +468,20 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
   const hiddenFields = getDefaultHiddenSchemaFields()
 
   assert(
-    allFields.length === 113,
-    `Subtest 26a: Total registered schema fields is 113 (got ${allFields.length})`
+    allFields.length === 114,
+    `Subtest 26a: Total registered schema fields is 114 (got ${allFields.length})`
   )
   assert(
-    visibleFields.length === 94,
-    `Subtest 26b: Default visible fields count is 94 (got ${visibleFields.length})`
+    visibleFields.length === 95,
+    `Subtest 26b: Default visible fields count is 95 (got ${visibleFields.length})`
   )
   assert(
     hiddenFields.length === 19,
     `Subtest 26c: Default hidden fields count is 19 (got ${hiddenFields.length})`
   )
   assert(
-    WORKSPACE_DEFAULT_VISIBLE_FIELDS.length === 92 && WORKSPACE_HIDDEN_FIELDS.length === 17,
-    'Subtest 26d: WORKSPACE_DEFAULT_VISIBLE_FIELDS (92) and WORKSPACE_HIDDEN_FIELDS (17) explicitly configured'
+    WORKSPACE_DEFAULT_VISIBLE_FIELDS.length === 93 && WORKSPACE_HIDDEN_FIELDS.length === 17,
+    'Subtest 26d: WORKSPACE_DEFAULT_VISIBLE_FIELDS (93) and WORKSPACE_HIDDEN_FIELDS (17) explicitly configured'
   )
 
   // Subtest 26e: All 10 Workspace Sections defined and cover all workspace fields
@@ -491,8 +491,8 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
   )
   const totalSectionFields = WORKSPACE_SECTIONS.flatMap((s) => s.fieldKeys)
   assert(
-    totalSectionFields.length === 109,
-    `Subtest 26f: All 10 Workspace sections map to all 109 section fields (got ${totalSectionFields.length})`
+    totalSectionFields.length === 110,
+    `Subtest 26f: All 10 Workspace sections map to all 110 section fields (got ${totalSectionFields.length})`
   )
 
   // Subtest 27: Hidden fields remain in SavedApplication and retain populated values
@@ -525,8 +525,8 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
   await saveApplication(khokonApp)
   const reloadedKhokon = await getSavedApplicationByApplicantId('KHOKON_001')
   assert(
-    reloadedKhokon !== null && Object.keys(reloadedKhokon.fields).length === 110,
-    'Subtest 28a: SavedApplication preserves all 110 unique fields in storage'
+    reloadedKhokon !== null && Object.keys(reloadedKhokon.fields).length === 111,
+    'Subtest 28a: SavedApplication preserves all 111 unique fields in storage'
   )
   assert(
     reloadedKhokon?.fields['appl.surname']?.value === 'AHMED',
