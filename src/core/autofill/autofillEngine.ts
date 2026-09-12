@@ -329,25 +329,27 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
 
         // Resolve Value
         let resolvedValue = resolveApplicantValue(applicant, mapping.sourceField)
-        if (resolvedValue === undefined || resolvedValue === '') {
-          if (mapping.required) {
-            fieldResult = {
-              fieldId: mapping.id,
-              status: 'failed',
-              failureType: 'source-data-missing',
-              reason: 'Required source field is missing from confirmed applicant document data.',
-              attempts,
-            }
-            break // non-recoverable, do not retry
-          }
+        const valuePresent = Boolean(resolvedValue !== undefined && resolvedValue !== '')
+        console.log(`[Autofill Diagnostic] Field: ${mapping.id} (${mapping.targetField}) | source=SavedApplication, valuePresent=${valuePresent}`)
+
+        if (!valuePresent) {
           fieldResult = {
             fieldId: mapping.id,
             status: 'skipped',
-            reason: 'Applicant confirmed data contains no value for optional field.',
+            failureType: 'source-data-missing',
+            reason: 'Source value is not present in SavedApplication.',
             attempts,
           }
           success = true
           break
+        }
+
+        // For dynamic dropdowns (like Indian Mission), wait briefly if options are currently empty
+        if (typeof HTMLSelectElement !== 'undefined' && element instanceof HTMLSelectElement) {
+          const opts = element.options ? Array.from(element.options).filter((o) => o.value !== '' || o.text.trim() !== '') : []
+          if (opts.length === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
         }
 
         if (mapping.transform) {

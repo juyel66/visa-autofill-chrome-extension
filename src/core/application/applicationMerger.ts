@@ -978,6 +978,12 @@ export function convertSavedApplicationToApplicantProfile(
     updatedAt: savedApp.updatedAt,
     notes: baseProfile?.notes,
 
+    registration: {
+      applyingFromCountry: getFieldStr('appl.countryname') || getFieldStr('present_country'),
+      indianMission: getFieldStr('appl.missioncode') || getFieldStr('missioncode'),
+      nationality: getFieldStr('appl.nationality') || getFieldStr('nationality'),
+    },
+
     personalInfo: {
       surname: getFieldStr('appl.surname'),
       givenNames: getFieldStr('appl.applname'),
@@ -989,14 +995,14 @@ export function convertSavedApplicationToApplicantProfile(
         if (g === 'other' || g === 'transgender') return 'other'
         return undefined
       })(),
-      dateOfBirth: getFieldDate('appl.birthdate'),
+      dateOfBirth: getFieldDate('appl.birthdate') || getFieldStr('appl.birthdate') || getFieldDate('birthdate') || getFieldStr('birthdate'),
       townCityOfBirth: getFieldStr('appl.placbrth'),
       countryOfBirth: getFieldStr('appl.country_of_birth'),
       nationalIdNumber: getFieldStr('appl.nic_no'),
       religion: getFieldStr('appl.religion'),
       visibleIdentificationMarks: getFieldStr('appl.visual_mark'),
       educationalQualification: getFieldStr('appl.edu_id'),
-      nationality: getFieldStr('appl.nationality'),
+      nationality: getFieldStr('appl.nationality') || getFieldStr('nationality'),
       nationalityAcquiredBy: (() => {
         const n = getFieldStr('appl.nationality_by')?.toLowerCase()
         if (n?.includes('birth')) return 'birth'
@@ -1045,7 +1051,7 @@ export function convertSavedApplicationToApplicantProfile(
     },
 
     contact: {
-      email: getFieldStr('appl.email'),
+      email: getFieldStr('appl.email') || getFieldStr('email'),
       phone: getFieldStr('pres_phone'),
       isdCode: getFieldStr('isd_code'),
       mobile: getFieldStr('mobile'),
@@ -1094,7 +1100,7 @@ export function convertSavedApplicationToApplicantProfile(
     travel: {
       duration: getFieldStr('duration'),
       visaEntryType: getFieldStr('visa_entry_id'),
-      intendedArrivalDate: getFieldDate('journeydate') || getFieldDate('appl.journeydate'),
+      intendedArrivalDate: getFieldDate('journeydate') || getFieldDate('appl.journeydate') || getFieldStr('journeydate') || getFieldStr('appl.journeydate'),
       entryPoint: getFieldStr('entrypoint'),
       exitPoint: getFieldStr('exitpoint'),
       countriesVisited: getFieldStr('country_visited'),

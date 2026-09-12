@@ -31,10 +31,18 @@ import {
   getIndiaVisaMappings,
 } from '../countries/india'
 
-console.log('[VISA AUTOFILL] content script loaded', {
-  hostname: typeof window !== 'undefined' ? window.location.hostname : '',
-  pathname: typeof window !== 'undefined' ? window.location.pathname : '',
-})
+const initDet = detectIndiaVisaPage()
+const initPageDisplayName = initDet.page
+  ? initDet.page === 'REGISTRATION'
+    ? 'Registration'
+    : initDet.page
+  : 'Unknown'
+
+console.log(
+  `[Visa Autofill]\nContent script initialized\nURL: ${
+    typeof window !== 'undefined' ? window.location.pathname : ''
+  }\nPage: ${initPageDisplayName}\nAdapter: ${initDet.matched ? 'ready' : 'idle'}`
+)
 
 let activeState: WorkflowState = createInitialWorkflowState()
 let observerCleanup: (() => void) | null = null
@@ -179,7 +187,10 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === 'EXECUTE_AUTOFILL') {
       const detection = detectIndiaVisaPage()
-      console.log('[VISA AUTOFILL Content] Received EXECUTE_AUTOFILL request on page:', detection.page, 'flow:', detection.flow)
+      const currentPageName =
+        detection.page === 'REGISTRATION' ? 'Registration' : detection.page || 'Unknown'
+
+      console.log(`[Visa Autofill]\nEXECUTE_AUTOFILL received\nPage: ${currentPageName}`)
 
       if (!detection.matched || detection.page === 'unknown' || !detection.page) {
         activeState = updateWorkflowState(activeState, {
@@ -293,7 +304,12 @@ chrome.runtime.onMessage.addListener(
             },
           })
             .then((result) => {
-              console.log(`[VISA AUTOFILL Content] Autofill execution completed: ${result.filledFields} filled, ${result.skippedFields} skipped, ${result.failedFields} failed.`)
+              const manualCount = result.results.filter(
+                (r) => r.failureType === 'manual-required' || r.fieldId.includes('captcha')
+              ).length
+              console.log(
+                `[Visa Autofill]\nAutofill completed\nPage: ${currentPageName}\nFields processed: ${result.totalFields}\nFields filled: ${result.filledFields}\nFields skipped: ${result.skippedFields}\nManual: ${manualCount > 0 ? 'CAPTCHA' : 'None'}`
+              )
 
               if (detection.page && !activeState.completedPages.includes(detection.page)) {
                 activeState = updateWorkflowState(activeState, {

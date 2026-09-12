@@ -59,9 +59,14 @@ export async function sendMessageToTab<T>(
       chrome.tabs.sendMessage(tabId, message, (response: ExtensionResponse<T>) => {
         const lastError = chrome.runtime.lastError
         if (lastError) {
+          const msg = lastError.message || ''
+          const isReceiverMissing =
+            msg.includes('Receiving end does not exist') || msg.includes('Could not establish connection')
           resolve({
             status: 'error',
-            error: 'Content script is not available on this page.',
+            error: isReceiverMissing
+              ? 'Content script is not available on this page.'
+              : lastError.message || 'Error communicating with content script.',
           })
           return
         }
@@ -69,17 +74,17 @@ export async function sendMessageToTab<T>(
         if (!response) {
           resolve({
             status: 'error',
-            error: 'Content script is not available on this page.',
+            error: 'No response received from content script on this page.',
           })
           return
         }
 
         resolve(response)
       })
-    } catch {
+    } catch (err) {
       resolve({
         status: 'error',
-        error: 'Content script is not available on this page.',
+        error: err instanceof Error ? err.message : 'Content script is not available on this page.',
       })
     }
   })

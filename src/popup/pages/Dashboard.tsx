@@ -51,6 +51,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [autofillSummary, setAutofillSummary] = useState<{
+    page: string
+    items: { label: string; status: 'filled' | 'skipped' | 'manual' | 'failed'; reason?: string }[]
+  } | null>(null)
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg)
@@ -368,24 +372,64 @@ export const Dashboard: React.FC<DashboardProps> = ({
         applicant: selectedApplicant,
       })
 
-      if (response.status === 'success' && response.data?.result) {
+      if (response && response.status === 'success' && response.data?.result) {
         const res = response.data.result
-        const filled = res.filledFields
-        const alreadyFilled = res.results.filter(
-          (r) => r.status === 'already-matching' || r.status === 'already-filled' || r.status === 'skipped-existing'
-        ).length
-        const missing = res.results.filter(
-          (r) => r.status === 'skipped' || r.failureType === 'source-data-missing'
-        ).length
+        const filled = res.filledFields || 0
+        const missing = res.skippedFields || 0
         const manualCount = res.results.filter(
+          (r) => r.failureType === 'manual-required' || r.fieldId.includes('captcha')
+        ).length
+        const alreadyFilled = res.results.filter(
           (r) =>
-            r.failureType === 'manual-required' ||
-            r.status === 'unsupported' ||
-            r.failureType === 'unsupported-field'
+            r.status === 'already-matching' ||
+            r.status === 'already-filled' ||
+            r.status === 'skipped-existing'
         ).length
 
+        const fieldLabelMap: Record<string, string> = {
+          bd_reg_country: 'Country',
+          bd_reg_indian_mission: 'Indian Mission',
+          bd_reg_nationality: 'Nationality',
+          bd_reg_dob: 'Date of Birth',
+          bd_reg_email: 'Email',
+          bd_reg_email_confirm: 'Confirm Email',
+          bd_reg_expected_arrival: 'Journey Date',
+          bd_reg_captcha: 'CAPTCHA',
+        }
+
+        const items = res.results.map((r) => {
+          let itemStatus: 'filled' | 'skipped' | 'manual' | 'failed' = 'failed'
+          if (
+            r.status === 'filled' ||
+            r.status === 'already-matching' ||
+            r.status === 'already-filled' ||
+            r.status === 'skipped-existing'
+          ) {
+            itemStatus = 'filled'
+          } else if (
+            r.failureType === 'manual-required' ||
+            r.status === 'unsupported' ||
+            r.failureType === 'unsupported-field' ||
+            r.fieldId.includes('captcha')
+          ) {
+            itemStatus = 'manual'
+          } else if (r.status === 'skipped' || r.failureType === 'source-data-missing') {
+            itemStatus = 'skipped'
+          }
+
+          const label = fieldLabelMap[r.fieldId] || r.fieldId.replace(/^bd_[a-z]+_/, '').replace(/_/g, ' ')
+          return {
+            label,
+            status: itemStatus,
+            reason: r.reason,
+          }
+        })
+
+        const pageName = detection?.page ? (detection.page === 'REGISTRATION' ? 'Registration' : detection.page) : 'Autofill'
+        setAutofillSummary({ page: pageName, items })
+
         showToast(
-          `✓ Filled: ${filled} | Already filled: ${alreadyFilled} | Blank: ${missing} | Manual/Security: ${manualCount}`
+          `✓ Filled: ${filled} | Already filled: ${alreadyFilled} | Blank: ${missing} | Manual: ${manualCount}`
         )
         setCanUndo(true)
       } else {
@@ -679,6 +723,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
               >
                 {isUndoing ? 'Undoing...' : '↩ Undo Last Autofill'}
               </button>
+            )}
+
+            {autofillSummary && (
+              <div className="mt-3 bg-slate-950/90 rounded-lg p-2.5 border border-slate-700/80 text-[11px] space-y-1.5 shadow-inner">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1 font-bold text-slate-200">
+                  <span className="flex items-center gap-1">📋 {autofillSummary.page} Page</span>
+                  <button
+                    onClick={() => setAutofillSummary(null)}
+                    className="text-slate-400 hover:text-white cursor-pointer px-1"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="space-y-1 pt-0.5">
+                  {autofillSummary.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-0.5">
+                      <span className="text-slate-300">{item.label}</span>
+                      {item.status === 'filled' ? (
+                        <span className="text-emerald-400 font-semibold flex items-center gap-1">✓ Filled</span>
+                      ) : item.status === 'manual' ? (
+                        <span className="text-amber-400 font-semibold flex items-center gap-1">○ Manual</span>
+                      ) : item.status === 'skipped' ? (
+                        <span className="text-slate-400 italic">Skipped</span>
+                      ) : (
+                        <span className="text-rose-400 font-semibold" title={item.reason}>✕ Failed</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>

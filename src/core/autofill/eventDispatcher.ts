@@ -46,9 +46,10 @@ export function dispatchFieldEvents(element: HTMLElement): void {
   if (!element) return
 
   try {
-    element.dispatchEvent(new Event('input', { bubbles: true }))
-    element.dispatchEvent(new Event('change', { bubbles: true }))
-    element.dispatchEvent(new Event('blur', { bubbles: true }))
+    const EventConstructor = (element.ownerDocument?.defaultView?.Event || globalThis.Event || Event) as typeof Event
+    element.dispatchEvent(new EventConstructor('input', { bubbles: true }))
+    element.dispatchEvent(new EventConstructor('change', { bubbles: true }))
+    element.dispatchEvent(new EventConstructor('blur', { bubbles: true }))
   } catch (err) {
     console.error('Failed to dispatch DOM events:', err)
   }

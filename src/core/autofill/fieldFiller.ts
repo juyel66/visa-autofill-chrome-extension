@@ -1,7 +1,10 @@
 import { dispatchFieldEvents, setNativeInputValue } from './eventDispatcher'
 import { verifyDomValue } from './domVerifier'
 import { normalizeDateForControl } from './dateNormalizer'
+import { findMatchingSelectOption, selectOptionAndDispatchEvents } from './selectResolver'
 import type { AutofillFieldResult, AutofillPolicy, FieldMapping } from './types'
+
+export { findMatchingSelectOption, selectOptionAndDispatchEvents } from './selectResolver'
 
 function safeCssEscape(val: string): string {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
@@ -126,47 +129,17 @@ export function fillField(
       return { fieldId, status: 'skipped-existing', failureType: 'skipped-existing', reason: 'Radio group already has a selection' }
     }
   } else if (element instanceof HTMLSelectElement) {
-    const valLower = strValue.trim().toLowerCase()
-    const matchingOptions = Array.from(element.options).filter(
-      (opt) => opt.value.toLowerCase() === valLower || opt.text.trim().toLowerCase() === valLower
-    )
+    const { option: matchedOption, ambiguous } = findMatchingSelectOption(element, strValue)
 
-    let matchedOptionValue: string | null = null
-    if (matchingOptions.length === 1) {
-      matchedOptionValue = matchingOptions[0].value
-    } else if (matchingOptions.length > 1) {
-      return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Multiple select options match value' }
-    } else {
-      // Suffix / structured match
-      const secondaryMatches = Array.from(element.options).filter((opt) => {
-        const optVal = opt.value.trim().toLowerCase()
-        const optText = opt.text.trim().toLowerCase()
-        return (
-          optVal.endsWith('-' + valLower) ||
-          optVal.endsWith(' ' + valLower) ||
-          optText.endsWith('-' + valLower) ||
-          optText.endsWith(' ' + valLower) ||
-          optText.endsWith('- ' + valLower) ||
-          optText.endsWith(' - ' + valLower) ||
-          optText.startsWith(valLower + ' -') ||
-          optText.startsWith(valLower + ' ') ||
-          optVal.startsWith(valLower + '_') ||
-          optVal.startsWith(valLower + '-')
-        )
-      })
-
-      if (secondaryMatches.length === 1) {
-        matchedOptionValue = secondaryMatches[0].value
-      } else if (secondaryMatches.length > 1) {
-        return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Multiple select options match value' }
-      }
+    if (ambiguous) {
+      return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Ambiguous select choices' }
     }
 
-    if (matchedOptionValue === null) {
-      return { fieldId, status: 'failed', failureType: 'option-not-found', reason: 'Matching option could not be found.' }
+    if (!matchedOption) {
+      return { fieldId, status: 'failed', failureType: 'option-not-found', reason: `No matching dropdown option for "${strValue}"` }
     }
 
-    if (element.value === matchedOptionValue) {
+    if (element.value === matchedOption.value) {
       return { fieldId, status: 'already-matching', failureType: 'already-matching', reason: 'Dropdown option matches source' }
     }
 
@@ -194,46 +167,17 @@ export function fillField(
   try {
     // A. Select dropdown
     if (element instanceof HTMLSelectElement) {
-      const valLower = strValue.trim().toLowerCase()
-      const exactMatches = Array.from(element.options).filter(
-        (opt) => opt.value.toLowerCase() === valLower || opt.text.trim().toLowerCase() === valLower
-      )
+      const { option: matchedOption, ambiguous } = findMatchingSelectOption(element, strValue)
 
-      let matchedOption: HTMLOptionElement | null = null
-      if (exactMatches.length === 1) {
-        matchedOption = exactMatches[0]
-      } else if (exactMatches.length > 1) {
+      if (ambiguous) {
         return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Ambiguous select choices' }
-      } else {
-        const secondaryMatches = Array.from(element.options).filter((opt) => {
-          const optVal = opt.value.trim().toLowerCase()
-          const optText = opt.text.trim().toLowerCase()
-          return (
-            optVal.endsWith('-' + valLower) ||
-            optVal.endsWith(' ' + valLower) ||
-            optText.endsWith('-' + valLower) ||
-            optText.endsWith(' ' + valLower) ||
-            optText.endsWith('- ' + valLower) ||
-            optText.endsWith(' - ' + valLower) ||
-            optText.startsWith(valLower + ' -') ||
-            optText.startsWith(valLower + ' ') ||
-            optVal.startsWith(valLower + '_') ||
-            optVal.startsWith(valLower + '-')
-          )
-        })
-
-        if (secondaryMatches.length === 1) {
-          matchedOption = secondaryMatches[0]
-        } else if (secondaryMatches.length > 1) {
-          return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Ambiguous select choices' }
-        }
       }
 
       if (!matchedOption) {
         return { fieldId, status: 'failed', failureType: 'option-not-found', reason: `No matching dropdown option for "${strValue}"` }
       }
 
-      setNativeInputValue(element, matchedOption.value)
+      selectOptionAndDispatchEvents(element, matchedOption)
 
       // Post-fill verification
       const verifyRes = verifyDomValue(element, mapping, matchedOption.value)

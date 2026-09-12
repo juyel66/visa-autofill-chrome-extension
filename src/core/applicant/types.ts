@@ -155,8 +155,15 @@ export interface AdditionalQuestionsDetails {
   question6?: AdditionalQuestionAnswer
 }
 
+export interface RegistrationDetails {
+  applyingFromCountry?: string
+  indianMission?: string
+  nationality?: string
+}
+
 export interface ApplicantProfile {
   applicantId: string
+  registration?: RegistrationDetails
   personalInfo?: PersonalInfo
   passport?: PassportDetails
   presentAddress?: Address

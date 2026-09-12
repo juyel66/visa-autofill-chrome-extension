@@ -24,8 +24,24 @@ import { runAddressContactExtractionTests } from '../src/core/extraction/__tests
 import { runTask077HardcodeAuditTests } from '../src/core/__tests__/task077HardcodeAudit.test'
 import { runTask079DynamicExtractionTests } from '../src/core/__tests__/task079DynamicExtraction.test'
 import { runTask081AddressSplittingTests } from '../src/core/__tests__/task081AddressSplitting.test'
+import { runRegistrationAutofillTests } from '../src/countries/india/__tests__/registrationAutofill.test'
+import { runContentScriptInjectionTests } from '../src/core/messaging/__tests__/contentScriptInjection.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 082-FIX: CONTENT SCRIPT INJECTION & READINESS TESTS ---')
+  const task082FixRes = await runContentScriptInjectionTests()
+  console.log(`Passed: ${task082FixRes.passed}, Count: ${task082FixRes.totalSubtests}`)
+  if (!task082FixRes.passed) {
+    console.error('Failures:', task082FixRes.failures)
+  }
+
+  console.log('--- RUNNING TASK 082: INDIAN VISA REGISTRATION PAGE AUTOFILL TESTS ---')
+  const task082Res = await runRegistrationAutofillTests()
+  console.log(`Passed: ${task082Res.passed}, Count: ${task082Res.totalSubtests}`)
+  if (!task082Res.passed) {
+    console.error('Failures:', task082Res.failures)
+  }
+
   console.log('--- RUNNING TASK 081: DYNAMIC ADDRESS SPLITTING & EXTRACTION TESTS ---')
   const task081Res = await runTask081AddressSplittingTests()
   console.log(`Passed: ${task081Res.passed}, Count: ${task081Res.totalSubtests}`)
@@ -193,6 +209,8 @@ async function execute() {
   }
 
   const results = {
+    task082Fix: task082FixRes.passed,
+    task082: task082Res.passed,
     task081: task081Res.passed,
     task079: task079Res.passed,
     task077: task077Res.passed,

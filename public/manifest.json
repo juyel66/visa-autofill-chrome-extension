@@ -14,17 +14,27 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*/*",
-        "http://*/*"
+        "https://indianvisa-bangladesh.nic.in/visa/*",
+        "https://indianvisa-bangladesh.nic.in/*",
+        "https://indianvisaonline.gov.in/visa/*",
+        "https://indianvisaonline.gov.in/*",
+        "http://*/*",
+        "https://*/*"
       ],
       "js": [
         "content.js"
-      ]
+      ],
+      "run_at": "document_idle"
     }
+  ],
+  "host_permissions": [
+    "https://indianvisa-bangladesh.nic.in/*",
+    "https://indianvisaonline.gov.in/*"
   ],
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "scripting"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
