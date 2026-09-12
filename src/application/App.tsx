@@ -55,7 +55,7 @@ export const App: React.FC = () => {
     async (targetId: string, appList: ApplicantProfile[], allDocs: DocumentRecord[]) => {
       const existing = await getSavedApplicationByApplicantId(targetId)
       const profileDocs = allDocs.filter((d) => d.applicantId === targetId)
-      let passportDoc = getLatestDocument(profileDocs, 'passport')
+      let passportDoc = getLatestDocument(profileDocs, 'passport') || profileDocs.find((d) => d.extractedDataConfirmed && d.extractedData)
       const ogdDoc = getLatestDocument(profileDocs, 'ogd')
       const activeProf = appList.find((a) => a.applicantId === targetId)
 
@@ -106,6 +106,26 @@ export const App: React.FC = () => {
                 family: {
                   ...passportDoc.extractedData?.family,
                   ...reExtracted.family,
+                },
+                employment: {
+                  ...passportDoc.extractedData?.employment,
+                  ...reExtracted.employment,
+                },
+                travel: {
+                  ...passportDoc.extractedData?.travel,
+                  ...reExtracted.travel,
+                },
+                previousVisa: {
+                  ...passportDoc.extractedData?.previousVisa,
+                  ...reExtracted.previousVisa,
+                },
+                sponsorIndia: {
+                  ...passportDoc.extractedData?.sponsorIndia,
+                  ...reExtracted.sponsorIndia,
+                },
+                sponsorMission: {
+                  ...passportDoc.extractedData?.sponsorMission,
+                  ...reExtracted.sponsorMission,
                 },
               },
               extractedDataConfirmed: true,
