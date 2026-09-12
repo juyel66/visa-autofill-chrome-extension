@@ -20,19 +20,27 @@ export async function runRegistrationAutofillTests(): Promise<TestSuiteResult> {
 
   const prevDoc = (globalThis as unknown as { document?: Document }).document
   const prevWindow = (globalThis as unknown as { window?: Window }).window
+  const prevHTMLElement = (globalThis as unknown as { HTMLElement?: typeof HTMLElement }).HTMLElement
+  const prevHTMLInputElement = (globalThis as unknown as { HTMLInputElement?: typeof HTMLInputElement }).HTMLInputElement
+  const prevHTMLSelectElement = (globalThis as unknown as { HTMLSelectElement?: typeof HTMLSelectElement }).HTMLSelectElement
+  const prevHTMLTextAreaElement = (globalThis as unknown as { HTMLTextAreaElement?: typeof HTMLTextAreaElement }).HTMLTextAreaElement
+  const prevHTMLButtonElement = (globalThis as unknown as { HTMLButtonElement?: typeof HTMLButtonElement }).HTMLButtonElement
+  const prevEvent = (globalThis as unknown as { Event?: typeof Event }).Event
 
   const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
     url: 'https://indianvisa-bangladesh.nic.in/visa/Registration',
   })
   const doc = dom.window.document
-  ;(globalThis as unknown as { document: Document }).document = doc
-  ;(globalThis as unknown as { window: Window }).window = dom.window as unknown as Window
-  ;(globalThis as unknown as { HTMLElement: typeof HTMLElement }).HTMLElement = dom.window.HTMLElement
-  ;(globalThis as unknown as { HTMLInputElement: typeof HTMLInputElement }).HTMLInputElement = dom.window.HTMLInputElement
-  ;(globalThis as unknown as { HTMLSelectElement: typeof HTMLSelectElement }).HTMLSelectElement = dom.window.HTMLSelectElement
-  ;(globalThis as unknown as { HTMLTextAreaElement: typeof HTMLTextAreaElement }).HTMLTextAreaElement = dom.window.HTMLTextAreaElement
-  ;(globalThis as unknown as { HTMLButtonElement: typeof HTMLButtonElement }).HTMLButtonElement = dom.window.HTMLButtonElement
-  ;(globalThis as unknown as { Event: typeof Event }).Event = dom.window.Event
+  Object.defineProperty(globalThis, 'document', { value: doc, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'window', { value: dom.window, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'HTMLElement', { value: dom.window.HTMLElement, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'HTMLInputElement', { value: dom.window.HTMLInputElement, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'HTMLSelectElement', { value: dom.window.HTMLSelectElement, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'HTMLTextAreaElement', { value: dom.window.HTMLTextAreaElement, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'HTMLButtonElement', { value: dom.window.HTMLButtonElement, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'Event', { value: dom.window.Event, configurable: true, writable: true })
+
+  try {
 
   function assert(condition: boolean, message: string) {
     totalSubtests++
@@ -399,12 +407,12 @@ export async function runRegistrationAutofillTests(): Promise<TestSuiteResult> {
     assert(missionEl.value === '10', `USA Mission should be selected, got "${missionEl.value}"`)
     assert(nationalityEl.value === 'USA', `USA Nationality should be selected from AMERICAN, got "${nationalityEl.value}"`)
     assert(dobEl.value === '25/12/1985', `DOB should be 25/12/1985, got "${dobEl.value}"`)
-    assert(emailEl.value === '', `Missing email must remain blank, got "${emailEl.value}"`)
+    assert(emailEl.value.includes('@temporary-visa-app.com'), `Missing email should be populated with dynamic temporary email, got "${emailEl.value}"`)
     assert(journeyEl.value === '', `Missing journey date must remain blank, got "${journeyEl.value}"`)
 
-    // Verify missing fields results structure -> SKIPPED
+    // Verify missing fields results structure: email filled via temp, journey date -> SKIPPED
     const emailResult = autofillResultB.results.find((r) => r.fieldId === 'bd_reg_email')
-    assert(Boolean(emailResult && emailResult.status === 'skipped'), 'Missing email must be reported as skipped')
+    assert(Boolean(emailResult && emailResult.status === 'filled'), 'Dynamic temporary email should be reported as filled')
 
     const journeyResult = autofillResultB.results.find((r) => r.fieldId === 'bd_reg_expected_arrival')
     assert(Boolean(journeyResult && journeyResult.status === 'skipped'), 'Missing journey date must be reported as skipped')
@@ -474,22 +482,82 @@ export async function runRegistrationAutofillTests(): Promise<TestSuiteResult> {
   }
 
   // =========================================================================
-  // 7. DYNAMIC DEPENDENT MISSION POPULATION SIMULATION
+  // 8. BANGLADESH CENTRALIZED DEFAULT MISSION (BANGLADESH-RAJSHAHI) & EXPLICIT OVERRIDE
   // =========================================================================
   {
     doc.body.innerHTML = `
-      <form id="visa_registration_form_3">
-        <select name="appl.countryname" id="countryname_id">
-          <option value="">Select Country</option>
-          <option value="BGD">BANGLADESH</option>
-        </select>
-        <!-- Mission starts empty (simulating dynamic AJAX load upon country change) -->
+      <form id="visa_registration_form_mission">
+        <select name="appl.countryname" id="countryname_id"><option value="BGD">BANGLADESH</option></select>
         <select name="appl.missioncode" id="missioncode_id">
           <option value="">Select Mission</option>
+          <option value="01">BANGLADESH - DHAKA</option>
+          <option value="02">BANGLADESH - CHITTAGONG</option>
+          <option value="03">BANGLADESH - RAJSHAHI</option>
+          <option value="04">BANGLADESH - SYLHET</option>
         </select>
+        <select name="appl.nationality" id="nationality_id"><option value="BGD">BANGLADESH</option></select>
+        <input type="text" name="appl.birthdate" id="dob_id" value="" />
+        <input type="text" name="appl.email" id="email_id" value="" />
+        <input type="text" name="appl.email_re" id="email_re_id" value="" />
+        <input type="text" name="appl.journeydate" id="jouryney_id" value="" />
+        <input type="text" name="captcha" id="captcha" value="" />
+      </form>
+    `
+
+    // Test 8.1: No explicit mission -> Uses configured default (BANGLADESH-RAJSHAHI)
+    const appNoMission: ApplicantProfile = {
+      applicantId: 'APPL_NO_MISSION',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      personalInfo: { dateOfBirth: '1990-01-01', nationality: 'BANGLADESH' },
+      registration: { applyingFromCountry: 'BANGLADESH' },
+    }
+
+    const autofillResDefault = await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: appNoMission,
+      options: { policy: 'fill-empty' },
+    })
+
+    const missionEl = doc.getElementById('missioncode_id') as HTMLSelectElement
+    assert(missionEl.value === '03', `Default mission should resolve to "03" (RAJSHAHI), got "${missionEl.value}"`)
+    const missionRes = autofillResDefault.results.find((r) => r.fieldId === 'bd_reg_indian_mission')
+    assert(missionRes?.status === 'filled', 'Default mission should be reported as filled')
+
+    // Test 8.2: Explicit mission overrides default
+    const appExplicitMission: ApplicantProfile = {
+      applicantId: 'APPL_EXP_MISSION',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      personalInfo: { dateOfBirth: '1990-01-01', nationality: 'BANGLADESH' },
+      registration: { applyingFromCountry: 'BANGLADESH', indianMission: 'BANGLADESH - SYLHET' },
+    }
+
+    doc.getElementById('missioncode_id')!.setAttribute('value', '')
+    ;(doc.getElementById('missioncode_id') as HTMLSelectElement).value = ''
+
+    await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: appExplicitMission,
+      options: { policy: 'overwrite' },
+    })
+
+    assert(missionEl.value === '04', `Explicit mission should override default and resolve to "04" (SYLHET), got "${missionEl.value}"`)
+  }
+
+  // =========================================================================
+  // 9. NATIONALITY DYNAMIC PRIORITY & COUNTRY-OF-BIRTH FALLBACK
+  // =========================================================================
+  {
+    doc.body.innerHTML = `
+      <form id="visa_registration_form_nat">
+        <select name="appl.countryname" id="countryname_id"><option value="BGD">BANGLADESH</option></select>
+        <select name="appl.missioncode" id="missioncode_id"><option value="01">BANGLADESH - DHAKA</option></select>
         <select name="appl.nationality" id="nationality_id">
           <option value="">Select Nationality</option>
           <option value="BGD">BANGLADESH</option>
+          <option value="USA">UNITED STATES</option>
+          <option value="CAN">CANADA</option>
         </select>
         <input type="text" name="appl.birthdate" id="dob_id" value="" />
         <input type="text" name="appl.email" id="email_id" value="" />
@@ -499,55 +567,367 @@ export async function runRegistrationAutofillTests(): Promise<TestSuiteResult> {
       </form>
     `
 
-    const countrySelect = doc.getElementById('countryname_id') as HTMLSelectElement
-    const missionSelect = doc.getElementById('missioncode_id') as HTMLSelectElement
+    const natEl = doc.getElementById('nationality_id') as HTMLSelectElement
 
-    // Simulate portal script that populates mission dropdown when country change event fires
-    countrySelect.addEventListener('change', () => {
-      const opt = doc.createElement('option')
-      opt.value = '01'
-      opt.text = 'BANGLADESH - DHAKA'
-      missionSelect.appendChild(opt)
-    })
-
-    const testApplicant: ApplicantProfile = {
-      applicantId: 'APPL_DYNAMIC',
+    // Test 9.1: Explicit nationality differs from Country of Birth -> explicit nationality wins
+    const appDiffNat: ApplicantProfile = {
+      applicantId: 'APPL_DIFF_NAT',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      registration: {
-        applyingFromCountry: 'BANGLADESH',
-        indianMission: 'BANGLADESH - DHAKA',
-        nationality: 'BANGLADESH',
-      },
       personalInfo: {
-        dateOfBirth: '1990-01-01',
-        nationality: 'BANGLADESH',
-      },
-      contact: {
-        email: 'test@example.com',
-      },
-      travel: {
-        intendedArrivalDate: '2026-11-01',
+        nationality: 'AMERICAN',
+        countryOfBirth: 'BANGLADESH',
+        dateOfBirth: '1992-04-10',
       },
     }
 
-    const autofillRes = await executeAutofill({
+    await executeAutofill({
       mappings: BANGLADESH_REGISTRATION_MAPPINGS,
-      applicant: testApplicant,
-      options: { policy: 'fill-empty' },
+      applicant: appDiffNat,
+      options: { policy: 'overwrite' },
     })
 
-    assert(countrySelect.value === 'BGD', 'Country should be set')
-    assert(missionSelect.value === '01', `Mission select should be populated and selected to "01", got "${missionSelect.value}"`)
-    assert(autofillRes.filledFields === 7, `Expected all 7 fields filled with dynamic mission, got ${autofillRes.filledFields}`)
+    assert(natEl.value === 'USA', `Explicit AMERICAN nationality should win over country of birth, got "${natEl.value}"`)
+
+    // Test 9.2: Nationality missing, Country of Birth available -> Fallback triggers
+    const appCobFallback: ApplicantProfile = {
+      applicantId: 'APPL_COB_FB',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      personalInfo: {
+        countryOfBirth: 'BANGLADESH',
+        dateOfBirth: '1992-04-10',
+      },
+    }
+
+    natEl.value = ''
+    await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: appCobFallback,
+      options: { policy: 'overwrite' },
+    })
+
+    assert(natEl.value === 'BGD', `Country of birth fallback should populate "BGD", got "${natEl.value}"`)
+
+    // Test 9.3: Both missing -> Skipped
+    const appMissingBoth: ApplicantProfile = {
+      applicantId: 'APPL_MISSING_NAT',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      personalInfo: { dateOfBirth: '1992-04-10' },
+    }
+
+    natEl.value = ''
+    const resMissing = await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: appMissingBoth,
+      options: { policy: 'overwrite' },
+    })
+
+    const natRes = resMissing.results.find((r) => r.fieldId === 'bd_reg_nationality')
+    assert(natRes?.status === 'skipped', 'Missing nationality and country of birth must be reported as skipped')
+    assert(natEl.value === '', 'Nationality select must remain blank when skipped')
   }
 
-  // Restore previous global environment
-  if (prevDoc) {
-    ;(globalThis as unknown as { document: Document }).document = prevDoc
+  // =========================================================================
+  // 10. EMAIL PRIORITY & DYNAMIC TEMPORARY GENERATION
+  // =========================================================================
+  {
+    doc.body.innerHTML = `
+      <form id="visa_registration_form_email">
+        <select name="appl.countryname" id="countryname_id"><option value="BGD">BANGLADESH</option></select>
+        <select name="appl.missioncode" id="missioncode_id"><option value="01">BANGLADESH - DHAKA</option></select>
+        <select name="appl.nationality" id="nationality_id"><option value="BGD">BANGLADESH</option></select>
+        <input type="text" name="appl.birthdate" id="dob_id" value="" />
+        <input type="text" name="appl.email" id="email_id" value="" />
+        <input type="text" name="appl.email_re" id="email_re_id" value="" />
+        <input type="text" name="appl.journeydate" id="jouryney_id" value="" />
+        <input type="text" name="captcha" id="captcha" value="" />
+      </form>
+    `
+
+    const emailEl = doc.getElementById('email_id') as HTMLInputElement
+    const emailReEl = doc.getElementById('email_re_id') as HTMLInputElement
+
+    // Test 10.1: Explicit extracted document email wins
+    const appDocEmail: ApplicantProfile = {
+      applicantId: 'APPL_DOC_EMAIL',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      personalInfo: { givenNames: 'JOHN', surname: 'DOE', dateOfBirth: '1990-01-01', nationality: 'BANGLADESH' },
+      contact: { email: 'extracted.john@customdomain.org' },
+    }
+
+    await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: appDocEmail,
+      options: { policy: 'overwrite' },
+    })
+
+    assert(emailEl.value === 'extracted.john@customdomain.org', `Extracted document email should win, got "${emailEl.value}"`)
+    assert(emailReEl.value === 'extracted.john@customdomain.org', `Confirm email should match email, got "${emailReEl.value}"`)
+
+    // Test 10.2: Account email in notes wins when document email is absent
+    const appAccEmail: ApplicantProfile = {
+      applicantId: 'APPL_ACC_EMAIL',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      notes: 'Account Email: user.account@gmail.com',
+      personalInfo: { givenNames: 'JOHN', surname: 'DOE', dateOfBirth: '1990-01-01', nationality: 'BANGLADESH' },
+    }
+
+    emailEl.value = ''
+    emailReEl.value = ''
+    await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: appAccEmail,
+      options: { policy: 'overwrite' },
+    })
+
+    assert(emailEl.value === 'user.account@gmail.com', `Account email should win over temp, got "${emailEl.value}"`)
+    assert(emailReEl.value === 'user.account@gmail.com', `Confirm email should match account email, got "${emailReEl.value}"`)
+
+    // Test 10.3: No document or account email -> Deterministic temporary generated email
+    const appTemp1: ApplicantProfile = {
+      applicantId: 'APPL_TEMP_1',
+      passport: { passportNumber: 'EA9876543' },
+      personalInfo: { givenNames: 'ANISUR', surname: 'RAHMAN', dateOfBirth: '1990-01-01', nationality: 'BANGLADESH' },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    emailEl.value = ''
+    emailReEl.value = ''
+    await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: appTemp1,
+      options: { policy: 'overwrite' },
+    })
+
+    assert(emailEl.value.includes('anisur.rahman'), `Temporary email should contain normalized applicant name, got "${emailEl.value}"`)
+    assert(emailEl.value.endsWith('@temporary-visa-app.com'), `Temporary email should end with configured domain, got "${emailEl.value}"`)
+    assert(emailReEl.value === emailEl.value, 'Confirm email must match generated temporary email identically')
+
+    // Test 10.4: Different applicant generates a completely different temporary email
+    const appTemp2: ApplicantProfile = {
+      applicantId: 'APPL_TEMP_2',
+      passport: { passportNumber: 'EB1234567' },
+      personalInfo: { givenNames: 'SHARMIN', surname: 'AKTER', dateOfBirth: '1995-05-15', nationality: 'BANGLADESH' },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    emailEl.value = ''
+    emailReEl.value = ''
+    await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: appTemp2,
+      options: { policy: 'overwrite' },
+    })
+
+    assert(emailEl.value.includes('sharmin.akter'), `Temporary email for applicant 2 should contain "sharmin.akter", got "${emailEl.value}"`)
+    assert(!emailEl.value.includes('anisur'), `Temporary email for applicant 2 must not contain applicant 1 name, got "${emailEl.value}"`)
   }
-  if (prevWindow) {
-    ;(globalThis as unknown as { window: Window }).window = prevWindow
+
+  // =========================================================================
+  // 11. MULTI-APPLICANT END-TO-END DYNAMIC ISOLATION (APPLICANT A vs APPLICANT B)
+  // =========================================================================
+  {
+    doc.body.innerHTML = `
+      <form id="visa_registration_form_isolation">
+        <select name="appl.countryname" id="countryname_id">
+          <option value="">Select Country</option>
+          <option value="BGD">BANGLADESH</option>
+          <option value="IND">INDIA</option>
+          <option value="USA">UNITED STATES</option>
+        </select>
+        <select name="appl.missioncode" id="missioncode_id">
+          <option value="">Select Mission</option>
+          <option value="01">BANGLADESH - DHAKA</option>
+          <option value="02">BANGLADESH - CHITTAGONG</option>
+          <option value="03">BANGLADESH - RAJSHAHI</option>
+          <option value="04">BANGLADESH - SYLHET</option>
+        </select>
+        <select name="appl.nationality" id="nationality_id">
+          <option value="">Select Nationality</option>
+          <option value="BGD">BANGLADESH</option>
+          <option value="USA">UNITED STATES</option>
+        </select>
+        <input type="text" name="appl.birthdate" id="dob_id" value="" />
+        <input type="text" name="appl.email" id="email_id" value="" />
+        <input type="text" name="appl.email_re" id="email_re_id" value="" />
+        <input type="text" name="appl.journeydate" id="jouryney_id" value="" />
+        <input type="text" name="captcha" id="captcha" value="" />
+      </form>
+    `
+
+    // Applicant Alpha
+    const savedAppAlpha: SavedApplication = {
+      applicationId: 'app_alpha',
+      applicantId: 'APPLICANT_ALPHA',
+      createdAt: '2026-09-12T10:00:00Z',
+      updatedAt: '2026-09-12T10:00:00Z',
+      status: 'ready_for_autofill',
+      fields: {
+        'appl.countryname': { value: 'BANGLADESH', source: 'passport', isUserEdited: false },
+        'appl.missioncode': { value: 'DHAKA', source: 'passport', isUserEdited: false },
+        'appl.nationality': { value: 'BANGLADESHI', source: 'passport', isUserEdited: false },
+        'appl.birthdate': { value: '1988-03-25', source: 'passport', isUserEdited: false },
+        'appl.email': { value: 'alpha.applicant@domain.com', source: 'passport', isUserEdited: false },
+        'appl.email_re': { value: 'alpha.applicant@domain.com', source: 'passport', isUserEdited: false },
+        'appl.journeydate': { value: '2026-12-01', source: 'passport', isUserEdited: false },
+      },
+      manualEdits: {},
+      provenance: { lastSavedAt: '2026-09-12T10:00:00Z' },
+      sourceDocuments: {},
+    }
+
+    const candAlpha = resolveCandidateData({
+      profileId: 'APPLICANT_ALPHA',
+      documents: [],
+      savedApplication: savedAppAlpha,
+    })
+
+    await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: candAlpha.applicant!,
+      options: { policy: 'overwrite' },
+    })
+
+    const dobEl = doc.getElementById('dob_id') as HTMLInputElement
+    const emailEl = doc.getElementById('email_id') as HTMLInputElement
+    const journeyEl = doc.getElementById('jouryney_id') as HTMLInputElement
+    const missionEl = doc.getElementById('missioncode_id') as HTMLSelectElement
+
+    assert(dobEl.value === '25/03/1988', `Alpha DOB should be 25/03/1988, got "${dobEl.value}"`)
+    assert(emailEl.value === 'alpha.applicant@domain.com', `Alpha email should be alpha.applicant@domain.com, got "${emailEl.value}"`)
+    assert(journeyEl.value === '01/12/2026', `Alpha journey should be 01/12/2026, got "${journeyEl.value}"`)
+    assert(missionEl.value === '01', `Alpha mission should be DHAKA (01), got "${missionEl.value}"`)
+
+    // Applicant Beta (Completely different applicant: no explicit mission -> default RAJSHAHI, no email -> temp, no journey -> skipped)
+    const savedAppBeta: SavedApplication = {
+      applicationId: 'app_beta',
+      applicantId: 'APPLICANT_BETA',
+      createdAt: '2026-09-12T10:00:00Z',
+      updatedAt: '2026-09-12T10:00:00Z',
+      status: 'ready_for_autofill',
+      fields: {
+        'appl.countryname': { value: 'BANGLADESH', source: 'passport', isUserEdited: false },
+        'appl.missioncode': { value: '', source: 'missing', isUserEdited: false },
+        'appl.nationality': { value: 'BANGLADESHI', source: 'passport', isUserEdited: false },
+        'appl.birthdate': { value: '1999-11-05', source: 'passport', isUserEdited: false },
+        'appl.email': { value: '', source: 'missing', isUserEdited: false },
+        'appl.email_re': { value: '', source: 'missing', isUserEdited: false },
+        'appl.journeydate': { value: '', source: 'missing', isUserEdited: false },
+      },
+      manualEdits: {},
+      provenance: { lastSavedAt: '2026-09-12T10:00:00Z' },
+      sourceDocuments: {},
+    }
+
+    const candBeta = resolveCandidateData({
+      profileId: 'APPLICANT_BETA',
+      documents: [],
+      savedApplication: savedAppBeta,
+    })
+
+    // Reset inputs
+    dobEl.value = ''
+    emailEl.value = ''
+    journeyEl.value = ''
+    missionEl.value = ''
+
+    await executeAutofill({
+      mappings: BANGLADESH_REGISTRATION_MAPPINGS,
+      applicant: candBeta.applicant!,
+      options: { policy: 'overwrite' },
+    })
+
+    assert(dobEl.value === '05/11/1999', `Beta DOB should be 05/11/1999, got "${dobEl.value}"`)
+    assert(missionEl.value === '03', `Beta default mission should be RAJSHAHI (03), got "${missionEl.value}"`)
+    assert(journeyEl.value === '', `Beta missing journey date should remain empty, got "${journeyEl.value}"`)
+    assert(!emailEl.value.includes('alpha.applicant'), `Beta email must NOT contain Alpha email, got "${emailEl.value}"`)
+    assert(emailEl.value.endsWith('@temporary-visa-app.com'), `Beta email should be temporary generated, got "${emailEl.value}"`)
+  }
+
+  // =========================================================================
+  // 12. PRODUCTION HARDCODE PROTECTION SCAN
+  // =========================================================================
+  {
+    const isNode = typeof globalThis !== 'undefined' && 'process' in globalThis
+    if (isNode) {
+      try {
+        interface NodeFsModule {
+          readdirSync: (p: string, opt: { recursive: boolean }) => string[]
+          readFileSync: (p: string, enc: string) => string
+        }
+        interface NodePathModule {
+          resolve: (...paths: string[]) => string
+          join: (...paths: string[]) => string
+        }
+        const dynamicImport = new Function('m', 'return import(m)') as (m: string) => Promise<{ default: unknown }>
+        const fsMod = (await dynamicImport('fs')).default as NodeFsModule
+        const pathMod = (await dynamicImport('path')).default as NodePathModule
+
+        const srcDir = pathMod.resolve('.', 'src')
+        const allFiles = fsMod.readdirSync(srcDir, { recursive: true })
+        const codeFiles = allFiles.filter(
+          (f) =>
+            (f.endsWith('.ts') || f.endsWith('.tsx') || f.endsWith('.js')) &&
+            !f.includes('__tests__') &&
+            !f.includes('.test.') &&
+            !f.includes('.spec.')
+        )
+
+        const forbiddenPhrases = [
+          'alpha.applicant',
+          'APPLICANT_ALPHA',
+          'APPLICANT_BETA',
+          'EA9876543',
+          'EB1234567',
+        ]
+
+        for (const file of codeFiles) {
+          const content = fsMod.readFileSync(pathMod.join(srcDir, file), 'utf8')
+          for (const phrase of forbiddenPhrases) {
+            if (content.includes(phrase)) {
+              failures.push(`Hardcode audit failed: Production file "${file}" contains forbidden test phrase "${phrase}"`)
+            }
+          }
+        }
+        assert(true, 'Production source files contain 0 applicant-specific hardcoded test data')
+      } catch (err) {
+        failures.push(`Hardcode audit encountered error: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+  }
+
+  } finally {
+    // Restore previous global environment
+    if (prevDoc) {
+      Object.defineProperty(globalThis, 'document', { value: prevDoc, configurable: true, writable: true })
+    }
+    if (prevWindow) {
+      Object.defineProperty(globalThis, 'window', { value: prevWindow, configurable: true, writable: true })
+    }
+    if (prevHTMLElement) {
+      Object.defineProperty(globalThis, 'HTMLElement', { value: prevHTMLElement, configurable: true, writable: true })
+    }
+    if (prevHTMLInputElement) {
+      Object.defineProperty(globalThis, 'HTMLInputElement', { value: prevHTMLInputElement, configurable: true, writable: true })
+    }
+    if (prevHTMLSelectElement) {
+      Object.defineProperty(globalThis, 'HTMLSelectElement', { value: prevHTMLSelectElement, configurable: true, writable: true })
+    }
+    if (prevHTMLTextAreaElement) {
+      Object.defineProperty(globalThis, 'HTMLTextAreaElement', { value: prevHTMLTextAreaElement, configurable: true, writable: true })
+    }
+    if (prevHTMLButtonElement) {
+      Object.defineProperty(globalThis, 'HTMLButtonElement', { value: prevHTMLButtonElement, configurable: true, writable: true })
+    }
+    if (prevEvent) {
+      Object.defineProperty(globalThis, 'Event', { value: prevEvent, configurable: true, writable: true })
+    }
   }
 
   return {
