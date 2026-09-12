@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 VISA AUTOFILL — APPLICATION PURPOSE & COMPLETE ARCHITECTURE NOTE
+=======
+# VISA AUTOFILL — APPLICATION PURPOSE & COMPLETE ARCHITECTURE NOTE
+>>>>>>> 93d0daf072a697f0309967255ba22ed42ac9eedd
 
 1.  THIS APPLICATION’S MAIN PURPOSE
 
@@ -8,7 +12,11 @@ information from uploaded documents and then using that saved
 information to autofill the appropriate fields on the official Indian
 Visa website.
 
+<<<<<<< HEAD
 The complete workflow is:
+=======
+## The complete workflow is:
+>>>>>>> 93d0daf072a697f0309967255ba22ed42ac9eedd
 
 Passport / OGD Document ↓ Document Extraction ↓ Gemini AI + PDF Text +
 OCR + MRZ ↓ Normalization & Validation ↓ ApplicantProfile ↓
