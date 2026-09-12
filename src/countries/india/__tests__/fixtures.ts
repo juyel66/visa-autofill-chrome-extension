@@ -214,6 +214,15 @@ export const BANGLADESH_REGISTRATION_FIXTURE_HTML = `
     <!-- Expected Date of Arrival -->
     <input type="text" id="jouryney_id" name="appl.journeydate" placeholder="DD/MM/YYYY" value="" />
 
+    <!-- Visiting India for / Purpose of Visit -->
+    <select id="purpose_id" name="appl.purpose">
+      <option value="">Select Purpose...</option>
+      <option value="TOURISM">FOR TOURISM / RECREATION</option>
+      <option value="BUSINESS">BUSINESS</option>
+      <option value="MEDICAL">MEDICAL</option>
+      <option value="STUDENT">STUDENT</option>
+    </select>
+
     <!-- CAPTCHA (Manual Security Control) -->
     <input type="text" id="captcha" name="captcha" value="" />
   </form>
