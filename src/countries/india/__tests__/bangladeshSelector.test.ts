@@ -219,14 +219,14 @@ export async function runBangladeshSelectorTests(): Promise<{ passed: boolean; t
   const photoControls = getBangladeshPageControls('DOCUMENT_UPLOAD')
 
   if (
-    totalVerifiedCount !== 101 ||
-    regControls.length !== 8 ||
+    totalVerifiedCount !== 102 ||
+    regControls.length !== 9 ||
     basicControls.length !== 20 ||
     familyControls.length !== 39 ||
     travelControls.length !== 27 ||
     qControls.length !== 15 ||
     photoControls.length !== 4 ||
-    BANGLADESH_FIELD_REGISTRY.length !== 113
+    BANGLADESH_FIELD_REGISTRY.length !== 114
   ) {
     failures.push(`Test 13 Failed: Registry did not return expected control counts. Total verified: ${totalVerifiedCount}, total: ${BANGLADESH_FIELD_REGISTRY.length}`)
   }
