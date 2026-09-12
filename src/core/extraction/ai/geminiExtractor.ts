@@ -147,7 +147,7 @@ Return ONLY a valid JSON object matching the following structure:
     "visaEntryType": "SINGLE | DOUBLE | TRIPLE | MULTIPLE | null",
     "entryPoint": "Port of entry as stated or null",
     "exitPoint": "Port of exit as stated or null",
-    "purposeOfVisit": "TOURISM | BUSINESS | MEDICAL | TRANSIT | null",
+    "purposeOfVisit": "Exact purpose of visit as stated in the document (e.g. Tourism, Business, Medical, or detailed purpose sentence) or null",
     "countriesVisited": "Comma separated list of countries visited if stated or null",
     "visitedSaarc": true | false | null
   },
