@@ -266,7 +266,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         // Populate or update SavedApplication directly
         const docs = await getDocumentsByApplicantId(selectedApplicant.applicantId)
-        const pDoc = targetType === 'passport' && newDoc.extractedDataConfirmed ? newDoc : getLatestDocument(docs, 'passport')
+        const pDoc =
+          targetType === 'passport' && newDoc.extractedDataConfirmed
+            ? newDoc
+            : getLatestDocument(docs, 'passport') || (newDoc.extractedDataConfirmed && newDoc.extractedData ? newDoc : docs.find((d) => d.extractedDataConfirmed && d.extractedData))
         const oDoc = targetType === 'ogd' && newDoc.extractedDataConfirmed ? newDoc : getLatestDocument(docs, 'ogd')
         const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
         const mergedApp = populateApplicationFromDocuments({
@@ -394,6 +397,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           bd_reg_email: 'Email',
           bd_reg_email_confirm: 'Confirm Email',
           bd_reg_expected_arrival: 'Journey Date',
+          bd_reg_visiting_purpose: 'Visiting India for',
           bd_reg_captcha: 'CAPTCHA',
         }
 

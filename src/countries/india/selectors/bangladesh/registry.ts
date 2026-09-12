@@ -86,6 +86,14 @@ export const BANGLADESH_FIELD_REGISTRY: BangladeshRegisteredControl[] = [
     description: 'Expected Date of Arrival (#jouryney_id)',
   },
   {
+    controlId: 'reg_visiting_purpose',
+    page: 'REGISTRATION',
+    category: 'verified-selector',
+    eligibility: 'autofillable',
+    selectors: BANGLADESH_REGISTRATION_SELECTORS.visitingPurpose,
+    description: 'Visiting India for / Purpose of Visit (#purpose_id)',
+  },
+  {
     controlId: 'reg_captcha',
     page: 'REGISTRATION',
     category: 'security-control',

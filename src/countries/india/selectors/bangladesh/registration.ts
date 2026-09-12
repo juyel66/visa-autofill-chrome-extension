@@ -14,6 +14,7 @@ export interface BangladeshRegistrationSelectors {
   email: IndiaFieldSelector[]
   emailConfirm: IndiaFieldSelector[]
   expectedArrivalDate: IndiaFieldSelector[]
+  visitingPurpose: IndiaFieldSelector[]
   captcha: IndiaFieldSelector[]
 }
 
@@ -53,6 +54,17 @@ export const BANGLADESH_REGISTRATION_SELECTORS: BangladeshRegistrationSelectors 
     { strategy: 'name', value: 'appl.journeydate' },
     { strategy: 'id', value: 'journey_id' },
     { strategy: 'css', value: 'input[name="appl.journeydate"], input#jouryney_id' },
+  ],
+  visitingPurpose: [
+    { strategy: 'id', value: 'purpose_id' },
+    { strategy: 'name', value: 'appl.purpose' },
+    { strategy: 'id', value: 'visatype_id' },
+    { strategy: 'name', value: 'appl.visatype' },
+    { strategy: 'id', value: 'purpose' },
+    { strategy: 'name', value: 'purpose' },
+    { strategy: 'id', value: 'visatype' },
+    { strategy: 'name', value: 'visatype' },
+    { strategy: 'css', value: 'select[name="appl.purpose"], select#purpose_id, select[name="appl.visatype"], select#visatype_id, select#purpose, select[name="purpose"], select#visatype, select[name="visatype"], select[name*="purpose"], select[id*="purpose"], select[name*="visatype"], select[id*="visatype"]' },
   ],
   captcha: [
     { strategy: 'id', value: 'captcha' },
