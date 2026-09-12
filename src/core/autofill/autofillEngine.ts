@@ -242,6 +242,15 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
         }
 
         if (els.length === 0) {
+          if (mapping.required === false) {
+            fieldResult = {
+              fieldId: mapping.id,
+              status: 'skipped',
+              reason: 'Optional field is not present on page DOM.',
+              attempts,
+            }
+            break
+          }
           fieldResult = {
             fieldId: mapping.id,
             status: 'not-found',
@@ -352,7 +361,7 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
           }
         }
 
-        if (mapping.transform) {
+        if (mapping.transform && resolvedValue !== undefined) {
           resolvedValue = applyValueTransform(resolvedValue, mapping.transform)
         }
 
