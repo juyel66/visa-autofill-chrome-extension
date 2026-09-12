@@ -17,7 +17,7 @@ import { setNativeInputValue } from './eventDispatcher'
 export interface SelectOptionMatchResult {
   option: HTMLOptionElement | null
   ambiguous: boolean
-  matchMethod?: 'exact-value' | 'exact-text' | 'clean-match' | 'alias-match' | 'structured-match' | 'token-match'
+  matchMethod?: 'exact-value' | 'exact-text' | 'clean-match' | 'alias-match' | 'structured-match' | 'token-match' | 'semantic-match'
 }
 
 /**
@@ -124,6 +124,213 @@ export function areAliasesEquivalent(val1: string, val2: string): boolean {
   }
 
   return false
+}
+
+export interface PurposeCategory {
+  category: string
+  keywords: readonly string[]
+}
+
+/**
+ * Generic Purpose of Visit and Visa Type semantic category groups.
+ * Ordered with specific sub-categories (e.g. Medical Attendant) before broader categories (Medical).
+ */
+export const PURPOSE_OF_VISIT_SEMANTIC_CATEGORIES: readonly PurposeCategory[] = [
+  {
+    category: 'MEDICAL ATTENDANT',
+    keywords: [
+      'medical attendant',
+      'med-x',
+      'med x',
+      'medical escort',
+      'patient attendant',
+      'accompanying patient',
+      'attendant',
+    ],
+  },
+  {
+    category: 'TOURISM',
+    keywords: [
+      'touris',
+      'tourist',
+      'recreation',
+      'sightseeing',
+      'sight seeing',
+      'holiday',
+      'vacation',
+      'yoga',
+      'visiting friends',
+      'visiting relatives',
+      'leisure',
+      'tourism',
+      'tourist visa',
+      'individual tourist',
+    ],
+  },
+  {
+    category: 'BUSINESS',
+    keywords: [
+      'business',
+      'trade',
+      'commercial',
+      'meeting',
+      'investor',
+      'industrial',
+      'sales',
+      'corporate',
+      'business meetings',
+      'business visa',
+    ],
+  },
+  {
+    category: 'MEDICAL',
+    keywords: [
+      'medical',
+      'treatment',
+      'hospital',
+      'doctor',
+      'surgery',
+      'consultation',
+      'patient',
+      'health',
+      'therapy',
+      'clinic',
+      'medical visa',
+      'short duration medical',
+    ],
+  },
+  {
+    category: 'CONFERENCE',
+    keywords: [
+      'conference',
+      'seminar',
+      'workshop',
+      'symposium',
+      'summit',
+      'forum',
+      'webinar',
+      'conference visa',
+    ],
+  },
+  {
+    category: 'STUDENT',
+    keywords: [
+      'student',
+      'study',
+      'education',
+      'university',
+      'college',
+      'academic',
+      'scholarship',
+      'course',
+      'internship',
+      'short term courses',
+      'short-term courses',
+      'student visa',
+    ],
+  },
+  {
+    category: 'EMPLOYMENT',
+    keywords: [
+      'employment',
+      'work permit',
+      'job',
+      'deputation',
+      'technician',
+      'contractor',
+      'employed',
+      'employment visa',
+    ],
+  },
+  {
+    category: 'JOURNALIST',
+    keywords: [
+      'journalist',
+      'journalism',
+      'media',
+      'press',
+      'filming',
+      'documentary',
+      'reporter',
+      'journalist visa',
+    ],
+  },
+  {
+    category: 'VOLUNTARY',
+    keywords: [
+      'voluntary',
+      'volunteer',
+      'voluntary work',
+      'charity',
+      'missionary',
+      'ngo work',
+    ],
+  },
+  {
+    category: 'RESEARCH',
+    keywords: [
+      'research',
+      'researcher',
+      'fellowship',
+      'research visa',
+    ],
+  },
+  {
+    category: 'FILM',
+    keywords: [
+      'film',
+      'film making',
+      'shooting',
+      'cinema',
+      'movie',
+      'film visa',
+    ],
+  },
+  {
+    category: 'TRANSIT',
+    keywords: [
+      'transit',
+      'layover',
+      'direct transit',
+      'connecting flight',
+      'transit visa',
+    ],
+  },
+  {
+    category: 'ENTRY',
+    keywords: [
+      'entry',
+      'family visa',
+      'person of indian origin',
+      'dependent',
+      'spouse of indian',
+      'entry visa',
+    ],
+  },
+]
+
+/**
+ * Resolves a purpose string or option label to its semantic category.
+ */
+export function resolvePurposeSemanticCategory(text?: string | null): PurposeCategory | null {
+  const norm = normalizeSelectString(text)
+  if (!norm) return null
+
+  for (const cat of PURPOSE_OF_VISIT_SEMANTIC_CATEGORIES) {
+    // Check if category name itself is contained in text
+    const catNorm = normalizeSelectString(cat.category)
+    if (norm.includes(catNorm)) {
+      return cat
+    }
+    // Check if any keyword is contained in text
+    for (const kw of cat.keywords) {
+      const normKw = normalizeSelectString(kw)
+      if (norm.includes(normKw)) {
+        return cat
+      }
+    }
+  }
+  return null
 }
 
 /**
@@ -280,6 +487,75 @@ export function findMatchingSelectOption(
   }
   if (tokenMatches.length > 1) {
     return { option: null, ambiguous: true }
+  }
+
+  // 7. Level 7: Purpose of Visit Semantic Category & Keyword Relevance Ranking
+  const targetCategory = resolvePurposeSemanticCategory(targetValue)
+  if (targetCategory) {
+    const scoredCandidates: Array<{ option: HTMLOptionElement; score: number }> = []
+    const targetWords = normTarget.split(/[^a-z0-9]+/).filter((w) => w.length > 2)
+
+    for (const opt of options) {
+      const optText = normalizeSelectString(opt.text)
+      const optVal = normalizeSelectString(opt.value)
+      const optCategory = resolvePurposeSemanticCategory(opt.text) || resolvePurposeSemanticCategory(opt.value)
+
+      let score = 0
+
+      // Match on same semantic category
+      if (optCategory && optCategory.category === targetCategory.category) {
+        score += 10
+      }
+
+      // Keyword density matches (how many keywords of this category are in option)
+      for (const kw of targetCategory.keywords) {
+        const normKw = normalizeSelectString(kw)
+        if (normKw && (optText.includes(normKw) || optVal.includes(normKw))) {
+          score += 5
+          // If the targetValue itself specifically contains this keyword, boost further
+          if (normTarget.includes(normKw)) {
+            score += 5
+          }
+        }
+      }
+
+      // Target words contained in option
+      for (const tw of targetWords) {
+        if (optText.includes(tw) || optVal.includes(tw)) {
+          score += 3
+        }
+      }
+
+      // Substring bonus
+      if (normTarget.includes(optText) && optText.length > 3) {
+        score += 8
+      }
+      if (optText.includes(normTarget) && normTarget.length > 3) {
+        score += 8
+      }
+
+      if (score > 0) {
+        scoredCandidates.push({ option: opt, score })
+      }
+    }
+
+    if (scoredCandidates.length === 1) {
+      return { option: scoredCandidates[0].option, ambiguous: false, matchMethod: 'semantic-match' }
+    }
+
+    if (scoredCandidates.length > 1) {
+      scoredCandidates.sort((a, b) => b.score - a.score)
+      const top = scoredCandidates[0]
+      const runnerUp = scoredCandidates[1]
+
+      // If top candidate has a clear lead (distinct score winner), select it
+      if (top.score > runnerUp.score) {
+        return { option: top.option, ambiguous: false, matchMethod: 'semantic-match' }
+      }
+
+      // Exact score tie between top candidates -> ambiguous
+      return { option: null, ambiguous: true }
+    }
   }
 
   return { option: null, ambiguous: false }
