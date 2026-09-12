@@ -330,11 +330,29 @@ export function normalizeOldVisaType(raw?: string): string | undefined {
 export function normalizeVisaEntryType(raw?: string): string | undefined {
   if (!raw) return undefined
   const cleaned = raw.trim().toUpperCase()
-  if (cleaned === 'SINGLE' || cleaned === 'SINGLE ENTRY' || cleaned === '1') return 'Single'
-  if (cleaned === 'DOUBLE' || cleaned === 'DOUBLE ENTRY' || cleaned === '2') return 'Double'
-  if (cleaned === 'MULTIPLE' || cleaned === 'MULTIPLE ENTRY' || cleaned === 'M') return 'Multiple'
-  if (cleaned === 'TRIPLE' || cleaned === 'TRIPLE ENTRY' || cleaned === '3') return 'Triple'
+  if (cleaned.includes('MULTIPLE') || cleaned === 'M' || cleaned.includes('MULTI')) return 'Multiple'
+  if (cleaned.includes('TRIPLE') || cleaned === 'T') return 'Triple'
+  if (cleaned.includes('DOUBLE') || cleaned === 'D') return 'Double'
+  if (cleaned.includes('SINGLE') || cleaned === 'S') return 'Single'
   return undefined
+}
+
+/**
+ * Normalizes an extracted Purpose of Visit string dynamically:
+ * - fixes hyphenated words broken across line breaks (e.g. "RECREA- \n TION" -> "RECREATION")
+ * - collapses line breaks and multiple whitespace characters into single space
+ * - strips leading/trailing OCR punctuation artifacts (e.g. colons, dashes, quotes)
+ * - preserves the full semantic meaning without hardcoding any example text
+ */
+export function cleanExtractedPurpose(raw?: string | null): string | undefined {
+  if (!raw) return undefined
+  let cleaned = String(raw)
+    .replace(/-\s*[\r\n]+\s*/g, '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  cleaned = cleaned.replace(/^[:\s\-–—"'.]+/, '').replace(/[:\s\-–—"'.]+$/, '').trim()
+  return cleaned !== '' ? cleaned : undefined
 }
 
 /**
@@ -705,10 +723,19 @@ export function extractFromOgdVisaApplication(
   const visaSectionMatch = text.match(/(?:details\s*of\s*visa\s*sought|visa\s*sought)[:\s]*([\s\S]+?)(?=(?:previous\s*visa|hotel|reference|declaration|$))/i)
   const visaText = visaSectionMatch ? visaSectionMatch[1] : text
 
-  const visaTypeMatch = visaText.match(/(?:type\s*of\s*visa|visa\s*type)[:\s]+([A-Za-z ]+?)(?=\s+(?:duration|no\s*of\s*entries|places|expected)|$|\r?\n)/i)
-  if (visaTypeMatch && visaTypeMatch[1]) {
-    const rawVT = visaTypeMatch[1].trim().toUpperCase()
-    result.travel!.purposeOfVisit = { value: rawVT, source, confidence: baseConfidence }
+  const visaTypeMatch = visaText.match(/(?:type\s*of\s*visa|visa\s*type)[:\s]+([^\r\n:]+)/i)
+
+  const purposeMatch = visaText.match(/(?:purpose\s*of\s*(?:visit|journey)|visiting\s*india\s*for|visit\s*purpose|purpose\s*for\s*visit|purpose)[:\s]+([\s\S]+?)(?=(?:[\r\n]+\s*(?:places|countries|hotel|reference|duration|no\.?\s*of\s*entries|number\s*of\s*entries|expected|port|declaration|previous|profession|old|validity)|\s{2,}(?:places|countries|hotel|reference|duration|no\.?\s*of\s*entries|number\s*of\s*entries|expected|port|declaration|previous|profession|old|validity)|$))/i)
+  if (purposeMatch && purposeMatch[1]) {
+    const rawPurpose = cleanExtractedPurpose(purposeMatch[1])
+    if (rawPurpose) {
+      result.travel!.purposeOfVisit = { value: rawPurpose, source, confidence: baseConfidence }
+    }
+  } else if (visaTypeMatch && visaTypeMatch[1]) {
+    const rawVT = cleanExtractedPurpose(visaTypeMatch[1])?.toUpperCase()
+    if (rawVT) {
+      result.travel!.purposeOfVisit = { value: rawVT, source, confidence: baseConfidence }
+    }
   }
 
   const durationMatch = visaText.match(/(?:duration\s*of\s*visa(?:\s*\(in\s*months\))?|visa\s*duration)[:\s]+([0-9A-Za-z ]+?)(?=\s+(?:no\s*of\s*entries|purpose|expected)|$|\r?\n)/i)
@@ -1256,7 +1283,7 @@ export function parseApplicantContact(text: string): ParsedContactResult {
 /**
  * Extracts candidate fields from raw text (PDF text or OCR text) using conservative pattern matching.
  */
-function extractFromRawText(
+export function extractFromRawText(
   text: string,
   source: ExtractionSource,
   baseConfidence: number,
@@ -2143,11 +2170,25 @@ function extractFromRawText(
   }
 
   // Purpose of Visit
-  const purposeMatch = text.match(/(?:purpose\s*of\s*visit|visit\s*purpose)[:\s]+([A-Za-z0-9 /()-]{3,50})/i)
+  const purposeMatch = text.match(/(?:purpose\s*of\s*(?:visit|journey)|visiting\s*india\s*for|visit\s*purpose|purpose\s*for\s*visit|purpose)[:\s]+([\s\S]+?)(?=(?:[\r\n]+\s*(?:places|countries|hotel|reference|duration|no\.?\s*of\s*entries|number\s*of\s*entries|expected|port|declaration|previous|old|profession|military|details|name|father|mother|applicant|signature|date)|\s{2,}(?:places|countries|hotel|reference|duration|no\.?\s*of\s*entries|number\s*of\s*entries|expected|port|declaration|previous|old|profession|military|details|name|father|mother|applicant|signature|date)|$))/i)
   if (purposeMatch && purposeMatch[1]) {
-    result.travel = {
-      ...result.travel,
-      purposeOfVisit: { value: purposeMatch[1].trim(), source, confidence: baseConfidence },
+    const cleanPurpose = cleanExtractedPurpose(purposeMatch[1])
+    if (cleanPurpose) {
+      result.travel = {
+        ...result.travel,
+        purposeOfVisit: { value: cleanPurpose, source, confidence: baseConfidence },
+      }
+    }
+  } else {
+    const visaTypeMatch = text.match(/(?:type\s*of\s*visa|visa\s*type)[:\s]+([^\r\n:]+)/i)
+    if (visaTypeMatch && visaTypeMatch[1]) {
+      const cleanVT = cleanExtractedPurpose(visaTypeMatch[1])?.toUpperCase()
+      if (cleanVT) {
+        result.travel = {
+          ...result.travel,
+          purposeOfVisit: { value: cleanVT, source, confidence: baseConfidence },
+        }
+      }
     }
   }
 
