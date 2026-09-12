@@ -162,7 +162,10 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
           }
         }
         const docs = await getDocumentsByApplicantId(currentApplicantId)
-        const pDoc = docRecord.documentType === 'passport' && docRecord.extractedDataConfirmed ? docRecord : getLatestDocument(docs, 'passport')
+        const pDoc =
+          docRecord.documentType === 'passport' && docRecord.extractedDataConfirmed
+            ? docRecord
+            : getLatestDocument(docs, 'passport') || (docRecord.extractedDataConfirmed && docRecord.extractedData ? docRecord : docs.find((d) => d.extractedDataConfirmed && d.extractedData))
         const oDoc = docRecord.documentType === 'ogd' && docRecord.extractedDataConfirmed ? docRecord : getLatestDocument(docs, 'ogd')
         const existingApp = await getSavedApplicationByApplicantId(currentApplicantId)
         const mergedApp = populateApplicationFromDocuments({
@@ -386,8 +389,11 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
           }
         }
         const allDocs = await getDocumentsByApplicantId(activeId)
-        const pDoc = updatedDoc.documentType === 'passport' ? updatedDoc : getLatestDocument(allDocs, 'passport')
-        const oDoc = updatedDoc.documentType === 'ogd' ? updatedDoc : getLatestDocument(allDocs, 'ogd')
+        const pDoc =
+          updatedDoc.documentType === 'passport' && updatedDoc.extractedDataConfirmed
+            ? updatedDoc
+            : getLatestDocument(allDocs, 'passport') || (updatedDoc.extractedDataConfirmed && updatedDoc.extractedData ? updatedDoc : allDocs.find((d) => d.extractedDataConfirmed && d.extractedData))
+        const oDoc = updatedDoc.documentType === 'ogd' && updatedDoc.extractedDataConfirmed ? updatedDoc : getLatestDocument(allDocs, 'ogd')
         const existingApp = await getSavedApplicationByApplicantId(activeId)
         const mergedApp = populateApplicationFromDocuments({
           applicantId: activeId,
