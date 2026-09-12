@@ -1,270 +1,1262 @@
-# Indian Visa Field Inventory, Page Mapping & Data Model Architecture
+VISA AUTOFILL — APPLICATION PURPOSE & COMPLETE ARCHITECTURE NOTE
 
-**Product Name:** Visa Autofill  
-**Module:** Indian Visa Application (`src/countries/india/visa`)  
-**Task:** 005.1 Field Inventory & Data Model Finalization  
+1.  THIS APPLICATION’S MAIN PURPOSE
 
----
+The main purpose of this application is to make the Bangladesh-to-India
+visa application process faster and easier by extracting applicant
+information from uploaded documents and then using that saved
+information to autofill the appropriate fields on the official Indian
+Visa website.
 
-## 1. Executive Summary & Data Model Separation
+The complete workflow is:
 
-The Indian Visa application workflow consists of **10 distinct pages/steps**. To maintain a scalable, clean, and multi-country architecture, applicant data is separated into two primary domain models:
+Passport / OGD Document ↓ Document Extraction ↓ Gemini AI + PDF Text +
+OCR + MRZ ↓ Normalization & Validation ↓ ApplicantProfile ↓
+SavedApplication ↓ Application Workspace ↓ User Reviews / Edits Missing
+or Incorrect Data ↓ SAVE APPLICATION ↓ Open Indian Visa Website ↓ Detect
+Current Visa Page ↓ Autofill Current Page ↓ Fill Supported Fields ↓ User
+Manually Handles CAPTCHA / OTP / Required Security Decisions ↓ User
+Manually Clicks Portal Continue / Save & Continue ↓ Next Page ↓ Autofill
+Current Page Again
 
-1. **Generic `ApplicantProfile` (`src/core/applicant/types.ts`)**:
-   Contains reusable, country-agnostic personal details (e.g. personal details, passport details, addresses, contact details, family details, present/past employment, military history).
-   
-2. **India Visa Application `IndiaVisaApplication` (`src/countries/india/visa/types.ts`)**:
-   Contains application-specific and workflow details exclusive to the Indian Visa process (e.g., registration office selection, expected arrival date, visa duration, port of entry/exit, previous Indian visa history, local Indian stay addresses, Indian/home reference contacts, and document metadata).
+The application is NOT intended to automatically submit a visa
+application. It is an applicant-data extraction, review, storage, and
+page-by-page autofill assistant.
 
-```
-                            ApplicantProfile
-                                   │
-                ┌──────────────────┴──────────────────┐
-                ▼                                     ▼
-      IndiaVisaApplication                FutureCountryApplication
-   (India-specific workflow)              (e.g., US / UK / Schengen)
-```
+2.  CORE PRODUCT GOALS
 
----
+The application must:
 
-## 2. Page Identifier System
+-   Accept Passport and OGD documents.
+-   Extract as much reliable applicant information as possible.
+-   Work dynamically with any applicant’s document.
+-   Never depend on one specific applicant’s data.
+-   Store the extracted information in an Application Workspace.
+-   Allow the user to manually correct or complete fields.
+-   Save the final application data.
+-   Autofill supported Indian Visa website fields page-by-page.
+-   Clearly identify fields that were filled, skipped, failed, or
+    require manual entry.
+-   Keep security-sensitive actions manual.
 
-Each workflow page is identified by a strongly-typed string union `IndiaVisaPage`:
+3.  ABSOLUTE DYNAMIC DATA RULE
 
-| Page ID | Step | Page Title | Description |
-| :--- | :---: | :--- | :--- |
-| `registration` | 1 | Registration | Application setup, Mission selection, CAPTCHA verification |
-| `basic-details` | 2 | Basic Details | Personal identification, nationality, passport details, address |
-| `family-details` | 3 | Family Details | Father, Mother, Spouse details, Pakistan relation inquiry |
-| `visa-details` | 4 | Visa Details | Visa category, validity, ports of entry/exit, purpose |
-| `previous-visit` | 5 | Previous Visit Details | Past travel to India, previous visa history, refusal/deportation flags |
-| `profession` | 6 | Profession / Occupation | Current/past occupation, employer details, military service |
-| `accommodation` | 7 | Accommodation / Place of Stay | Hotel / place of stay details in India |
-| `references` | 8 | References | Reference details in India & home country (e.g., Bangladesh) |
-| `documents` | 9 | Documents | File upload metadata (Passport, Photo, Supporting docs) |
-| `declaration` | 10 | Declaration / Final Application | Declaration confirmation and completion timestamp |
-| `unknown` | - | Unknown Page | Unrecognized or unmapped page step |
+All PDFs, passport scans, screenshots, and documents supplied during
+development are ONLY reference/test documents.
 
----
+They must NEVER become production data.
 
-## 3. Data Source Classification
+ZERO applicant-specific values may be hardcoded into runtime code.
 
-Every form field is classified into one of 5 data source categories:
+This includes:
 
-1. **Applicant Profile (`applicant_profile`)**: Permanent applicant data stored in generic `ApplicantProfile`.
-2. **India Visa Application (`india_visa_application`)**: Application-specific data stored in `IndiaVisaApplication`.
-3. **Derived (`derived`)**: Values computed/duplicated automatically from another field (e.g. `reg_reenter_email`).
-4. **User Input (`user_input`)**: Dynamic runtime input selected by user per session.
-5. **Manual / CAPTCHA (`manual_captcha`)**: Manual interactive step completed directly by the user.
+-   names
+-   surnames
+-   given names
+-   passport numbers
+-   previous passport numbers
+-   phone numbers
+-   mobile numbers
+-   addresses
+-   postal codes
+-   dates
+-   emails
+-   family names
+-   emergency contacts
+-   districts
+-   cities
+-   religions
+-   nationality values tied to a specific applicant
+-   any other applicant information
 
-> [!IMPORTANT]
-> **CAPTCHA Handling Policy**: CAPTCHA must **NEVER** be automated, bypassed, intercepted, or solved programmatically. It is strictly designated as `manual_captcha` requiring direct user completion.
+The supplied documents may be used inside isolated automated test
+fixtures to verify expected results.
 
----
+They must NEVER leak into runtime extraction, normalization, application
+merging, defaults, UI defaults, or autofill logic.
 
-## 4. Comprehensive Page-by-Page Field Inventory
+If a completely different person’s document is uploaded, the extension
+must automatically extract that person’s information without any code
+change.
 
-### Page 1: Registration Page (`registration`)
+If information is not present or cannot be reliably read:
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| Registration | `reg_applying_from_country` | Country/Region applying visa from | `select` | Required | `india_visa_application` | Country selection |
-| Registration | `reg_indian_mission` | Indian Mission/Office | `select` | Required | `india_visa_application` | Embassy/Consulate office |
-| Registration | `reg_nationality` | Nationality/Region | `select` | Required | `applicant_profile` | Applicant citizenship |
-| Registration | `reg_date_of_birth` | Date of Birth | `date` | Required | `applicant_profile` | Formatted YYYY-MM-DD |
-| Registration | `reg_email` | Email ID | `text` | Required | `applicant_profile` | Main email address |
-| Registration | `reg_reenter_email` | Re-enter Email ID | `text` | Required | `derived` | Email confirmation field |
-| Registration | `reg_expected_arrival_date` | Expected Date of Arrival | `date` | Required | `india_visa_application` | Formatted YYYY-MM-DD |
-| Registration | `reg_captcha` | CAPTCHA | `manual` | Required | `manual_captcha` | **Manual user completion only** |
+→ leave the field blank/null → do not guess → do not use previous
+applicant data → do not use test data → do not invent a value
 
----
+4.  HIGH-LEVEL ARCHITECTURE
 
-### Page 2: Basic Details Page (`basic-details`)
+DOCUMENT ↓ DOCUMENT INGESTION ↓ PDF TEXT / GEMINI / OCR / MRZ ↓
+EXTRACTION CANDIDATES ↓ NORMALIZATION + VALIDATION ↓ APPLICANT PROFILE ↓
+SAVED APPLICATION ↓ APPLICATION WORKSPACE ↓ MANUAL USER REVIEW / EDIT ↓
+SAVE APPLICATION ↓ INDIAN VISA WEBSITE ↓ PAGE DETECTION ↓ PAGE-SPECIFIC
+MAPPING ↓ SELECTOR RESOLUTION ↓ VALUE RESOLUTION ↓ FIELD FILLING ↓ DOM
+EVENT DISPATCH ↓ DOM VERIFICATION ↓ AUTOFILL RESULT
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| Basic Details | `surname` | Surname / Family Name | `text` | Required | `applicant_profile` | As in passport |
-| Basic Details | `given_names` | Given Name(s) | `text` | Required | `applicant_profile` | As in passport |
-| Basic Details | `has_changed_name` | Have you ever changed your name? | `checkbox` | Required | `applicant_profile` | Boolean flag |
-| Basic Details | `previous_name` | Previous / Other Name | `text` | Conditional | `applicant_profile` | Shown if `has_changed_name` = true |
-| Basic Details | `gender` | Gender | `radio` | Required | `applicant_profile` | Male / Female / Other |
-| Basic Details | `date_of_birth` | Date of Birth | `date` | Required | `applicant_profile` | Formatted YYYY-MM-DD |
-| Basic Details | `town_city_of_birth` | Town/City of Birth | `text` | Required | `applicant_profile` | Birth city |
-| Basic Details | `country_of_birth` | Country/Region of Birth | `select` | Required | `applicant_profile` | Birth country |
-| Basic Details | `national_id_number` | Citizenship / National ID Number | `text` | Optional | `applicant_profile` | NID or SSN where applicable |
-| Basic Details | `religion` | Religion | `select` | Required | `applicant_profile` | Controlled list |
-| Basic Details | `visible_identification_marks` | Visible Identification Marks | `text` | Optional | `applicant_profile` | Scars/tattoos or 'NONE' |
-| Basic Details | `educational_qualification` | Educational Qualification | `select` | Required | `applicant_profile` | Highest education level |
-| Basic Details | `nationality` | Nationality | `select` | Required | `applicant_profile` | Current nationality |
-| Basic Details | `nationality_acquired_by` | Nationality acquired by birth or naturalization? | `radio` | Required | `applicant_profile` | `birth` or `naturalization` |
-| Basic Details | `previous_nationality` | Previous Nationality | `select` | Conditional | `applicant_profile` | Shown if `naturalization` |
-| Basic Details | `passport_number` | Passport Number | `text` | Required | `applicant_profile` | Primary passport |
-| Basic Details | `passport_place_of_issue` | Place of Issue | `text` | Required | `applicant_profile` | Issuing authority/city |
-| Basic Details | `passport_issue_date` | Date of Issue | `date` | Required | `applicant_profile` | Formatted YYYY-MM-DD |
-| Basic Details | `passport_expiry_date` | Date of Expiry | `date` | Required | `applicant_profile` | Formatted YYYY-MM-DD |
-| Basic Details | `holds_other_passport` | Hold another valid Passport/Identity Cert? | `checkbox` | Required | `applicant_profile` | Boolean flag |
-| Basic Details | `other_passport_number` | Other Passport Number | `text` | Conditional | `applicant_profile` | Shown if `holds_other_passport` = true |
-| Basic Details | `other_passport_country_of_issue` | Other Passport Country of Issue | `select` | Conditional | `applicant_profile` | Shown if `holds_other_passport` = true |
-| Basic Details | `other_passport_issue_date` | Other Passport Date of Issue | `date` | Conditional | `applicant_profile` | Shown if `holds_other_passport` = true |
-| Basic Details | `other_passport_place_of_issue` | Other Passport Place of Issue | `text` | Conditional | `applicant_profile` | Shown if `holds_other_passport` = true |
-| Basic Details | `other_passport_nationality` | Other Passport Nationality | `select` | Conditional | `applicant_profile` | Shown if `holds_other_passport` = true |
-| Basic Details | `present_address_line1` | Present Address Line 1 | `text` | Required | `applicant_profile` | Street address |
-| Basic Details | `present_address_line2` | Present Address Line 2 | `text` | Optional | `applicant_profile` | Apartment/Suite |
-| Basic Details | `present_village_town_city` | Present Village/Town/City | `text` | Required | `applicant_profile` | City |
-| Basic Details | `present_district` | Present District | `text` | Optional | `applicant_profile` | District |
-| Basic Details | `present_state_province` | Present State/Province | `text` | Required | `applicant_profile` | State/Province |
-| Basic Details | `present_country` | Present Country | `select` | Required | `applicant_profile` | Country |
-| Basic Details | `present_postal_code` | Present Postal/ZIP Code | `text` | Required | `applicant_profile` | Postal code |
-| Basic Details | `present_phone` | Present Phone | `text` | Optional | `applicant_profile` | Landline phone |
-| Basic Details | `present_mobile` | Present Mobile | `text` | Required | `applicant_profile` | Mobile phone |
-| Basic Details | `present_email` | Present Email | `text` | Required | `applicant_profile` | Contact email |
-| Basic Details | `same_as_present_address` | Permanent Address same as Present Address? | `checkbox` | Required | `applicant_profile` | Boolean flag |
-| Basic Details | `permanent_address_line1` | Permanent Address Line 1 | `text` | Conditional | `applicant_profile` | Shown if `same_as_present_address` = false |
-| Basic Details | `permanent_address_line2` | Permanent Address Line 2 | `text` | Optional | `applicant_profile` | Apartment/Suite |
-| Basic Details | `permanent_village_town_city` | Permanent Village/Town/City | `text` | Conditional | `applicant_profile` | Shown if `same_as_present_address` = false |
-| Basic Details | `permanent_district` | Permanent District | `text` | Optional | `applicant_profile` | District |
-| Basic Details | `permanent_state_province` | Permanent State/Province | `text` | Conditional | `applicant_profile` | Shown if `same_as_present_address` = false |
-| Basic Details | `permanent_country` | Permanent Country | `select` | Conditional | `applicant_profile` | Shown if `same_as_present_address` = false |
-| Basic Details | `permanent_postal_code` | Permanent Postal/ZIP Code | `text` | Conditional | `applicant_profile` | Shown if `same_as_present_address` = false |
+5.  SOURCE PRECEDENCE
 
----
+When the same field is available from multiple sources, use:
 
-### Page 3: Family Details Page (`family-details`)
+Manual Edit > Current Passport Document > Current OGD Document >
+Approved Generic Derived Rule > Blank
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| Family Details | `father_name` | Father's Name | `text` | Required | `applicant_profile` | Full name |
-| Family Details | `father_nationality` | Father's Nationality | `select` | Required | `applicant_profile` | Current nationality |
-| Family Details | `father_previous_nationality` | Father's Previous Nationality | `select` | Optional | `applicant_profile` | If applicable |
-| Family Details | `father_place_of_birth` | Father's Place of Birth | `text` | Required | `applicant_profile` | City of birth |
-| Family Details | `father_country_of_birth` | Father's Country of Birth | `select` | Required | `applicant_profile` | Country of birth |
-| Family Details | `mother_name` | Mother's Name | `text` | Required | `applicant_profile` | Full name |
-| Family Details | `mother_nationality` | Mother's Nationality | `select` | Required | `applicant_profile` | Current nationality |
-| Family Details | `mother_previous_nationality` | Mother's Previous Nationality | `select` | Optional | `applicant_profile` | If applicable |
-| Family Details | `mother_place_of_birth` | Mother's Place of Birth | `text` | Required | `applicant_profile` | City of birth |
-| Family Details | `mother_country_of_birth` | Mother's Country of Birth | `select` | Required | `applicant_profile` | Country of birth |
-| Family Details | `spouse_name` | Spouse's Name | `text` | Optional | `applicant_profile` | Required if married |
-| Family Details | `spouse_nationality` | Spouse's Nationality | `select` | Optional | `applicant_profile` | Current nationality |
-| Family Details | `spouse_previous_nationality` | Spouse's Previous Nationality | `select` | Optional | `applicant_profile` | If applicable |
-| Family Details | `spouse_place_of_birth` | Spouse's Place of Birth | `text` | Optional | `applicant_profile` | City of birth |
-| Family Details | `spouse_country_of_birth` | Spouse's Country of Birth | `select` | Optional | `applicant_profile` | Country of birth |
-| Family Details | `has_pakistan_relation` | Parents/Grandparents Pakistan relation inquiry | `radio` | Required | `applicant_profile` | Yes/No flag |
-| Family Details | `pakistan_relation_details` | Pakistan Relation Details | `textarea` | Conditional | `applicant_profile` | Shown if `has_pakistan_relation` = true |
+Passport is the current identity authority.
 
----
+OGD is supplementary/historical information.
 
-### Page 4: Visa Details Page (`visa-details`)
+OGD must not overwrite stronger current Passport identity information.
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| Visa Details | `visa_type` | Type of Visa Required | `select` | Required | `india_visa_application` | e.g. Tourist, Business, Medical |
-| Visa Details | `number_of_entries` | Number of Entries | `select` | Required | `india_visa_application` | Single / Double / Multiple |
-| Visa Details | `period_of_visa` | Period of Visa (months) | `number` | Required | `india_visa_application` | Duration in months |
-| Visa Details | `expected_date_of_journey` | Expected Date of Journey | `date` | Required | `india_visa_application` | Formatted YYYY-MM-DD |
-| Visa Details | `port_of_arrival` | Port of Arrival | `select` | Required | `india_visa_application` | Indian immigration port |
-| Visa Details | `port_of_exit` | Port of Exit | `select` | Optional | `india_visa_application` | Departure port |
-| Visa Details | `places_to_be_visited` | Places to be Visited | `text` | Required | `india_visa_application` | Cities/destinations |
-| Visa Details | `purpose_of_visit` | Purpose of Visit | `select` | Required | `india_visa_application` | Specific purpose |
+6.  APPLICANT PROFILE
 
----
+ApplicantProfile is the reusable applicant data model.
 
-### Page 5: Previous Visit Details Page (`previous-visit`)
+It can contain:
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| Previous Visit | `has_visited_india` | Have you ever visited India before? | `radio` | Required | `india_visa_application` | Yes/No flag |
-| Previous Visit | `stay_address_in_india` | Address where stayed in India | `textarea` | Conditional | `india_visa_application` | Shown if `has_visited_india` = true |
-| Previous Visit | `cities_visited_in_india` | Cities in India Visited | `text` | Conditional | `india_visa_application` | Shown if `has_visited_india` = true |
-| Previous Visit | `previous_visa_type` | Previous Indian Visa Type | `select` | Conditional | `india_visa_application` | Shown if `has_visited_india` = true |
-| Previous Visit | `previous_visa_number` | Previous Visa Number | `text` | Conditional | `india_visa_application` | Shown if `has_visited_india` = true |
-| Previous Visit | `previous_visa_issued_place` | Previous Visa Issued Place | `text` | Conditional | `india_visa_application` | Shown if `has_visited_india` = true |
-| Previous Visit | `previous_visa_date_of_issue` | Previous Visa Date of Issue | `date` | Conditional | `india_visa_application` | Formatted YYYY-MM-DD |
-| Previous Visit | `countries_visited_last_10_years` | Countries Visited during Last 10 Years | `text` | Optional | `india_visa_application` | List of countries |
-| Previous Visit | `has_been_refused_visa` | Has Indian Visa ever been refused? | `radio` | Required | `india_visa_application` | Yes/No flag |
-| Previous Visit | `visa_refusal_details` | Visa Refusal Details | `textarea` | Conditional | `india_visa_application` | Shown if `has_been_refused_visa` = true |
-| Previous Visit | `has_been_deported` | Have you ever been deported from India? | `radio` | Required | `india_visa_application` | Yes/No flag |
-| Previous Visit | `deportation_details` | Deportation Details | `textarea` | Conditional | `india_visa_application` | Shown if `has_been_deported` = true |
+-   personal information
+-   passport information
+-   present address
+-   permanent address
+-   contact information
+-   family information
+-   employment
+-   military history
+-   other reusable applicant information
 
----
+ApplicantProfile should remain generic and country-agnostic.
 
-### Page 6: Profession / Occupation Page (`profession`)
+7.  SAVED APPLICATION
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| Profession | `present_occupation` | Present Occupation | `select` | Required | `applicant_profile` | Occupation category |
-| Profession | `designation_rank` | Designation / Rank | `text` | Required | `applicant_profile` | Job title |
-| Profession | `employer_name` | Employer Name / Business | `text` | Required | `applicant_profile` | Company/Org name |
-| Profession | `employer_address` | Employer Address | `text` | Required | `applicant_profile` | Address |
-| Profession | `employer_phone` | Employer Phone Number | `text` | Required | `applicant_profile` | Office phone |
-| Profession | `past_occupation` | Past Occupation | `select` | Optional | `applicant_profile` | Previous work |
-| Profession | `has_military_service` | Worked with Armed Forces/Police/Para-Military? | `radio` | Required | `applicant_profile` | Yes/No flag |
-| Profession | `military_organization` | Military Organization Name | `text` | Conditional | `applicant_profile` | Shown if `has_military_service` = true |
-| Profession | `military_designation` | Military Designation | `text` | Conditional | `applicant_profile` | Shown if `has_military_service` = true |
-| Profession | `military_place_of_posting` | Military Place of Posting | `text` | Conditional | `applicant_profile` | Shown if `has_military_service` = true |
-| Profession | `military_rank` | Military Rank | `text` | Conditional | `applicant_profile` | Shown if `has_military_service` = true |
+SavedApplication is the final editable application representation used
+by the Indian Visa workflow.
 
----
+It is the source of truth for website autofill after extraction and user
+review.
 
-### Page 7: Accommodation / Place of Stay Page (`accommodation`)
+The website autofill layer must read from SavedApplication rather than
+directly reading:
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| Accommodation | `acc_hotel_name` | Place / Hotel Name | `text` | Required | `india_visa_application` | First stay location |
-| Accommodation | `acc_address` | Accommodation Address | `text` | Required | `india_visa_application` | Hotel/stay street address |
-| Accommodation | `acc_state` | Accommodation State | `select` | Required | `india_visa_application` | Indian state |
-| Accommodation | `acc_phone` | Accommodation Phone Number | `text` | Required | `india_visa_application` | Hotel contact phone |
+-   raw OCR
+-   raw Gemini responses
+-   previous documents
+-   old profiles
+-   test fixtures
 
----
+Workflow:
 
-### Page 8: References Page (`references`)
+SavedApplication ↓ Field Resolver ↓ Website Adapter ↓ Portal Form
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| References | `ref_india_name` | India Reference Name | `text` | Required | `india_visa_application` | Contact person/hotel in India |
-| References | `ref_india_address` | India Reference Address | `text` | Required | `india_visa_application` | Address in India |
-| References | `ref_india_phone` | India Reference Phone | `text` | Required | `india_visa_application` | Indian phone number |
-| References | `ref_bangladesh_name` | Home Country Reference Name | `text` | Required | `india_visa_application` | Home country reference |
-| References | `ref_bangladesh_address` | Home Country Reference Address | `text` | Required | `india_visa_application` | Home country address |
-| References | `ref_bangladesh_phone` | Home Country Reference Phone | `text` | Required | `india_visa_application` | Home country phone number |
+8.  DOCUMENT SOURCES
 
----
+PASSPORT
 
-### Page 9: Documents Page (`documents`)
+Passport is the primary current identity source.
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| Documents | `doc_passport` | Passport Document Metadata | `text` | Required | `india_visa_application` | `documentId`, `fileName`, `uploadedAt` |
-| Documents | `doc_photo` | Applicant Photo Metadata | `text` | Required | `india_visa_application` | `documentId`, `fileName`, `uploadedAt` |
-| Documents | `doc_supporting` | Supporting Documents Metadata | `text` | Optional | `india_visa_application` | Optional attachments |
+Possible passport information:
 
----
+-   surname
+-   given name
+-   nationality
+-   date of birth
+-   gender
+-   place of birth
+-   passport number
+-   passport issue date
+-   passport expiry date
+-   passport issue place
+-   previous passport information
+-   permanent address
+-   emergency contact
+-   emergency contact phone
+-   MRZ
 
-### Page 10: Declaration Page (`declaration`)
+OGD / PREVIOUS APPLICATION
 
-| Page | Field Identifier | Label / Question | Field Type | Requirement | Data Source | Notes |
-| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| Declaration | `dec_agreed` | Declaration Agreement | `checkbox` | Required | `india_visa_application` | Terms acceptance flag |
-| Declaration | `dec_date` | Declaration Date | `date` | Required | `india_visa_application` | Formatted YYYY-MM-DD |
+OGD is supplementary/historical.
 
----
+It may provide:
 
-## 5. Field Mapping Architecture Specification
+-   previous visa information
+-   historical application information
+-   family information
+-   employment
+-   references
+-   previous travel information
+-   historical address
+-   other fields not available in the Passport
 
-The mapping architecture decouples domain models from DOM execution logic. Each mapping rule is defined by `IndiaVisaFieldMapping`:
+9.  EXTRACTION ARCHITECTURE
 
-```typescript
-export interface IndiaVisaFieldMapping {
-  page: IndiaVisaPage
-  fieldId: IndiaVisaFieldId
-  label: string
-  sourcePath: string
-  dataSource: FieldDataSource
-  fieldType: FieldType
-  requirement: FieldRequirementStatus
-  conditionallyDisplayed?: boolean
-  conditionDescription?: string
-  notes?: string
-}
-```
+The extraction system combines multiple possible sources:
 
-The mapping registry (`INDIA_VISA_FIELD_MAPPINGS` in `src/countries/india/visa/field-mapping.ts`) provides a complete field-by-field specification for all 10 pages without binding to fragile CSS or DOM selectors.
+PDF text + Gemini AI + OCR + MRZ + document-specific extraction
+
+These produce extraction candidates.
+
+Candidates are then:
+
+1.  normalized
+2.  validated
+3.  merged
+4.  converted into the application model
+
+Important: No raw extraction result should directly become final
+application data without normalization/validation.
+
+10. GEMINI EXTRACTION
+
+Gemini is used for document understanding and structured extraction.
+
+Gemini must:
+
+-   inspect the current uploaded document
+-   extract only document-supported information
+-   return structured data
+-   return null when unavailable
+-   never invent missing values
+-   never use previous applicant information
+-   never use test data
+-   never infer sensitive information from names
+
+Preferred structured address:
+
+address: addressLine1 addressLine2 villageTownCity district
+stateProvince country postalCode
+
+Preferred contact:
+
+contact: phone mobile email
+
+11. OCR AND MRZ
+
+OCR is a supporting/fallback extraction mechanism.
+
+MRZ is especially useful for:
+
+-   passport number
+-   nationality
+-   date of birth
+-   sex
+-   expiry date
+-   surname
+-   given names
+
+OCR output must be normalized.
+
+OCR garbage must never become applicant information.
+
+Examples of OCR problems that must be cleaned:
+
+-   random isolated characters
+-   broken words
+-   duplicated fragments
+-   incorrect punctuation
+-   broken address lines
+-   unrelated text
+-   fragments such as “COLON” when it is OCR noise
+
+12. ADDRESS ARCHITECTURE
+
+Present Address fields:
+
+-   Present Address Line 1
+-   Present Address Line 2
+-   Present Village/Town/City
+-   Present District
+-   Present State/Province
+-   Present Country
+-   Present Postal/Pincode
+-   Present Phone
+-   Present Mobile
+-   Present Email
+
+Permanent Address fields:
+
+-   Permanent Address Line 1
+-   Permanent Address Line 2
+-   Permanent Village/Town/City
+-   Permanent District
+-   Permanent State/Province
+-   Permanent Country
+-   Permanent Postal/Pincode
+
+13. ADDRESS PARSING RULE
+
+The complete address should first be reconstructed from the document.
+
+Then it should be semantically separated.
+
+Generic pattern:
+
+FIRST COMPONENT, SECOND COMPONENT, THIRD COMPONENT - POSTAL CODE, CITY
+
+should generally become:
+
+Address Line 1 = FIRST COMPONENT
+
+Address Line 2 = SECOND COMPONENT, THIRD COMPONENT
+
+Village/Town/City = CITY
+
+Postal/Pincode = POSTAL CODE
+
+This is a generic parsing rule.
+
+Do NOT hardcode the current test applicant’s address.
+
+The parser must work for completely different addresses.
+
+14. ADDRESS REFERENCE EXAMPLE
+
+One supplied reference/test document contains an address equivalent to:
+
+KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120, THAKURGAON
+
+Expected structure for that test is:
+
+Present Address Line 1: KASHIPUR
+
+Present Address Line 2: RANISANKAIL, MUZAHIDABAD COLONI
+
+Present Village/Town/City: THAKURGAON
+
+District: THAKURGAON
+
+Postal/Pincode: 5120
+
+These values are ONLY a reference/test example.
+
+They must never be hardcoded into production.
+
+15. PRESENT ADDRESS FALLBACK
+
+Existing business rule:
+
+If explicit Present Address exists: use Present Address
+
+Else if Permanent Address exists: clone structured Permanent Address
+into Present Address
+
+Else: leave Present Address blank
+
+If Present and Permanent addresses are both available and different:
+keep them separate.
+
+Manual user edits always override extracted/derived values.
+
+Do not copy phone/mobile/email merely because the address itself was
+copied.
+
+16. CONTACT EXTRACTION
+
+Supported applicant contact information:
+
+-   phone
+-   mobile
+-   email
+-   ISD code
+
+Rules:
+
+-   Applicant phone may populate Present Phone.
+-   Applicant mobile may populate Mobile.
+-   +880… / 880… may be normalized into mobile + ISD.
+-   Applicant email may populate Email.
+-   Emergency contact telephone may be used as an applicant phone
+    fallback only when the existing approved rule allows it.
+-   Employer phone must not become applicant phone.
+-   Sponsor phone must not become applicant phone.
+-   Hotel phone must not become applicant phone.
+-   Family phone must not become applicant phone.
+
+17. RELIGION SAFETY
+
+Religion is sensitive personal information.
+
+Do NOT infer religion from:
+
+-   name
+-   surname
+-   title
+-   family name
+-   location
+-   community association
+
+Religion may only be populated from:
+
+-   explicit document evidence
+-   explicit OGD evidence
+-   manual user entry
+
+18. BANGLADESH FAMILY NATIONALITY RULE
+
+The approved generic business rule remains:
+
+If the applicant’s nationality is Bangladesh and a father/mother record
+exists, Father/Mother nationality may be populated as Bangladesh
+according to the existing application rule.
+
+This is a generic business rule, not applicant-specific hardcoding.
+
+Users can manually correct rare exceptions.
+
+Do NOT remove this rule unless explicitly requested.
+
+19. APPLICATION WORKSPACE
+
+The Application Workspace is the central review/edit page.
+
+Its purpose is to:
+
+-   show extracted information
+-   show source badges
+-   show missing information
+-   allow manual editing
+-   allow the user to save
+-   keep all supported fields available
+-   prepare SavedApplication for autofill
+
+The Workspace is not the Indian Visa website.
+
+20. WORKSPACE VIEW
+
+The UI can use a curated view for practical use.
+
+Hidden fields must remain:
+
+-   stored
+-   mapped
+-   available for autofill
+
+Hiding a field in the UI must not remove its underlying
+application/autofill capability.
+
+A Show All Fields option may expose the full inventory.
+
+21. SOURCE BADGES
+
+Possible source labels:
+
+-   Passport PDF
+-   OGD
+-   Derived Rule
+-   Manual Entry
+
+Source badges must be truthful.
+
+A derived value must not be labeled as directly extracted from the
+Passport.
+
+22. SAVE APPLICATION
+
+The user should have one primary SAVE APPLICATION action.
+
+Manual edits must persist to SavedApplication.
+
+After saving:
+
+Workspace ↓ SavedApplication ↓ Autofill
+
+23. INDIAN VISA PORTAL
+
+Target:
+
+https://indianvisa-bangladesh.nic.in/
+
+Current supported workflow pages:
+
+-   Registration
+-   Basic Details
+-   Family Details
+-   Visa Details
+-   Additional Questions
+-   Photo Upload
+
+Other portal states may exist, but unsupported/security-sensitive states
+must remain outside automated autofill.
+
+24. PAGE DETECTION
+
+Use the existing India Visa page detection architecture.
+
+Registration:
+
+/visa/Registration
+
+Basic Details:
+
+/visa/BasicDetails
+
+Family Details:
+
+/visa/FamilyDetails
+
+Visa Details:
+
+/visa/VisaDetails
+
+Additional Questions:
+
+/visa/AdditionalQuestions
+
+Photo:
+
+/visa/PhotoUpload
+
+Do not create multiple competing page-detection systems.
+
+25. REGISTRATION PAGE
+
+Target:
+
+/visa/Registration
+
+Supported fields:
+
+Country/Region: Selector: #countryname_id Source: appl.countryname
+
+Indian Mission: Selector: #missioncode_id Source: appl.missioncode
+
+Nationality/Region: Selector: #nationality_id Source: appl.nationality
+
+Date of Birth: Selector: #dob_id Source: appl.birthdate
+
+Email: Selector: #email_id Source: appl.email
+
+Re-enter Email: Selector: #email_re_id Source: appl.email_re
+
+Expected Date of Arrival: Selector: #jouryney_id Source:
+appl.journeydate
+
+CAPTCHA: Selector: #captcha Status: MANUAL
+
+26. REGISTRATION DROPDOWN HANDLING
+
+Country, Mission and Nationality are portal dropdowns.
+
+Do not assume the SavedApplication value equals the HTML option value.
+
+Resolution should inspect actual DOM options.
+
+Preferred resolution:
+
+Exact normalized option value > Exact normalized option text > Approved
+generic alias > Unresolved
+
+If unresolved: FAILED
+
+Do not guess.
+
+Mission may depend on Country.
+
+Sequence:
+
+Country ↓ dispatch change ↓ wait for Mission options ↓ resolve Mission ↓
+select Mission ↓ verify
+
+27. DATE HANDLING
+
+SavedApplication should keep normalized dates.
+
+Website adapters may convert dates into the portal’s required format.
+
+Example:
+
+SavedApplication: 1993-09-18
+
+Portal: 18/09/1993
+
+Do not mutate the underlying application data just to satisfy the
+website.
+
+28. AUTOFILL CURRENT PAGE
+
+When the user clicks:
+
+AUTOFILL CURRENT PAGE
+
+the extension should:
+
+1.  detect the current supported page
+2.  load SavedApplication
+3.  resolve fields
+4.  fill reliable values
+5.  leave missing values blank
+6.  verify actual DOM values
+7.  report the result
+
+It must not require re-uploading the document for every page.
+
+29. FIELD RESULT STATES
+
+FILLED: Reliable value existed and the final DOM value was successfully
+verified.
+
+SKIPPED: No reliable source value exists.
+
+FAILED: Reliable source value exists but the portal field could not be
+resolved, written, or verified.
+
+MANUAL: The field is intentionally excluded from automation.
+
+Example:
+
+Country = FILLED Mission = FAILED Email = SKIPPED CAPTCHA = MANUAL
+
+30. DOM VERIFICATION
+
+After filling a field, verify the actual website DOM.
+
+For text fields:
+
+element.value must match the expected normalized website value.
+
+For selects:
+
+the selected option must match the resolved expected option.
+
+Do not report FILLED merely because an assignment operation executed.
+
+If the portal resets the value: report FAILED.
+
+31. DOM EVENTS
+
+When required by the portal, dispatch:
+
+-   input
+-   change
+-   blur
+
+For dependent fields, allow the portal to update before selecting the
+dependent field.
+
+Example:
+
+Country ↓ change ↓ Mission options update ↓ Mission selection
+
+32. CONTENT SCRIPT ARCHITECTURE
+
+The website side uses:
+
+Manifest V3 ↓ Content Script ↓ India Visa Page Detection ↓ Message
+Receiver ↓ Autofill Engine ↓ Page Adapter ↓ Portal DOM
+
+The background/service worker routes the autofill request to the active
+supported portal tab.
+
+33. AUTOFILL MESSAGE FLOW
+
+Application Workspace / Extension UI ↓ AUTOFILL CURRENT PAGE ↓
+Background / Service Worker ↓ Current Active Tab ↓ Content Script ↓ Page
+Adapter ↓ Autofill Engine ↓ Portal Fields
+
+A readiness/ping mechanism may be used so the background can confirm the
+content script is available.
+
+34. BASIC DETAILS PAGE
+
+Target:
+
+/visa/BasicDetails
+
+Important fields include:
+
+-   surname
+-   given name
+-   changed surname
+-   gender
+-   place of birth
+-   country of birth
+-   national ID number
+-   religion
+-   visible identification marks
+-   education
+-   nationality by
+-   passport number
+-   passport issue place
+-   passport issue date
+-   passport expiry date
+-   other passport information
+
+Existing verified selectors include:
+
+#surname #givenName #changedSurnameCheck #gender #birth_place
+#country_birth #nic_number #religion #identity_marks #education
+#nationality_by #passport_no #passport_issue_place #passport_issue_date
+#passport_expiry_date #other_ppt_1 #other_ppt_2 #other_ppt_no
+#other_ppt_issue_place #other_ppt_country_issue #other_ppt_nat
+
+35. FAMILY DETAILS PAGE
+
+Important fields:
+
+Present Address: #pres_add1 #pres_add2 #pres_add3 / appl.state_name
+#pincode #pres_phone #mobile #sameAddress_id
+
+Permanent Address: #perm_address1 #perm_address2 #perm_address3
+
+Father: #fthrname #father_place_of_birth #father_country_of_birth
+#father_nationality
+
+Mother: #mother_name #mother_place_of_birth #mother_country_of_birth
+#mother_nationality
+
+Other: #marital_status #grandparent_flag1 #grandparent_flag2
+#grandparent_details
+
+Same Address checkbox: MANUAL ONLY
+
+36. EMPLOYMENT
+
+Important fields:
+
+#occupation #empname #empdesignation #empaddress #empphone
+#previous_occupation #prev_org1 #prev_org2 #previous_organization
+#previous_designation #previous_rank #previous_posting
+
+Employer information must not be confused with applicant contact
+information.
+
+37. VISA DETAILS
+
+Important fields include:
+
+#duration #visa_entry_id #journeydate / #jouryney_id #entrypoint
+#exitpointprc
+
+Previous visa:
+
+#old_visa_flag1 #old_visa_flag2 #prv_visit_add1 #prv_visit_add2
+#prv_visit_add3 #visited_city #old_visa_no #old_visa_type_id
+#oldvisaissueplace #oldvisaissuedate
+
+Refusal:
+
+#refuse_flag1 #refuse_flag2 #refuse_details
+
+SAARC history:
+
+#saarc_flag1 #saarc_flag2 #saarcCountry1 … #saarcCountry8 #saarcYear1 …
+#saarcYear8 #saarcVisitNo1 … #saarcVisitNo8
+
+India sponsor:
+
+#nameofsponsor_ind #add1ofsponsor_ind #add2ofsponsor_ind
+#stateofsponsor_ind #districtofsponsor_ind #phoneofsponsor_ind
+
+Bangladesh reference:
+
+#nameofsponsor_msn #add1ofsponsor_msn #add2ofsponsor_msn
+#phoneofsponsor_msn
+
+38. ADDITIONAL QUESTIONS
+
+Current question fields:
+
+#question_yes_1 … #question_yes_6 #question_no_1 … #question_no_6
+#answer_1 … #answer_6
+
+Declaration:
+
+#verifyQuestions
+
+Declaration/verification must remain manual.
+
+The extension must not invent answers to security/compliance questions.
+
+39. PHOTO PAGE
+
+Photo file selection remains manual.
+
+The extension must NOT:
+
+-   open the browser file chooser
+-   select the portal photo
+-   click Upload
+-   click Continue
+-   click Exit
+
+The photo section may provide status/guidance only.
+
+40. SECURITY / MANUAL BOUNDARIES
+
+The extension must NEVER automate:
+
+-   CAPTCHA
+-   OTP
+-   payment
+-   final submission
+-   declaration checkbox
+-   same-address checkbox
+-   refusal/criminal disclosures
+-   security/compliance decisions
+-   portal photo file chooser
+-   portal Upload
+-   portal Continue
+-   portal Save & Continue
+-   portal Exit
+
+The user remains in control of these actions.
+
+41. PAGE-BY-PAGE USER WORKFLOW
+
+42. Upload Passport / OGD.
+
+43. Extraction runs automatically.
+
+44. Application Workspace opens.
+
+45. User reviews extracted information.
+
+46. User manually corrects/enters missing values.
+
+47. User clicks SAVE APPLICATION.
+
+48. User opens Indian Visa website.
+
+49. User clicks AUTOFILL CURRENT PAGE.
+
+50. Extension fills supported fields.
+
+51. User manually completes CAPTCHA if present.
+
+52. User manually clicks portal Continue / Save & Continue.
+
+53. Next page loads.
+
+54. User clicks AUTOFILL CURRENT PAGE again.
+
+55. Repeat until all supported pages are completed.
+
+56. HIDDEN FIELD POLICY
+
+The application internally supports the complete field inventory.
+
+The UI may hide less frequently used fields.
+
+Hidden fields must remain:
+
+-   stored
+-   mapped
+-   available to autofill
+-   editable through Show All Fields when needed
+
+43. COUNTRY-SPECIFIC ARCHITECTURE
+
+Generic reusable logic belongs under:
+
+src/core/
+
+India-specific logic belongs under:
+
+src/countries/india/
+
+Bangladesh-specific Indian Visa mappings belong under:
+
+src/countries/india/mappings/bangladesh/
+
+Bangladesh-specific Indian Visa selectors belong under:
+
+src/countries/india/selectors/bangladesh/
+
+This separation allows future country support without rebuilding the
+core system.
+
+44. SELECTOR ARCHITECTURE
+
+Selectors and mappings should remain separate.
+
+Selectors define:
+
+WHERE the portal field is.
+
+Mappings define:
+
+WHAT application data goes there and HOW it is transformed.
+
+45. WEBSITE ADAPTER PRINCIPLE
+
+Website-specific transformations belong in the website adapter layer.
+
+Examples:
+
+-   normalized date → DD/MM/YYYY
+-   saved country → portal option
+-   saved nationality → portal option
+-   saved mission → portal option
+
+Do not mutate core applicant data simply because the website requires
+another representation.
+
+46. ERROR HANDLING
+
+The system must not silently fail.
+
+Examples:
+
+Element not found Saved value missing Select option unresolved Portal
+reset value Content script unavailable Unsupported page
+
+must result in clear status information.
+
+47. LOGGING POLICY
+
+Development logs should be concise and should not expose unnecessary
+personal data.
+
+Safe example:
+
+Page: REGISTRATION Adapter: ready Fields processed: 7 Filled: 5 Skipped:
+1 Failed: 1 Manual: 1
+
+Avoid logging:
+
+-   passport numbers
+-   phone numbers
+-   email addresses
+-   full addresses
+-   personal names
+
+48. APPLICANT ISOLATION
+
+Applicant A:
+
+Applicant A document ↓ SavedApplication A
+
+Applicant B:
+
+Applicant B document ↓ SavedApplication B
+
+No values from Applicant A may appear in Applicant B.
+
+Whenever a new document is processed, the current application must be
+isolated from previous applicant data.
+
+49. DOCUMENT REPROCESSING
+
+New document:
+
+New Document ↓ New Extraction ↓ New Candidates ↓ Normalization ↓ Merge ↓
+Current Application
+
+Previous applicant data must not be used as an automatic fallback.
+
+50. HARDcoding POLICY
+
+PROHIBITED:
+
+if passportNumber === known value if filename.includes(known applicant
+name) if name === known applicant if address.includes(known locality) if
+phone === known phone if nationalId === known number
+
+Also prohibited:
+
+-   known applicant defaults
+-   known passport defaults
+-   known address defaults
+-   known phone defaults
+-   known email defaults
+-   known emergency contact defaults
+
+Generic normalization rules are allowed.
+
+Applicant-specific rules are not.
+
+51. APPROVED GENERIC DERIVED RULES
+
+Examples:
+
+Present Address fallback: Permanent Address → Present Address when
+Present Address is absent.
+
+Father/Mother Bangladesh nationality: Approved generic Bangladesh
+business rule.
+
+Email confirmation: Mirror the current validated application email when
+the existing application rule permits it.
+
+These rules must remain generic and documented.
+
+52. TEST STRATEGY
+
+Tests should cover:
+
+-   document extraction
+-   OCR
+-   MRZ
+-   Gemini extraction
+-   address parsing
+-   contact extraction
+-   applicant isolation
+-   hardcode audit
+-   workspace
+-   manual edit persistence
+-   application saving
+-   page detection
+-   selector resolution
+-   value resolution
+-   DOM autofill
+-   DOM verification
+-   error handling
+-   end-to-end workflow
+
+53. REGISTRATION AUTOFILL TESTS
+
+Required tests:
+
+-   Registration URL detection
+-   Content script readiness
+-   Country selection
+-   Mission selection
+-   Nationality selection
+-   DOB filling
+-   Email filling
+-   Confirm Email filling
+-   Journey Date filling
+-   Missing value behavior
+-   Select option resolution
+-   Dependent Mission dropdown
+-   DOM event dispatch
+-   DOM verification
+-   CAPTCHA untouched
+-   Continue button untouched
+-   Save & Continue untouched
+-   Applicant isolation
+
+54. DYNAMIC EXTRACTION TESTS
+
+Test at least two different applicants.
+
+Applicant A: Document A ↓ Data A
+
+Applicant B: Document B ↓ Data B
+
+Verify:
+
+-   A values do not appear in B.
+-   B values are taken from B’s document.
+-   No applicant-specific production hardcode exists.
+
+55. HARDcode AUDIT
+
+Production source must be scanned for applicant-specific values.
+
+Runtime source areas include:
+
+-   src/core/
+-   src/countries/
+-   src/application/
+-   src/background/
+-   src/content/
+-   src/components/
+-   src/popup/
+
+Test fixtures may contain reference values.
+
+Runtime production code may not.
+
+56. BUILD AND QUALITY REQUIREMENTS
+
+Before declaring a feature complete:
+
+-   unit tests
+-   integration tests where applicable
+-   hardcode audit
+-   lint
+-   production build
+-   real Chrome test
+-   actual portal DOM verification
+
+A passing unit test alone is not enough for website autofill.
+
+57. REAL CHROME VALIDATION
+
+For every portal autofill page:
+
+1.  Build extension.
+
+2.  Reload unpacked extension.
+
+3.  Open actual Indian Visa page.
+
+4.  Confirm page detection.
+
+5.  Click Autofill Current Page.
+
+6.  Observe actual portal fields.
+
+7.  Verify filled values.
+
+8.  Verify manual/security fields remain untouched.
+
+9.  Verify no portal button was automatically clicked.
+
+10. REGISTRATION SUCCESS CRITERIA
+
+Registration should result in:
+
+Country: FILLED when reliable data exists.
+
+Indian Mission: FILLED when reliable data exists and portal option
+resolves.
+
+Nationality: FILLED when reliable data exists and portal option
+resolves.
+
+DOB: FILLED when reliable data exists.
+
+Email: FILLED when reliable data exists.
+
+Confirm Email: FILLED when reliable data exists.
+
+Journey Date: FILLED when reliable data exists.
+
+CAPTCHA: MANUAL.
+
+If data is missing: SKIPPED.
+
+If reliable data exists but the portal field cannot be resolved: FAILED.
+
+59. NO FALSE COMPLETION
+
+Never report FILLED unless the final DOM value has been verified.
+
+Never report SKIPPED when a reliable value exists but filling failed.
+
+Use FAILED in that situation.
+
+60. CURRENT DEVELOPMENT STATUS
+
+Completed / working areas:
+
+-   document upload
+-   PDF extraction
+-   scanned passport support
+-   OCR/MRZ support
+-   Gemini extraction
+-   dynamic applicant extraction
+-   applicant hardcode removal
+-   Application Workspace
+-   SavedApplication
+-   manual editing
+-   Save Application
+-   Present Address fallback
+-   structured address parsing
+-   contact extraction
+-   applicant isolation
+-   religion safety
+-   Bangladesh family nationality rule
+-   India Visa page detection
+-   content-script communication
+-   Registration page detection
+-   Registration Autofill execution
+
+Current Registration work:
+
+-   Country autofill
+-   Mission dropdown resolution
+-   Nationality dropdown resolution
+-   Email autofill
+-   Confirm Email autofill
+-   Journey Date autofill
+-   DOM verification
+
+Next development stages:
+
+-   Basic Details Autofill
+-   Family Details Autofill
+-   Visa / Travel Details Autofill
+-   Additional Questions safe autofill
+-   Photo page boundary verification
+-   Full end-to-end autofill audit
+
+61. FUTURE IMPROVEMENTS
+
+Possible future improvements:
+
+-   stronger document classification
+-   better OCR preprocessing
+-   better multilingual OCR
+-   improved portal select resolution
+-   improved date adapters
+-   better field-level confidence/provenance
+-   stronger extraction conflict resolution
+-   automated regression fixtures
+-   secure backend Gemini API architecture for production
+-   additional country support
+
+Future improvements must not break the existing workflow.
+
+62. ABSOLUTE RULES
+
+63. No applicant-specific hardcoded production data.
+
+64. Every uploaded document must be processed dynamically.
+
+65. Previous applicant data must never leak.
+
+66. Passport is current identity authority.
+
+67. OGD is supplementary/historical.
+
+68. Manual edits override extraction.
+
+69. SavedApplication is the autofill source of truth.
+
+70. Present Address may fall back from Permanent Address when Present is
+    absent.
+
+71. Address must remain structurally separated.
+
+72. Missing values remain blank.
+
+73. Unsupported values must not be guessed.
+
+74. Religion must not be inferred from names.
+
+75. Father/Mother Bangladesh nationality generic business rule remains
+    allowed.
+
+76. CAPTCHA remains manual.
+
+77. OTP remains manual.
+
+78. Payment remains manual.
+
+79. Declaration remains manual.
+
+80. Same-address checkbox remains manual.
+
+81. Refusal/criminal/security questions remain manual unless safely
+    supported by an approved existing rule.
+
+82. Portal Continue/Save & Continue/Submit/Exit remain manual.
+
+83. Portal photo file chooser remains manual.
+
+84. Website autofill must verify the actual DOM.
+
+85. Hidden UI fields remain internally available for autofill.
+
+86. Country-specific logic belongs under countries//.
+
+87. Portal selectors and mappings remain separate.
+
+88. Real Chrome testing is required before declaring portal autofill
+    complete.
+
+89. FINAL ARCHITECTURE SUMMARY
+
+DOCUMENTS ↓ PDF TEXT + GEMINI + OCR + MRZ ↓ EXTRACTION CANDIDATES ↓
+NORMALIZATION / VALIDATION ↓ APPLICANT PROFILE ↓ SAVED APPLICATION ↓
+APPLICATION WORKSPACE ↓ MANUAL REVIEW / EDIT ↓ SAVE APPLICATION ↓ INDIAN
+VISA PORTAL ↓ PAGE DETECTOR ↓ CANONICAL PAGE ↓ COUNTRY/PAGE MAPPING ↓
+SELECTOR RESOLVER ↓ VALUE RESOLVER ↓ FIELD FILLER ↓ DOM EVENTS ↓ DOM
+VERIFICATION ↓ FILLED / SKIPPED / FAILED / MANUAL
+
+The core objective remains:
+
+EXTRACT THE CURRENT APPLICANT’S REAL DATA FROM THE CURRENT DOCUMENT, LET
+THE USER REVIEW AND CORRECT IT, THEN AUTOFILL ONLY THE SUPPORTED INDIAN
+VISA FIELDS, WITHOUT APPLICANT-SPECIFIC HARDCODING AND WITHOUT
+AUTOMATING CAPTCHA, OTP, PAYMENT, FINAL SUBMISSION, OR OTHER MANUAL
+SECURITY ACTIONS.
