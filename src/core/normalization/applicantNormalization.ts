@@ -28,6 +28,17 @@ function cleanPhone(phoneStr?: string): string | undefined {
   return cleaned !== '' ? cleaned : undefined
 }
 
+function cleanPurpose(purposeStr?: string): string | undefined {
+  if (!purposeStr) return undefined
+  let cleaned = purposeStr
+    .replace(/-\s*[\r\n]+\s*/g, '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  cleaned = cleaned.replace(/^[:\s\-–—"'.]+/, '').replace(/[:\s\-–—"'.]+$/, '').trim()
+  return cleaned !== '' ? cleaned : undefined
+}
+
 /**
  * Helper to normalize an Address object immutably.
  */
@@ -120,7 +131,7 @@ function cleanPreviousVisa(visa?: PreviousVisaDetails): PreviousVisaDetails | un
 function cleanTravel(travel?: TravelDetails): TravelDetails | undefined {
   if (!travel) return undefined
   const res: TravelDetails = {
-    purposeOfVisit: cleanString(travel.purposeOfVisit),
+    purposeOfVisit: cleanPurpose(travel.purposeOfVisit),
     intendedArrivalDate: cleanString(travel.intendedArrivalDate),
     intendedDepartureDate: cleanString(travel.intendedDepartureDate),
     duration: cleanString(travel.duration),
