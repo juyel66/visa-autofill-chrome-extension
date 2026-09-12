@@ -108,7 +108,8 @@ export const WORKSPACE_DEFAULT_VISIBLE_FIELDS: string[] = [
   'previous_occupation',
   'prev_org',
 
-  // 7. Visa Details (15)
+  // 7. Visa Details (16)
+  'purpose',
   'duration',
   'visa_entry_id',
   'journeydate',
@@ -304,6 +305,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
     subtitle: 'Visa duration, port of arrival/exit, and Indian & Bangladesh references',
     iconName: 'Compass',
     fieldKeys: [
+      'purpose',
       'duration',
       'visa_entry_id',
       'journeydate',
@@ -1420,6 +1422,18 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
       },
     ],
     fields: [
+      {
+        key: 'purpose',
+        label: 'Purpose of Visit',
+        section: 'visaDetails',
+        subsection: 'Visa Information',
+        inputType: 'text',
+        targetMappingField: 'purpose',
+        sourceApplicantPath: 'travel.purposeOfVisit',
+        placeholder: 'e.g. Tourism, Business, Medical',
+        description: 'Purpose of Visit as stated on application or passport (maps to "Visiting India for" on registration page)',
+        visibleByDefault: true,
+      },
       {
         key: 'duration',
         label: 'Duration of Visa (in Months)',
