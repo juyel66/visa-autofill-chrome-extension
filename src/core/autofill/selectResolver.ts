@@ -334,19 +334,154 @@ export function resolvePurposeSemanticCategory(text?: string | null): PurposeCat
 }
 
 /**
- * Reads all non-empty <option> elements from an HTMLSelectElement.
+ * Checks whether an option element is a generic non-selectable placeholder.
+ * Handles: "Select Purpose", "Select Mission", "Select Country", "-- Select --", "Choose...", empty values, etc.
+ */
+export function isPlaceholderOption(opt: HTMLOptionElement): boolean {
+  if (!opt) return true
+  const val = (opt.value || '').trim()
+  const text = (opt.text || opt.innerText || '').trim()
+
+  if (val === '' && text === '') return true
+
+  // Standard placeholder texts: "Select Purpose", "Select Country", "-- Select --", "Choose...", etc.
+  const isGenericText =
+    /^(?:select\b|choose\b|--|\.\.\.|please select|select one)/i.test(text) ||
+    /^select\s+[a-z\s]+$/i.test(text) ||
+    text === '---' ||
+    text === '--'
+
+  if (val === '' && isGenericText) return true
+  if ((val === '0' || val === '-1' || val.toLowerCase() === 'select' || val.toLowerCase() === 'none') && isGenericText) return true
+  if (opt.disabled && val === '') return true
+
+  return false
+}
+
+/**
+ * Checks whether an HTMLSelectElement control is currently initialized and ready with real options.
+ */
+export function isSelectControlReady(element: HTMLSelectElement): boolean {
+  if (!element || !element.options) return false
+  if (element.disabled) return false
+  const validOpts = getSelectOptions(element)
+  return validOpts.length > 0
+}
+
+/**
+ * Reads all valid, non-placeholder <option> elements from an HTMLSelectElement.
  */
 export function getSelectOptions(element: HTMLSelectElement): HTMLOptionElement[] {
   if (!element || !element.options) return []
-  return Array.from(element.options).filter((opt) => {
-    const val = opt.value.trim()
-    const text = opt.text.trim()
-    // Exclude generic placeholder options like "Select", "Select Country", "---", etc.
-    if (val === '' && (text === '' || /^select\b|^--|^choose\b/i.test(text))) {
-      return false
+  return Array.from(element.options).filter((opt) => !isPlaceholderOption(opt))
+}
+
+export interface SelectReadinessOptions {
+  minOptions?: number
+  targetValue?: string
+  timeoutMs?: number
+  pollIntervalMs?: number
+  stabilityDelayMs?: number
+}
+
+export interface SelectReadinessResult {
+  ready: boolean
+  options: HTMLOptionElement[]
+  matchedOption: HTMLOptionElement | null
+  matchMethod?: SelectOptionMatchResult['matchMethod']
+  timedOut: boolean
+}
+
+/**
+ * Condition-based readiness waiting for an HTMLSelectElement control.
+ * Dynamically waits until valid options are populated by the portal (e.g. after Country or Mission change event).
+ * Accepts either an HTMLSelectElement or a dynamic getter function `() => HTMLSelectElement | null` so that
+ * re-rendered / replaced DOM nodes during AJAX updates are seamlessly tracked.
+ * 
+ * If targetValue is provided, waits until a matching option is found or timeout expires.
+ */
+export async function waitForSelectReadiness(
+  elementOrGetter: HTMLSelectElement | (() => HTMLSelectElement | null),
+  opts?: SelectReadinessOptions
+): Promise<SelectReadinessResult> {
+  const minOptions = opts?.minOptions ?? 1
+  const targetValue = opts?.targetValue
+  const timeoutMs = opts?.timeoutMs ?? 2500
+  const pollIntervalMs = opts?.pollIntervalMs ?? 30
+  const stabilityDelayMs = opts?.stabilityDelayMs ?? 250
+
+  const startTime = Date.now()
+  let lastOptionCount = -1
+  let stableCountSince = -1
+
+  while (Date.now() - startTime < timeoutMs) {
+    const element = typeof elementOrGetter === 'function' ? elementOrGetter() : elementOrGetter
+
+    if (element && typeof element.options !== 'undefined') {
+      const validOptions = getSelectOptions(element)
+
+      // Control is considered ready to evaluate if it is not disabled and has at least minOptions
+      if (validOptions.length >= minOptions && !element.disabled) {
+        if (targetValue) {
+          const match = findMatchingSelectOption(element, targetValue)
+          if (match.option) {
+            return {
+              ready: true,
+              options: validOptions,
+              matchedOption: match.option,
+              matchMethod: match.matchMethod,
+              timedOut: false,
+            }
+          }
+
+          // If options are populated (>= 1 option) but no match found, check if list is stable
+          if (validOptions.length >= 1 && lastOptionCount === validOptions.length) {
+            if (stableCountSince === -1) {
+              stableCountSince = Date.now()
+            } else if (Date.now() - stableCountSince >= stabilityDelayMs) {
+              // Options list has been populated and stable for stabilityDelayMs, but no option matched targetValue
+              return {
+                ready: true,
+                options: validOptions,
+                matchedOption: null,
+                timedOut: true,
+              }
+            }
+          } else {
+            stableCountSince = Date.now()
+          }
+        } else {
+          return {
+            ready: true,
+            options: validOptions,
+            matchedOption: null,
+            timedOut: false,
+          }
+        }
+      }
+
+      lastOptionCount = validOptions.length
     }
-    return true
-  })
+
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+  }
+
+
+  // Final check at timeout expiry
+  const currentElement = typeof elementOrGetter === 'function' ? elementOrGetter() : elementOrGetter
+  const finalOptions = currentElement ? getSelectOptions(currentElement) : []
+  let finalMatch: SelectOptionMatchResult = { option: null, ambiguous: false }
+  if (currentElement && targetValue && finalOptions.length > 0) {
+    finalMatch = findMatchingSelectOption(currentElement, targetValue)
+  }
+
+  return {
+    ready: finalOptions.length >= minOptions,
+    options: finalOptions,
+    matchedOption: finalMatch.option,
+    matchMethod: finalMatch.matchMethod,
+    timedOut: true,
+  }
 }
 
 /**
@@ -359,15 +494,12 @@ export async function waitForSelectOptions(
   timeoutMs = 1000,
   intervalMs = 50
 ): Promise<HTMLOptionElement[]> {
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    const options = getSelectOptions(element)
-    if (options.length >= minCount) {
-      return options
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs))
-  }
-  return getSelectOptions(element)
+  const res = await waitForSelectReadiness(element, {
+    minOptions: minCount,
+    timeoutMs,
+    pollIntervalMs: intervalMs,
+  })
+  return res.options
 }
 
 /**
@@ -570,5 +702,12 @@ export function selectOptionAndDispatchEvents(
 ): void {
   element.value = option.value
   option.selected = true
+  if (element.options) {
+    const idx = Array.from(element.options).indexOf(option)
+    if (idx >= 0) {
+      element.selectedIndex = idx
+    }
+  }
   setNativeInputValue(element, option.value)
 }
+
