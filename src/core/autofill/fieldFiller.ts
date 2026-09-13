@@ -128,8 +128,9 @@ export function fillField(
     if (policy === 'fill-empty' && radioGroup.some((r) => r.checked)) {
       return { fieldId, status: 'skipped-existing', failureType: 'skipped-existing', reason: 'Radio group already has a selection' }
     }
-  } else if (element instanceof HTMLSelectElement) {
-    const { option: matchedOption, ambiguous } = findMatchingSelectOption(element, strValue)
+  } else if (element instanceof HTMLSelectElement || element.tagName === 'SELECT') {
+    const sel = element as HTMLSelectElement
+    const { option: matchedOption, ambiguous } = findMatchingSelectOption(sel, strValue)
 
     if (ambiguous) {
       return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Ambiguous select choices' }
@@ -139,11 +140,11 @@ export function fillField(
       return { fieldId, status: 'failed', failureType: 'option-not-found', reason: `No matching dropdown option for "${strValue}"` }
     }
 
-    if (element.value === matchedOption.value) {
+    if (sel.value === matchedOption.value) {
       return { fieldId, status: 'already-matching', failureType: 'already-matching', reason: 'Dropdown option matches source' }
     }
 
-    if (policy === 'fill-empty' && element.value.trim() !== '') {
+    if (policy === 'fill-empty' && sel.value.trim() !== '') {
       return { fieldId, status: 'skipped-existing', failureType: 'skipped-existing', reason: 'Dropdown already has a selection' }
     }
   } else if (
@@ -166,8 +167,9 @@ export function fillField(
   // 5. Fill by Element Type & Perform Strict Post-Fill DOM Verification
   try {
     // A. Select dropdown
-    if (element instanceof HTMLSelectElement) {
-      const { option: matchedOption, ambiguous } = findMatchingSelectOption(element, strValue)
+    if (element instanceof HTMLSelectElement || element.tagName === 'SELECT') {
+      const sel = element as HTMLSelectElement
+      const { option: matchedOption, ambiguous } = findMatchingSelectOption(sel, strValue)
 
       if (ambiguous) {
         return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Ambiguous select choices' }
@@ -177,10 +179,10 @@ export function fillField(
         return { fieldId, status: 'failed', failureType: 'option-not-found', reason: `No matching dropdown option for "${strValue}"` }
       }
 
-      selectOptionAndDispatchEvents(element, matchedOption)
+      selectOptionAndDispatchEvents(sel, matchedOption)
 
       // Post-fill verification
-      const verifyRes = verifyDomValue(element, mapping, matchedOption.value)
+      const verifyRes = verifyDomValue(sel, mapping, matchedOption.value)
       if (!verifyRes.verified) {
         return {
           fieldId,
@@ -192,6 +194,7 @@ export function fillField(
 
       return { fieldId, status: 'filled' }
     }
+
 
     // B. Radio buttons
     if (
