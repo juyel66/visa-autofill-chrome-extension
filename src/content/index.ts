@@ -418,6 +418,10 @@ chrome.runtime.onMessage.addListener(
         return true
       }
 
+      
+
+
+
       executeUndo(opToUndo)
         .then((undoRes) => {
           if (opToUndo === latestOperation) {
