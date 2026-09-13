@@ -28,8 +28,26 @@ import { runRegistrationAutofillTests } from '../src/countries/india/__tests__/r
 import { runContentScriptInjectionTests } from '../src/core/messaging/__tests__/contentScriptInjection.test'
 import { runTask083PurposeOfVisitTests } from '../src/core/__tests__/task083PurposeOfVisit.test'
 import { runTask084PurposeDebugTests } from '../src/core/__tests__/task084PurposeDebug.test'
+import { runTask086FirstClickRegistrationDefinitiveTests } from '../src/core/__tests__/task086FirstClickRegistrationDefinitive.test'
+import { runTask085FirstClickRegistrationAutofillTests } from '../src/core/__tests__/task085FirstClickRegistrationAutofill.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 086: DEFINITIVE FIRST-CLICK REGISTRATION AUTOFILL TESTS ---')
+  const task086Res = await runTask086FirstClickRegistrationDefinitiveTests()
+  const task086Passed = task086Res.failedTests === 0
+  console.log(`Passed: ${task086Passed}, Count: ${task086Res.totalTests}`)
+  if (!task086Passed) {
+    console.error('Failures:', task086Res.errors)
+  }
+
+  console.log('--- RUNNING TASK 085: FIRST-CLICK REGISTRATION AUTOFILL & ASYNC PURPOSE TESTS ---')
+  const task085Res = await runTask085FirstClickRegistrationAutofillTests()
+
+  console.log(`Passed: ${task085Res.passed}, Count: ${task085Res.totalSubtests}`)
+  if (!task085Res.passed) {
+    console.error('Failures:', task085Res.failures)
+  }
+
   console.log('--- RUNNING TASK 084: PURPOSE OF VISIT END-TO-END DEBUG TESTS ---')
   const task084Res = await runTask084PurposeDebugTests()
   console.log(`Passed: ${task084Res.passed}, Count: ${task084Res.totalSubtests}`)
@@ -225,7 +243,10 @@ async function execute() {
   }
 
   const results = {
+    task086: task086Passed,
+    task085: task085Res.passed,
     task084: task084Res.passed,
+
     task083: task083Res.passed,
     task082Fix: task082FixRes.passed,
     task082: task082Res.passed,
