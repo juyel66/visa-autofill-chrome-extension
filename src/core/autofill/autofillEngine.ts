@@ -2,6 +2,7 @@ import type { AutofillChange, AutofillOperation } from '../safety/types'
 import { captureFieldState } from '../safety/undoManager'
 import { fillField } from './fieldFiller'
 import { resolveElements } from './selectorResolver'
+import { waitForSelectReadiness } from './selectResolver'
 import type {
   AutofillFieldResult,
   AutofillFieldStatus,
@@ -242,7 +243,7 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
         }
 
         if (els.length === 0) {
-          if (mapping.required === false) {
+          if (mapping.required === false && attempts >= 3) {
             fieldResult = {
               fieldId: mapping.id,
               status: 'skipped',
@@ -250,6 +251,9 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
               attempts,
             }
             break
+          }
+          if (mapping.required === false && attempts < 3) {
+            continue // recoverable, retry if element not yet rendered
           }
           fieldResult = {
             fieldId: mapping.id,
@@ -307,7 +311,6 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
         // Readonly / Disabled checks
         if (
           element instanceof HTMLInputElement ||
-          element instanceof HTMLSelectElement ||
           element instanceof HTMLTextAreaElement ||
           element instanceof HTMLButtonElement
         ) {
@@ -353,26 +356,63 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
           break
         }
 
-        // For dynamic dropdowns (like Indian Mission), wait briefly if options are currently empty
-        if (typeof HTMLSelectElement !== 'undefined' && element instanceof HTMLSelectElement) {
-          const opts = element.options ? Array.from(element.options).filter((o) => o.value !== '' || o.text.trim() !== '') : []
-          if (opts.length === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 100))
-          }
-        }
-
         if (mapping.transform && resolvedValue !== undefined) {
           resolvedValue = applyValueTransform(resolvedValue, mapping.transform)
         }
 
+        // For dynamic dropdowns (like Indian Mission, Purpose of Visit), wait for options readiness
+        if ((element instanceof HTMLSelectElement || element?.tagName === 'SELECT') && resolvedValue) {
+          const timeout = attempts === 1 ? 2500 : 300
+          const getter = () => {
+            const list = resolveElements(mapping.selector)
+            if (list.length > 0) return list[0] as HTMLSelectElement
+            if (mapping.fallbackSelector) {
+              const fb = resolveElements(mapping.fallbackSelector)
+              if (fb.length > 0) return fb[0] as HTMLSelectElement
+            }
+            return element as HTMLSelectElement
+          }
+          await waitForSelectReadiness(getter, {
+            minOptions: 1,
+            targetValue: resolvedValue,
+            timeoutMs: timeout,
+            pollIntervalMs: 30,
+          })
+
+          // If still disabled after readiness wait
+          const latestEl = getter()
+          if (latestEl && latestEl.disabled) {
+            fieldResult = {
+              fieldId: mapping.id,
+              status: 'failed',
+              failureType: 'disabled-field',
+              reason: 'Manual action is required: field is disabled.',
+              attempts,
+            }
+            break
+          }
+        }
+
+        // Re-acquire fresh element for filling (in case getter resolved a newer DOM node)
+        let fillTarget = element
+        if (element instanceof HTMLSelectElement || element?.tagName === 'SELECT') {
+          const freshList = resolveElements(mapping.selector)
+          if (freshList.length > 0) fillTarget = freshList[0]
+          else if (mapping.fallbackSelector) {
+            const freshFb = resolveElements(mapping.fallbackSelector)
+            if (freshFb.length > 0) fillTarget = freshFb[0]
+          }
+        }
+
+
         // Capture previous state
-        const previousState = captureFieldState(element)
+        const previousState = captureFieldState(fillTarget)
 
         // Execute DOM Fill with verification
-        const fillRes = fillField(element, mapping, resolvedValue, policy, dryRun)
+        const fillRes = fillField(fillTarget, mapping, resolvedValue, policy, dryRun)
 
         // Capture new state
-        const newState = captureFieldState(element)
+        const newState = captureFieldState(fillTarget)
 
         // Set failureType based on fillField results
         let failureType: FailureCategory | undefined = fillRes.failureType
