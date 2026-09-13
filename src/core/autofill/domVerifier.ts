@@ -1,5 +1,6 @@
 import type { FieldMapping } from './types'
 import { normalizeDateForControl } from './dateNormalizer'
+import { isPlaceholderOption } from './selectResolver'
 
 export interface DomVerificationResult {
   verified: boolean
@@ -57,9 +58,11 @@ export function verifyDomValue(
   }
 
   // 3. Select Dropdown
-  if (element instanceof HTMLSelectElement) {
-    const selectedIdx = element.selectedIndex
-    if (selectedIdx < 0 || selectedIdx >= element.options.length) {
+  if (element instanceof HTMLSelectElement || element.tagName === 'SELECT') {
+    const sel = element as HTMLSelectElement
+    const selectedIdx = sel.selectedIndex
+    if (selectedIdx < 0 || selectedIdx >= sel.options.length) {
+
       return {
         verified: false,
         actualValue: '',
@@ -68,8 +71,18 @@ export function verifyDomValue(
       }
     }
 
-    const selectedOpt = element.options[selectedIdx]
-    const actualVal = element.value
+    const selectedOpt = sel.options[selectedIdx]
+    if (isPlaceholderOption(selectedOpt)) {
+      return {
+        verified: false,
+        actualValue: sel.value,
+        expectedValue,
+        reason: `Placeholder option "${selectedOpt.text || selectedOpt.value}" is currently selected.`,
+      }
+    }
+
+    const actualVal = sel.value
+
     const actualText = selectedOpt.text.trim()
     const expLower = expectedValue.trim().toLowerCase()
 
@@ -91,6 +104,7 @@ export function verifyDomValue(
         : `Selected option (${actualVal} / "${actualText}") does not match expected "${expectedValue}".`,
     }
   }
+
 
   // 4. Date Input (<input type="date">)
   if (element instanceof HTMLInputElement && element.type.toLowerCase() === 'date') {
