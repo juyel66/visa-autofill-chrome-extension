@@ -44,7 +44,7 @@ Previous Passport No.: BK1234567
 Sex: M
 Place of Birth: DHAKA
 Date of Issue: 10 JAN 2020
-Issuing Authority: DIP/DHAKA
+Issuing Authority: DHAKA
 Date of Expiry: 09 JAN 2030
 
 P<BGDHOSSAIN<<MOHAMMAD<ARIF<<<<<<<<<<<<<<<<<<
@@ -123,7 +123,7 @@ export async function runScannedPassportOcrTests(): Promise<{
   assert(extracted.passport?.passportNumber?.value === 'A01234567', `Extracted passportNumber is A01234567 (got "${extracted.passport?.passportNumber?.value}")`)
   assert(extracted.passport?.issueDate?.value === '2020-01-10', `Extracted passport issueDate is 2020-01-10 (got "${extracted.passport?.issueDate?.value}")`)
   assert(extracted.passport?.expiryDate?.value === '2030-01-09', `Extracted passport expiryDate is 2030-01-09 (got "${extracted.passport?.expiryDate?.value}")`)
-  assert(extracted.passport?.placeOfIssue?.value === 'DIP/DHAKA', `Extracted passport placeOfIssue is DIP/DHAKA (got "${extracted.passport?.placeOfIssue?.value}")`)
+  assert(extracted.passport?.placeOfIssue?.value === 'DHAKA', `Extracted passport placeOfIssue is DHAKA (got "${extracted.passport?.placeOfIssue?.value}")`)
   assert(extracted.passport?.holdsOtherPassport?.value === true, 'Extracted holdsOtherPassport is true')
   assert(extracted.passport?.otherPassportDetails?.passportNumber?.value === 'BK1234567', `Extracted previous passport number is BK1234567 (got "${extracted.passport?.otherPassportDetails?.passportNumber?.value}")`)
   assert(extracted.family?.father?.name?.value === 'MOHAMMAD KHURSHED ALAM', `Extracted father name is MOHAMMAD KHURSHED ALAM (got "${extracted.family?.father?.name?.value}")`)
@@ -142,8 +142,8 @@ export async function runScannedPassportOcrTests(): Promise<{
   // TASK 074: Passport emergency contact telephone falls back into applicant contact phone/isd/mobile
   assert(
     extracted.contact?.phone?.value === '+8801711111111' &&
-      extracted.contact?.isdCode?.value === '880' &&
-      extracted.contact?.mobile?.value === '1711111111',
+    extracted.contact?.isdCode?.value === '880' &&
+    extracted.contact?.mobile?.value === '1711111111',
     'TASK 074: Passport telephone +8801711111111 extracted and normalized into contact phone, isdCode, and mobile'
   )
 
@@ -182,7 +182,7 @@ export async function runScannedPassportOcrTests(): Promise<{
     'appl.nationality_by': { value: 'Birth', source: 'passport' },
     'appl.nic_no': { value: '1990123456', source: 'passport' },
     'appl.passport_number': { value: 'A01234567', source: 'passport' },
-    'appl.passport_issue_place': { value: 'DIP/DHAKA', source: 'passport' },
+    'appl.passport_issue_place': { value: 'DHAKA', source: 'passport' },
     'appl.passport_issue_date': { value: '10/01/2020', source: 'passport' },
     'appl.passport_expiry_date': { value: '09/01/2030', source: 'passport' },
     'fthrname': { value: 'MOHAMMAD KHURSHED ALAM', source: 'passport' },
