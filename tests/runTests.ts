@@ -30,10 +30,18 @@ import { runTask083PurposeOfVisitTests } from '../src/core/__tests__/task083Purp
 import { runTask084PurposeDebugTests } from '../src/core/__tests__/task084PurposeDebug.test'
 import { runTask087RegistrationWorkspaceRedesignTests } from '../src/core/__tests__/task087RegistrationWorkspaceRedesign.test'
 import { runTask088FullWorkspacePortalRedesignTests } from '../src/core/__tests__/task088FullWorkspacePortalRedesign.test'
+import { runTask089ChangedNameAutofillTests } from '../src/core/__tests__/task089ChangedNameAutofill.test'
 import { runTask086FirstClickRegistrationDefinitiveTests } from '../src/core/__tests__/task086FirstClickRegistrationDefinitive.test'
 import { runTask085FirstClickRegistrationAutofillTests } from '../src/core/__tests__/task085FirstClickRegistrationAutofill.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 089: CHANGED NAME CHECKBOX & PREVIOUS SURNAME/NAME AUTOFILL TESTS ---')
+  const task089Res = await runTask089ChangedNameAutofillTests()
+  console.log(`Passed: ${task089Res.passed}, Count: ${task089Res.totalSubtests}`)
+  if (!task089Res.passed) {
+    console.error('Failures:', task089Res.failures)
+  }
+
   console.log('--- RUNNING TASK 088: ALL 4 PORTAL PAGES WORKSPACE REDESIGN TESTS ---')
   const task088Res = await runTask088FullWorkspacePortalRedesignTests()
   console.log(`Passed: ${task088Res.passed}, Count: ${task088Res.totalSubtests}`)
@@ -259,6 +267,7 @@ async function execute() {
   }
 
   const results = {
+    task089: task089Res.passed,
     task088: task088Res.passed,
     task087: task087Res.passed,
     task086: task086Passed,
