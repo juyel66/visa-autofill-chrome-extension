@@ -59,7 +59,7 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
     Sex / Sexe: M
     Place of Birth / Lieu de naissance: CHITTAGONG, BGD
     Date of Issue / Date de délivrance: 15 MAR 2021
-    Issuing Authority / Autorité: DIP/DHAKA
+    Issuing Authority / Autorité: DHAKA
     Date of Expiry / Date d'expiration: 14 MAR 2031
 
     P<BGDCHOWDHURY<<TANVIR<AHMED<<<<<<<<<<<<<<<<<
@@ -69,16 +69,16 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
   const extractedPassport = extractFromPdfText(samplePassportPdfText)
   assert(
     extractedPassport.personal?.lastName?.value === 'CHOWDHURY' &&
-      extractedPassport.personal?.firstName?.value === 'TANVIR AHMED' &&
-      extractedPassport.personal?.dateOfBirth?.value === '1992-10-12' &&
-      extractedPassport.personal?.gender?.value === 'male' &&
-      extractedPassport.personal?.nationality?.value === 'BANGLADESH' &&
-      extractedPassport.personal?.townCityOfBirth?.value === 'CHITTAGONG' &&
-      extractedPassport.personal?.countryOfBirth?.value === 'BANGLADESH' &&
-      extractedPassport.passport?.passportNumber?.value === 'EJ0123456' &&
-      extractedPassport.passport?.placeOfIssue?.value === 'DIP/DHAKA' &&
-      extractedPassport.passport?.issueDate?.value === '2021-03-15' &&
-      extractedPassport.passport?.expiryDate?.value === '2031-03-14',
+    extractedPassport.personal?.firstName?.value === 'TANVIR AHMED' &&
+    extractedPassport.personal?.dateOfBirth?.value === '1992-10-12' &&
+    extractedPassport.personal?.gender?.value === 'male' &&
+    extractedPassport.personal?.nationality?.value === 'BANGLADESH' &&
+    extractedPassport.personal?.townCityOfBirth?.value === 'CHITTAGONG' &&
+    extractedPassport.personal?.countryOfBirth?.value === 'BANGLADESH' &&
+    extractedPassport.passport?.passportNumber?.value === 'EJ0123456' &&
+    extractedPassport.passport?.placeOfIssue?.value === 'DHAKA' &&
+    extractedPassport.passport?.issueDate?.value === '2021-03-15' &&
+    extractedPassport.passport?.expiryDate?.value === '2031-03-14',
     'A & B: PDF Extraction & Normalization extracts all identity and passport fields'
   )
 
@@ -140,13 +140,13 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
 
   assert(
     initialMergedApp.fields['appl.surname']?.value === 'CHOWDHURY' &&
-      initialMergedApp.fields['appl.applname']?.value === 'TANVIR AHMED' &&
-      initialMergedApp.fields['appl.birthdate']?.value === '12/10/1992' &&
-      initialMergedApp.fields['appl.nationality']?.value === 'BANGLADESH' &&
-      initialMergedApp.fields['appl.countryname']?.value === 'BANGLADESH' &&
-      initialMergedApp.fields['appl.passport_number']?.value === 'EJ0123456' &&
-      initialMergedApp.fields['old_visa_no']?.value === 'VJ12345678' &&
-      initialMergedApp.fields['country_visited']?.value === 'INDIA, MALAYSIA, SINGAPORE',
+    initialMergedApp.fields['appl.applname']?.value === 'TANVIR AHMED' &&
+    initialMergedApp.fields['appl.birthdate']?.value === '12/10/1992' &&
+    initialMergedApp.fields['appl.nationality']?.value === 'BANGLADESH' &&
+    initialMergedApp.fields['appl.countryname']?.value === 'BANGLADESH' &&
+    initialMergedApp.fields['appl.passport_number']?.value === 'EJ0123456' &&
+    initialMergedApp.fields['old_visa_no']?.value === 'VJ12345678' &&
+    initialMergedApp.fields['country_visited']?.value === 'INDIA, MALAYSIA, SINGAPORE',
     'C: Application Merge populates both passport identity and OGD historical data'
   )
 
@@ -159,9 +159,9 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
   const persistedApp = await getSavedApplicationByApplicantId(applicantId)
   assert(
     persistedApp !== null &&
-      persistedApp.applicantId === applicantId &&
-      persistedApp.fields['appl.surname']?.value === 'CHOWDHURY' &&
-      persistedApp.fields['appl.passport_number']?.value === 'EJ0123456',
+    persistedApp.applicantId === applicantId &&
+    persistedApp.fields['appl.surname']?.value === 'CHOWDHURY' &&
+    persistedApp.fields['appl.passport_number']?.value === 'EJ0123456',
     'D: Automatic SavedApplication Persistence stores extracted application in storage'
   )
 
@@ -392,10 +392,10 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
   const reloadedSavedApp = await getSavedApplicationByApplicantId(applicantId)
   assert(
     reloadedSavedApp !== null &&
-      reloadedSavedApp.fields['fthrname']?.value === 'LATE ABDUR RAHIM CHOWDHURY' &&
-      reloadedSavedApp.fields['spouse_name']?.value === 'NUSRAT JAHAN' &&
-      reloadedSavedApp.fields['nameofsponsor_ind']?.value === 'RAJESH SHARMA' &&
-      reloadedSavedApp.fields['question_1_flag']?.value === 'No',
+    reloadedSavedApp.fields['fthrname']?.value === 'LATE ABDUR RAHIM CHOWDHURY' &&
+    reloadedSavedApp.fields['spouse_name']?.value === 'NUSRAT JAHAN' &&
+    reloadedSavedApp.fields['nameofsponsor_ind']?.value === 'RAJESH SHARMA' &&
+    reloadedSavedApp.fields['question_1_flag']?.value === 'No',
     'G: SavedApplication Reload preserves all manual edits'
   )
 
@@ -410,8 +410,8 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
 
   assert(
     resyncedApp.fields['fthrname']?.value === 'LATE ABDUR RAHIM CHOWDHURY' &&
-      resyncedApp.fields['spouse_name']?.value === 'NUSRAT JAHAN' &&
-      resyncedApp.fields['appl.surname']?.value === 'CHOWDHURY',
+    resyncedApp.fields['spouse_name']?.value === 'NUSRAT JAHAN' &&
+    resyncedApp.fields['appl.surname']?.value === 'CHOWDHURY',
     'G2: Re-synchronizing documents strictly respects User Manual Edit > Confirmed Document Value'
   )
 
@@ -425,11 +425,11 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
 
   assert(
     candRes.status === 'READY' &&
-      candRes.applicant !== undefined &&
-      candRes.applicant.personalInfo?.surname === 'CHOWDHURY' &&
-      candRes.applicant.family?.father?.name === 'LATE ABDUR RAHIM CHOWDHURY' &&
-      candRes.applicant.family?.spouse?.name === 'NUSRAT JAHAN' &&
-      candRes.applicant.additionalQuestions?.question1?.flag === 'No',
+    candRes.applicant !== undefined &&
+    candRes.applicant.personalInfo?.surname === 'CHOWDHURY' &&
+    candRes.applicant.family?.father?.name === 'LATE ABDUR RAHIM CHOWDHURY' &&
+    candRes.applicant.family?.spouse?.name === 'NUSRAT JAHAN' &&
+    candRes.applicant.additionalQuestions?.question1?.flag === 'No',
     'G3: Candidate resolver reads SavedApplication as the single source of autofill data'
   )
 
@@ -526,13 +526,13 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
 
   assert(
     regAutofillRes.filledFields >= 6 &&
-      regCountry === 'BANGLADESH' &&
-      regMission === 'BANGLADESH-DHAKA' &&
-      regNationality === 'BANGLADESH' &&
-      regDob === '12/10/1992' &&
-      regEmail === 'tanvir.chowdhury@example.com' &&
-      regEmailRe === 'tanvir.chowdhury@example.com' &&
-      regJourney === '20/12/2026',
+    regCountry === 'BANGLADESH' &&
+    regMission === 'BANGLADESH-DHAKA' &&
+    regNationality === 'BANGLADESH' &&
+    regDob === '12/10/1992' &&
+    regEmail === 'tanvir.chowdhury@example.com' &&
+    regEmailRe === 'tanvir.chowdhury@example.com' &&
+    regJourney === '20/12/2026',
     'H: Page 1 (Registration) fills all applicable supported fields'
   )
   assert(
@@ -606,14 +606,14 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
 
   assert(
     basicAutofillRes.filledFields >= 8 &&
-      bSurname === 'CHOWDHURY' &&
-      bGivenName === 'TANVIR AHMED' &&
-      bGender === 'MALE' &&
-      bBirthPlace === 'CHITTAGONG' &&
-      bPassportNo === 'EJ0123456' &&
-      bIssuePlace === 'DIP/DHAKA' &&
-      bIssueDate === '15/03/2021' &&
-      bExpiryDate === '14/03/2031',
+    bSurname === 'CHOWDHURY' &&
+    bGivenName === 'TANVIR AHMED' &&
+    bGender === 'MALE' &&
+    bBirthPlace === 'CHITTAGONG' &&
+    bPassportNo === 'EJ0123456' &&
+    bIssuePlace === 'DHAKA' &&
+    bIssueDate === '15/03/2021' &&
+    bExpiryDate === '14/03/2031',
     'I: Page 2 (Basic Details) autofills all personal and passport fields correctly'
   )
 
@@ -676,12 +676,12 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
 
   assert(
     famAutofillRes.filledFields >= 10 &&
-      fAddr1 === 'HOUSE 45, ROAD 11, GULSHAN' &&
-      fFather === 'LATE ABDUR RAHIM CHOWDHURY' &&
-      fMother === 'SURAIYA BEGUM' &&
-      fSpouse === 'NUSRAT JAHAN' &&
-      fOcc === 'BUSINESS' &&
-      fEmp === 'CHOWDHURY TRADING LTD',
+    fAddr1 === 'HOUSE 45, ROAD 11, GULSHAN' &&
+    fFather === 'LATE ABDUR RAHIM CHOWDHURY' &&
+    fMother === 'SURAIYA BEGUM' &&
+    fSpouse === 'NUSRAT JAHAN' &&
+    fOcc === 'BUSINESS' &&
+    fEmp === 'CHOWDHURY TRADING LTD',
     'J: Page 3 (Family Details) autofills address, family, marital, and employment details'
   )
   assert(
@@ -755,12 +755,12 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
 
   assert(
     visaAutofillRes.filledFields >= 8 &&
-      vDuration === '12' &&
-      vEntry === 'MULTIPLE' &&
-      vOldVisaNo === 'VJ12345678' &&
-      vCountryVisited === 'INDIA, MALAYSIA, SINGAPORE' &&
-      vSponsorInd === 'RAJESH SHARMA' &&
-      vSponsorMsn === 'KAMAL HOSSAIN',
+    vDuration === '12' &&
+    vEntry === 'MULTIPLE' &&
+    vOldVisaNo === 'VJ12345678' &&
+    vCountryVisited === 'INDIA, MALAYSIA, SINGAPORE' &&
+    vSponsorInd === 'RAJESH SHARMA' &&
+    vSponsorMsn === 'KAMAL HOSSAIN',
     'K: Page 4 (Visa Details) autofills travel, history, and sponsor references'
   )
   assert(
@@ -830,12 +830,12 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
 
   assert(
     qAutofillRes.filledFields >= 6 &&
-      q1No.checked &&
-      q2No.checked &&
-      q3No.checked &&
-      q4No.checked &&
-      q5No.checked &&
-      q6No.checked,
+    q1No.checked &&
+    q2No.checked &&
+    q3No.checked &&
+    q4No.checked &&
+    q5No.checked &&
+    q6No.checked,
     'L: Page 5 (Additional Questions) autofills all 6 question groups correctly'
   )
   assert(
@@ -891,8 +891,8 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
   const schemaNotices = BANGLADESH_APPLICATION_SCHEMA.flatMap((s) => s.manualNotices || [])
   assert(
     schemaNotices.some((n) => n.title.includes('CAPTCHA')) &&
-      schemaNotices.some((n) => n.title.includes('Declaration')) &&
-      schemaNotices.some((n) => n.title.includes('Portal Photo Chooser')),
+    schemaNotices.some((n) => n.title.includes('Declaration')) &&
+    schemaNotices.some((n) => n.title.includes('Portal Photo Chooser')),
     'N2: Application Workspace clearly notifies user of all manual security boundaries'
   )
 
