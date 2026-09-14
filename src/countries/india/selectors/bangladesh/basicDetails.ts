@@ -10,6 +10,8 @@ export interface BangladeshBasicDetailsSelectors {
   surname: IndiaFieldSelector[]
   givenName: IndiaFieldSelector[]
   changedSurnameCheck: IndiaFieldSelector[]
+  previousSurname: IndiaFieldSelector[]
+  previousGivenName: IndiaFieldSelector[]
   gender: IndiaFieldSelector[]
   townCityOfBirth: IndiaFieldSelector[]
   countryOfBirth: IndiaFieldSelector[]
@@ -43,8 +45,19 @@ export const BANGLADESH_BASIC_DETAILS_SELECTORS: BangladeshBasicDetailsSelectors
   ],
   changedSurnameCheck: [
     { strategy: 'id', value: 'changedSurnameCheck' },
+    { strategy: 'id', value: 'chk_prev_name' },
     { strategy: 'name', value: 'appl.changedSurnameCheck' },
-    { strategy: 'css', value: 'input[name="appl.changedSurnameCheck"], input#changedSurnameCheck' },
+    { strategy: 'css', value: 'input[name="appl.changedSurnameCheck"], input#changedSurnameCheck, input#chk_prev_name' },
+  ],
+  previousSurname: [
+    { strategy: 'id', value: 'prev_surname' },
+    { strategy: 'name', value: 'appl.prev_surname' },
+    { strategy: 'css', value: 'input[name="appl.prev_surname"], input#prev_surname' },
+  ],
+  previousGivenName: [
+    { strategy: 'id', value: 'prev_name' },
+    { strategy: 'name', value: 'appl.prev_name' },
+    { strategy: 'css', value: 'input[name="appl.prev_name"], input#prev_name, input[name="appl.prev_given_name"], input#prev_given_name' },
   ],
   gender: [
     { strategy: 'id', value: 'gender' },
