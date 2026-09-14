@@ -63,8 +63,8 @@ export async function runTask088FullWorkspacePortalRedesignTests(): Promise<Test
 
     const allSectionFieldKeys = WORKSPACE_SECTIONS.flatMap((s) => s.fieldKeys)
     assert(
-      allSectionFieldKeys.length === 119,
-      `All 11 sections must map to 119 canonical field keys (got ${allSectionFieldKeys.length})`
+      allSectionFieldKeys.length === 121,
+      `All 11 sections must map to 121 canonical field keys (got ${allSectionFieldKeys.length})`
     )
   }
 
