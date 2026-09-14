@@ -223,6 +223,18 @@ export const BANGLADESH_BASIC_DETAILS_MAPPINGS: IndiaVisaFieldMapping[] = [
     transform: 'uppercase',
   },
   {
+    id: 'bd_basic_other_ppt_date',
+    section: 'passport-information',
+    targetField: 'appl.oth_ppt_issue_date',
+    sourceField: 'passport.otherPassportDetails.issueDate',
+    sourceType: 'confirmed-document',
+    selector: BANGLADESH_BASIC_DETAILS_SELECTORS.otherPassportDateOfIssue,
+    inputType: 'text',
+    status: 'verified',
+    required: false,
+    page: 'BASIC_DETAILS',
+  },
+  {
     id: 'bd_basic_other_ppt_place',
     section: 'passport-information',
     targetField: 'appl.oth_ppt_issue_place',
