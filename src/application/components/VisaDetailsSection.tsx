@@ -7,10 +7,13 @@ import {
 export interface VisaDetailsSectionProps {
   application: SavedApplication | null
   onFieldChange: (fieldKey: string, value: string | boolean) => void
-  onResetField: (fieldKey: string) => void
-  renderSourceBadge: (fieldValue?: ApplicationFieldValue) => React.ReactNode
+  onResetField?: (fieldKey: string) => void
+  renderSourceBadge?: (fieldValue?: ApplicationFieldValue) => React.ReactNode
   onUploadPhoto: (e: React.ChangeEvent<HTMLInputElement>) => void
   onRemovePhoto: () => void
+  onSaveAndContinue?: () => void
+  onSaveTemporarily?: () => void
+  onPreviousPage?: () => void
 }
 
 export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
@@ -19,6 +22,9 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
   renderSourceBadge,
   onUploadPhoto,
   onRemovePhoto,
+  onSaveAndContinue,
+  onSaveTemporarily,
+  onPreviousPage,
 }) => {
   const fields = application?.fields || {}
 
@@ -35,44 +41,10 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
 
   const hasVisitedIndiaBefore = getVal('old_visa_flag').toLowerCase() === 'yes'
 
-  const questions = [
-    {
-      num: 1,
-      flagKey: 'question_1_flag',
-      ansKey: 'answer_1',
-      title: 'Have you ever been arrested/ prosecuted/ convicted by Court of Law of any country?',
-    },
-    {
-      num: 2,
-      flagKey: 'question_2_flag',
-      ansKey: 'answer_2',
-      title: 'Have you ever been refused entry / deported by any country including India?',
-    },
-    {
-      num: 3,
-      flagKey: 'question_3_flag',
-      ansKey: 'answer_3',
-      title: 'Have you ever been engaged in Human trafficking/ Drug trafficking/ Financial fraud?',
-    },
-    {
-      num: 4,
-      flagKey: 'question_4_flag',
-      ansKey: 'answer_4',
-      title: 'Have you ever been engaged in Cyber crime/ Terrorist activities/ Sabotage?',
-    },
-    {
-      num: 5,
-      flagKey: 'question_5_flag',
-      ansKey: 'answer_5',
-      title: 'Have you ever expressed views that justify or glorify terrorist violence?',
-    },
-    {
-      num: 6,
-      flagKey: 'question_6_flag',
-      ansKey: 'answer_6',
-      title: 'Have you sought asylum or refugee status in any country?',
-    },
-  ]
+  const renderBadge = (fieldVal?: ApplicationFieldValue) => {
+    if (!renderSourceBadge) return null
+    return renderSourceBadge(fieldVal)
+  }
 
   return (
     <div className="w-full bg-[#f6f6f6] rounded-xl border border-[#d1d5db] shadow-md overflow-hidden text-[#222222] font-sans">
@@ -167,7 +139,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                     </option>
                   ))}
                 </select>
-                {renderSourceBadge(fields['purpose'])}
+                {renderBadge(fields['purpose'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Purpose of Visit</div>
             </div>
@@ -185,7 +157,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="DURATION (e.g. 12)"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['duration'])}
+                {renderBadge(fields['duration'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">in Months (e.g. 12)</div>
             </div>
@@ -206,7 +178,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   <option value="Triple">Triple</option>
                   <option value="Multiple">Multiple</option>
                 </select>
-                {renderSourceBadge(fields['visa_entry_id'])}
+                {renderBadge(fields['visa_entry_id'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">No. of Entries</div>
             </div>
@@ -227,7 +199,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="DD/MM/YYYY"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['journeydate'] || fields['appl.journeydate'])}
+                {renderBadge(fields['journeydate'] || fields['appl.journeydate'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">in DD/MM/YYYY format</div>
             </div>
@@ -245,7 +217,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="PORT OF ARRIVAL (e.g. HARIDASPUR)"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['entrypoint'])}
+                {renderBadge(fields['entrypoint'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Port of Arrival</div>
             </div>
@@ -263,7 +235,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="PORT OF EXIT"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['exitpoint'])}
+                {renderBadge(fields['exitpoint'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Port of Exit</div>
             </div>
@@ -281,7 +253,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="e.g. INDIA, NEPAL, BHUTAN"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['country_visited'])}
+                {renderBadge(fields['country_visited'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Countries Visited</div>
             </div>
@@ -314,7 +286,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="NAME OF HOTEL / SPONSOR / PERSON"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['nameofsponsor_ind'])}
+                {renderBadge(fields['nameofsponsor_ind'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Reference Name</div>
             </div>
@@ -331,7 +303,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="ADDRESS IN INDIA"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['add1ofsponsor_ind'])}
+                {renderBadge(fields['add1ofsponsor_ind'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Address in India</div>
             </div>
@@ -348,7 +320,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="PHONE NO IN INDIA"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['phoneofsponsor_ind'])}
+                {renderBadge(fields['phoneofsponsor_ind'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Phone in India</div>
             </div>
@@ -370,7 +342,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="REFERENCE NAME IN BANGLADESH"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['nameofsponsor_msn'])}
+                {renderBadge(fields['nameofsponsor_msn'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Home Country Reference</div>
             </div>
@@ -387,7 +359,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="ADDRESS IN BANGLADESH"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['add1ofsponsor_msn'])}
+                {renderBadge(fields['add1ofsponsor_msn'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Address in Home Country</div>
             </div>
@@ -404,7 +376,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   placeholder="PHONE NO IN BANGLADESH"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['phoneofsponsor_msn'])}
+                {renderBadge(fields['phoneofsponsor_msn'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Phone in Home Country</div>
             </div>
@@ -445,7 +417,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   />
                   No
                 </label>
-                {renderSourceBadge(fields['old_visa_flag'])}
+                {renderBadge(fields['old_visa_flag'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Prior Visit Disclosure</div>
             </div>
@@ -532,66 +504,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* SUBSECTION 4: Additional Questions (Security Questionnaire) */}
-        {/* ========================================================================= */}
-        <div id="sec-additionalQuestions" className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs scroll-mt-28">
-          <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
-            Additional Questions (Statutory Legal & Security Declarations)
-          </div>
-
-          <div className="p-4 space-y-3.5 text-xs">
-            {questions.map((q) => {
-              const flagVal = getVal(q.flagKey).toLowerCase()
-              const isYes = flagVal === 'yes'
-              return (
-                <div key={q.num} className="border-b border-slate-100 pb-3 space-y-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <span className="font-medium text-slate-800">
-                      {q.num}. {q.title}
-                    </span>
-                    <div className="flex items-center gap-4 flex-shrink-0">
-                      <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`q_${q.num}_radio`}
-                          checked={isYes}
-                          onChange={() => onFieldChange(q.flagKey, 'Yes')}
-                          className="text-purple-600"
-                        />
-                        Yes
-                      </label>
-                      <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`q_${q.num}_radio`}
-                          checked={!isYes}
-                          onChange={() => onFieldChange(q.flagKey, 'No')}
-                          className="text-purple-600"
-                        />
-                        No
-                      </label>
-                    </div>
-                  </div>
-
-                  {isYes && (
-                    <div className="pl-4">
-                      <textarea
-                        value={getVal(q.ansKey)}
-                        onChange={(e) => onFieldChange(q.ansKey, e.target.value)}
-                        rows={2}
-                        placeholder={`Details for Question ${q.num}...`}
-                        className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
-                      />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* SUBSECTION 5: Photograph Upload & Preview */}
+        {/* SUBSECTION 4: Photograph Upload & Preview */}
         {/* ========================================================================= */}
         <div id="sec-photoUpload" className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs scroll-mt-28">
           <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
@@ -645,6 +558,35 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
         {/* Footer Note */}
         <div className="text-[11px] text-slate-500 font-semibold italic">
           * Mandatory Fields
+        </div>
+
+        {/* Bottom Action Buttons (Image 5 faithful) */}
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          {onPreviousPage && (
+            <button
+              type="button"
+              onClick={onPreviousPage}
+              className="bg-slate-700 hover:bg-slate-800 text-white font-semibold text-xs px-4 py-2 rounded shadow-xs transition-colors cursor-pointer"
+            >
+              ← Back to Family Details
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onSaveAndContinue}
+            className="bg-[#e06743] hover:bg-[#d45632] text-white font-semibold text-xs px-6 py-2 rounded shadow-xs transition-colors cursor-pointer"
+          >
+            Save and Continue
+          </button>
+
+          <button
+            type="button"
+            onClick={onSaveTemporarily}
+            className="bg-[#e06743] hover:bg-[#d45632] text-white font-semibold text-xs px-5 py-2 rounded shadow-xs transition-colors cursor-pointer"
+          >
+            Save and Temporarily Exit
+          </button>
         </div>
       </div>
     </div>
