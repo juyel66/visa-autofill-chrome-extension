@@ -313,7 +313,18 @@ export function populateApplicationFromDocuments(options: {
       isBangladeshiValue(activeProfile?.permanentAddress?.country) ||
       isBangladeshiValue(passportDoc?.extractedData?.personal?.nationality?.value) ||
       isBangladeshiValue(passportDoc?.extractedData?.passport?.issuingCountry?.value) ||
-      isBangladeshiValue(ogdProfile?.personalInfo?.nationality)
+      isBangladeshiValue(ogdProfile?.personalInfo?.nationality) ||
+      true
+
+    const passportPob =
+      activeProfile?.personalInfo?.townCityOfBirth ||
+      passportDoc?.extractedData?.personal?.townCityOfBirth?.value ||
+      ''
+
+    const hasSpouse = Boolean(
+      activeProfile?.family?.spouse?.name?.trim() ||
+      passportDoc?.extractedData?.family?.spouse?.name?.value?.trim()
+    )
 
     // Derivation pass for fields deterministically tied to confirmed documents
     if (!resolvedValue && activeProfile) {
@@ -325,11 +336,14 @@ export function populateApplicationFromDocuments(options: {
         source = activeSource
         docId = activeDocId
       } else if (
-        (key === 'appl.nationality' || key === 'nationality') &&
-        (activeProfile.personalInfo?.nationality ||
-          activeProfile.passport?.issuingCountry ||
-          passportDoc?.extractedData?.personal?.nationality?.value ||
-          passportDoc?.extractedData?.passport?.issuingCountry?.value)
+        key === 'appl.missioncode' || key === 'missioncode'
+      ) {
+        const missionFromNotes = options.notes?.match(/Indian\s*Mission:\s*([^\r\n]+)/i)?.[1]?.trim()
+        resolvedValue = activeProfile.registration?.indianMission || missionFromNotes || 'BANGLADESH-RAJSHAHI'
+        source = activeProfile.registration?.indianMission || missionFromNotes ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        key === 'appl.nationality' || key === 'nationality'
       ) {
         resolvedValue =
           activeProfile.personalInfo?.nationality ||
@@ -337,19 +351,33 @@ export function populateApplicationFromDocuments(options: {
           passportDoc?.extractedData?.personal?.nationality?.value ||
           passportDoc?.extractedData?.passport?.issuingCountry?.value ||
           'BANGLADESH'
-        source = activeSource
+        source = (activeProfile.personalInfo?.nationality || passportDoc?.extractedData?.personal?.nationality?.value) ? activeSource : 'derived'
         docId = activeDocId
       } else if (
-        key === 'appl.country_of_birth' &&
-        (isApplicantBangladeshi || activeProfile.personalInfo?.townCityOfBirth)
+        key === 'appl.country_of_birth'
       ) {
         resolvedValue = 'BANGLADESH'
         source = activeSource
         docId = activeDocId
       } else if (
-        (key === 'appl.nationality_by' || key === 'nationality_by') &&
-        (isApplicantBangladeshi ||
-          isBangladeshiValue(activeProfile.personalInfo?.countryOfBirth))
+        key === 'appl.placbrth' || key === 'placbrth'
+      ) {
+        if (passportPob) {
+          resolvedValue = passportPob
+          source = activeSource
+          docId = activeDocId
+        }
+      } else if (
+        key === 'appl.edu_id' || key === 'edu_id'
+      ) {
+        resolvedValue =
+          activeProfile.personalInfo?.educationalQualification ||
+          passportDoc?.extractedData?.personal?.educationalQualification?.value ||
+          'BELOW MATRICULATION'
+        source = (activeProfile.personalInfo?.educationalQualification || passportDoc?.extractedData?.personal?.educationalQualification?.value) ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        key === 'appl.nationality_by' || key === 'nationality_by'
       ) {
         resolvedValue = 'Birth'
         source = activeSource
@@ -375,6 +403,23 @@ export function populateApplicationFromDocuments(options: {
         if (pNo) {
           resolvedValue = pNo
           source = activeSource
+          docId = activeDocId
+        }
+      } else if (
+        key === 'appl.passport_issue_place' ||
+        key === 'issueplace' ||
+        key === 'appl.issueplace'
+      ) {
+        const rawIssuePlace =
+          activeProfile.passport?.placeOfIssue ||
+          passportDoc?.extractedData?.passport?.placeOfIssue?.value
+        if (rawIssuePlace) {
+          resolvedValue = rawIssuePlace.replace(/^DIP\s*\/\s*/i, '').trim() || 'DHAKA'
+          source = activeSource
+          docId = activeDocId
+        } else {
+          resolvedValue = 'DHAKA'
+          source = 'derived'
           docId = activeDocId
         }
       } else if (key === 'pres_phone' || key === 'appl.pres_phone') {
@@ -517,104 +562,102 @@ export function populateApplicationFromDocuments(options: {
         source = activeSource
         docId = activeDocId
       } else if (
-        (key === 'father_nationality' || key === 'appl.father_nationality') &&
-        activeProfile.family?.father?.name &&
-        isApplicantBangladeshi
+        key === 'father_nationality' || key === 'appl.father_nationality'
       ) {
-        resolvedValue = 'BANGLADESH'
-        source = 'derived'
+        resolvedValue = activeProfile.family?.father?.nationality || 'BANGLADESH'
+        source = activeProfile.family?.father?.nationality ? activeSource : 'derived'
         docId = activeDocId
       } else if (
-        (key === 'father_place_of_birth' || key === 'appl.father_place_of_birth') &&
-        activeProfile.family?.father?.placeOfBirth
+        key === 'father_place_of_birth' || key === 'appl.father_place_of_birth'
       ) {
-        resolvedValue = activeProfile.family.father.placeOfBirth
+        resolvedValue = activeProfile.family?.father?.placeOfBirth || passportPob
+        source = activeProfile.family?.father?.placeOfBirth ? activeSource : (passportPob ? 'derived' : 'missing')
+        docId = activeDocId
+      } else if (
+        key === 'father_country_of_birth' || key === 'appl.father_country_of_birth'
+      ) {
+        resolvedValue = activeProfile.family?.father?.countryOfBirth || 'BANGLADESH'
+        source = activeProfile.family?.father?.countryOfBirth ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        key === 'father_prev_nationality' || key === 'appl.father_prev_nationality'
+      ) {
+        resolvedValue = activeProfile.family?.father?.previousNationality || 'BANGLADESH'
+        source = activeProfile.family?.father?.previousNationality ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        key === 'mother_nationality' || key === 'appl.mother_nationality'
+      ) {
+        resolvedValue = activeProfile.family?.mother?.nationality || 'BANGLADESH'
+        source = activeProfile.family?.mother?.nationality ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        key === 'mother_place_of_birth' || key === 'appl.mother_place_of_birth'
+      ) {
+        resolvedValue = activeProfile.family?.mother?.placeOfBirth || passportPob
+        source = activeProfile.family?.mother?.placeOfBirth ? activeSource : (passportPob ? 'derived' : 'missing')
+        docId = activeDocId
+      } else if (
+        key === 'mother_country_of_birth' || key === 'appl.mother_country_of_birth'
+      ) {
+        resolvedValue = activeProfile.family?.mother?.countryOfBirth || 'BANGLADESH'
+        source = activeProfile.family?.mother?.countryOfBirth ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        key === 'mother_prev_nationality' || key === 'appl.mother_prev_nationality'
+      ) {
+        resolvedValue = activeProfile.family?.mother?.previousNationality || 'BANGLADESH'
+        source = activeProfile.family?.mother?.previousNationality ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        key === 'spouse_nationality' || key === 'appl.spouse_nationality'
+      ) {
+        if (hasSpouse) {
+          resolvedValue = activeProfile.family?.spouse?.nationality || 'BANGLADESH'
+          source = activeProfile.family?.spouse?.nationality ? activeSource : 'derived'
+          docId = activeDocId
+        }
+      } else if (
+        key === 'spouse_place_of_birth' || key === 'appl.spouse_place_of_birth'
+      ) {
+        if (hasSpouse) {
+          resolvedValue = activeProfile.family?.spouse?.placeOfBirth || passportPob
+          source = activeProfile.family?.spouse?.placeOfBirth ? activeSource : (passportPob ? 'derived' : 'missing')
+          docId = activeDocId
+        }
+      } else if (
+        key === 'spouse_country_of_birth' || key === 'appl.spouse_country_of_birth'
+      ) {
+        if (hasSpouse) {
+          resolvedValue = activeProfile.family?.spouse?.countryOfBirth || 'BANGLADESH'
+          source = activeProfile.family?.spouse?.countryOfBirth ? activeSource : 'derived'
+          docId = activeDocId
+        }
+      } else if (
+        key === 'spouse_prev_nationality' || key === 'appl.spouse_prev_nationality'
+      ) {
+        if (hasSpouse) {
+          resolvedValue = activeProfile.family?.spouse?.previousNationality || 'BANGLADESH'
+          source = activeProfile.family?.spouse?.previousNationality ? activeSource : 'derived'
+          docId = activeDocId
+        }
+      } else if (
+        key === 'marital_status' || key === 'appl.marital_status'
+      ) {
+        if (hasSpouse) {
+          resolvedValue = 'Married'
+          source = 'derived'
+          docId = activeDocId
+        } else {
+          resolvedValue = undefined
+        }
+      } else if (
+        (key === 'appl.oth_ppt_issue_date' || key === 'oth_ppt_issue_date') &&
+        activeProfile.passport?.holdsOtherPassport === true &&
+        activeProfile.passport?.otherPassportDetails?.issueDate
+      ) {
+        resolvedValue = activeProfile.passport.otherPassportDetails.issueDate
         source = activeSource
-        docId = activeDocId
-      } else if (
-        (key === 'father_country_of_birth' || key === 'appl.father_country_of_birth') &&
-        activeProfile.family?.father?.name &&
-        isApplicantBangladeshi
-      ) {
-        resolvedValue = 'BANGLADESH'
-        source = 'derived'
-        docId = activeDocId
-      } else if (
-        (key === 'father_prev_nationality' || key === 'appl.father_prev_nationality') &&
-        activeProfile.family?.father?.name &&
-        isApplicantBangladeshi
-      ) {
-        resolvedValue = 'BANGLADESH'
-        source = 'derived'
-        docId = activeDocId
-      } else if (
-        (key === 'mother_nationality' || key === 'appl.mother_nationality') &&
-        activeProfile.family?.mother?.name &&
-        isApplicantBangladeshi
-      ) {
-        resolvedValue = 'BANGLADESH'
-        source = 'derived'
-        docId = activeDocId
-      } else if (
-        (key === 'mother_place_of_birth' || key === 'appl.mother_place_of_birth') &&
-        activeProfile.family?.mother?.placeOfBirth
-      ) {
-        resolvedValue = activeProfile.family.mother.placeOfBirth
-        source = activeSource
-        docId = activeDocId
-      } else if (
-        (key === 'mother_country_of_birth' || key === 'appl.mother_country_of_birth') &&
-        activeProfile.family?.mother?.name &&
-        isApplicantBangladeshi
-      ) {
-        resolvedValue = 'BANGLADESH'
-        source = 'derived'
-        docId = activeDocId
-      } else if (
-        (key === 'mother_prev_nationality' || key === 'appl.mother_prev_nationality') &&
-        activeProfile.family?.mother?.name &&
-        isApplicantBangladeshi
-      ) {
-        resolvedValue = 'BANGLADESH'
-        source = 'derived'
-        docId = activeDocId
-      } else if (
-        (key === 'spouse_nationality' || key === 'appl.spouse_nationality') &&
-        activeProfile.family?.spouse?.name &&
-        isApplicantBangladeshi
-      ) {
-        resolvedValue = 'BANGLADESH'
-        source = 'derived'
-        docId = activeDocId
-      } else if (
-        (key === 'spouse_place_of_birth' || key === 'appl.spouse_place_of_birth') &&
-        activeProfile.family?.spouse?.placeOfBirth
-      ) {
-        resolvedValue = activeProfile.family.spouse.placeOfBirth
-        source = activeSource
-        docId = activeDocId
-      } else if (
-        (key === 'spouse_country_of_birth' || key === 'appl.spouse_country_of_birth') &&
-        activeProfile.family?.spouse?.name &&
-        isApplicantBangladeshi
-      ) {
-        resolvedValue = 'BANGLADESH'
-        source = 'derived'
-        docId = activeDocId
-      } else if (
-        (key === 'spouse_prev_nationality' || key === 'appl.spouse_prev_nationality') &&
-        activeProfile.family?.spouse?.name &&
-        isApplicantBangladeshi
-      ) {
-        resolvedValue = 'BANGLADESH'
-        source = 'derived'
-        docId = activeDocId
-      } else if (
-        (key === 'marital_status' || key === 'appl.marital_status') &&
-        activeProfile.family?.spouse?.name
-      ) {
-        resolvedValue = 'Married'
-        source = 'derived'
         docId = activeDocId
       } else if (
         (key === 'appl.oth_ppt_issue_place' || key === 'oth_ppt_issue_place') &&
@@ -827,6 +870,8 @@ export function populateApplicationFromDocuments(options: {
         } else if (key === 'marital_status') {
           if (finalVal === '0' || finalVal.toUpperCase() === 'MARRIED') finalVal = 'Married'
           else if (finalVal === '1' || finalVal.toUpperCase() === 'SINGLE' || finalVal.toUpperCase() === 'UNMARRIED') finalVal = 'Single'
+        } else if (key === 'appl.passport_issue_place' || key === 'issueplace' || key === 'appl.issueplace') {
+          finalVal = finalVal.replace(/^DIP\s*\/\s*/i, '').trim() || 'DHAKA'
         } else if (key === 'duration') {
           finalVal = finalVal.replace(/months?/i, '').trim()
         } else if (key === 'visa_entry_id') {
@@ -1024,6 +1069,7 @@ export function convertSavedApplicationToApplicantProfile(
         placeOfIssue: getFieldStr('appl.oth_ppt_issue_place'),
         countryOfIssue: getFieldStr('appl.prev_passport_country_issue'),
         nationalityInPassport: getFieldStr('appl.other_ppt_nationality'),
+        issueDate: getFieldDate('appl.oth_ppt_issue_date'),
       },
     },
 
