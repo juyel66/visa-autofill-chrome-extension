@@ -248,6 +248,14 @@ export const BANGLADESH_FIELD_REGISTRY: BangladeshRegisteredControl[] = [
     description: 'Other Passport Place of Issue (#other_ppt_issue_place)',
   },
   {
+    controlId: 'basic_other_ppt_issue_date',
+    page: 'BASIC_DETAILS',
+    category: 'verified-selector',
+    eligibility: 'autofillable',
+    selectors: BANGLADESH_BASIC_DETAILS_SELECTORS.otherPassportDateOfIssue,
+    description: 'Other Passport Date of Issue (#other_ppt_issue_date)',
+  },
+  {
     controlId: 'basic_other_ppt_country_issue',
     page: 'BASIC_DETAILS',
     category: 'verified-selector',
