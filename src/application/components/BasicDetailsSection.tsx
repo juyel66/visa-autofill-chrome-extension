@@ -14,6 +14,9 @@ export interface BasicDetailsSectionProps {
   onFieldChange: (fieldKey: string, value: string | boolean) => void
   onResetField: (fieldKey: string) => void
   renderSourceBadge: (fieldValue?: ApplicationFieldValue) => React.ReactNode
+  onSaveAndContinue?: () => void
+  onSaveTemporarily?: () => void
+  onPreviousPage?: () => void
 }
 
 export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
@@ -21,6 +24,9 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
   onFieldChange,
   onResetField,
   renderSourceBadge,
+  onSaveAndContinue,
+  onSaveTemporarily,
+  onPreviousPage,
 }) => {
   const fields = application?.fields || {}
 
@@ -642,6 +648,35 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
         {/* Footer Note */}
         <div className="text-[11px] text-slate-500 font-semibold italic">
           * Mandatory Fields
+        </div>
+
+        {/* Bottom Action Buttons (Image 2 faithful) */}
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          {onPreviousPage && (
+            <button
+              type="button"
+              onClick={onPreviousPage}
+              className="bg-slate-700 hover:bg-slate-800 text-white font-semibold text-xs px-4 py-2 rounded shadow-xs transition-colors cursor-pointer"
+            >
+              ← Back to Registration
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onSaveAndContinue}
+            className="bg-[#e06743] hover:bg-[#d45632] text-white font-semibold text-xs px-6 py-2 rounded shadow-xs transition-colors cursor-pointer"
+          >
+            Save and Continue
+          </button>
+
+          <button
+            type="button"
+            onClick={onSaveTemporarily}
+            className="bg-[#e06743] hover:bg-[#d45632] text-white font-semibold text-xs px-5 py-2 rounded shadow-xs transition-colors cursor-pointer"
+          >
+            Save and Temporarily Exit
+          </button>
         </div>
       </div>
     </div>
