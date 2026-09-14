@@ -16,6 +16,8 @@ export type IndiaVisaFieldId =
   | 'given_names'
   | 'has_changed_name'
   | 'previous_name'
+  | 'previous_surname'
+  | 'previous_given_name'
   | 'gender'
   | 'date_of_birth'
   | 'town_city_of_birth'
