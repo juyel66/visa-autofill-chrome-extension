@@ -345,12 +345,12 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         key === 'appl.nationality' || key === 'nationality'
       ) {
-        resolvedValue =
+        const rawNat =
           activeProfile.personalInfo?.nationality ||
           activeProfile.passport?.issuingCountry ||
           passportDoc?.extractedData?.personal?.nationality?.value ||
-          passportDoc?.extractedData?.passport?.issuingCountry?.value ||
-          'BANGLADESH'
+          passportDoc?.extractedData?.passport?.issuingCountry?.value
+        resolvedValue = isBangladeshiValue(rawNat) ? 'BANGLADESH' : (rawNat || 'BANGLADESH')
         source = (activeProfile.personalInfo?.nationality || passportDoc?.extractedData?.personal?.nationality?.value) ? activeSource : 'derived'
         docId = activeDocId
       } else if (
@@ -664,7 +664,7 @@ export function populateApplicationFromDocuments(options: {
         activeProfile.passport?.holdsOtherPassport === true &&
         activeProfile.passport?.otherPassportDetails?.placeOfIssue
       ) {
-        resolvedValue = activeProfile.passport.otherPassportDetails.placeOfIssue
+        resolvedValue = activeProfile.passport.otherPassportDetails.placeOfIssue.replace(/^DIP\s*\/\s*/i, '').trim() || 'DHAKA'
         source = activeSource
         docId = activeDocId
       } else if (
@@ -672,7 +672,8 @@ export function populateApplicationFromDocuments(options: {
         activeProfile.passport?.holdsOtherPassport === true &&
         activeProfile.passport?.otherPassportDetails?.countryOfIssue
       ) {
-        resolvedValue = activeProfile.passport.otherPassportDetails.countryOfIssue
+        const countryVal = activeProfile.passport.otherPassportDetails.countryOfIssue
+        resolvedValue = isBangladeshiValue(countryVal) ? 'BANGLADESH' : countryVal
         source = activeSource
         docId = activeDocId
       } else if (
@@ -680,7 +681,8 @@ export function populateApplicationFromDocuments(options: {
         activeProfile.passport?.holdsOtherPassport === true &&
         activeProfile.passport?.otherPassportDetails?.nationalityInPassport
       ) {
-        resolvedValue = activeProfile.passport.otherPassportDetails.nationalityInPassport
+        const natVal = activeProfile.passport.otherPassportDetails.nationalityInPassport
+        resolvedValue = isBangladeshiValue(natVal) ? 'BANGLADESH' : natVal
         source = activeSource
         docId = activeDocId
       } else if (
@@ -872,6 +874,19 @@ export function populateApplicationFromDocuments(options: {
           else if (finalVal === '1' || finalVal.toUpperCase() === 'SINGLE' || finalVal.toUpperCase() === 'UNMARRIED') finalVal = 'Single'
         } else if (key === 'appl.passport_issue_place' || key === 'issueplace' || key === 'appl.issueplace') {
           finalVal = finalVal.replace(/^DIP\s*\/\s*/i, '').trim() || 'DHAKA'
+        } else if (key === 'appl.oth_ppt_issue_place' || key === 'oth_ppt_issue_place') {
+          finalVal = finalVal.replace(/^DIP\s*\/\s*/i, '').trim() || 'DHAKA'
+        } else if (
+          key === 'appl.nationality' ||
+          key === 'nationality' ||
+          key === 'appl.other_ppt_nationality' ||
+          key === 'other_ppt_nationality' ||
+          key === 'appl.prev_passport_country_issue' ||
+          key === 'prev_passport_country_issue'
+        ) {
+          if (isBangladeshiValue(finalVal)) {
+            finalVal = 'BANGLADESH'
+          }
         } else if (key === 'duration') {
           finalVal = finalVal.replace(/months?/i, '').trim()
         } else if (key === 'visa_entry_id') {
@@ -1032,7 +1047,10 @@ export function convertSavedApplicationToApplicantProfile(
     personalInfo: {
       surname: getFieldStr('appl.surname'),
       givenNames: getFieldStr('appl.applname'),
-      hasChangedName: getFieldBool('appl.changedSurnameCheck'),
+      hasChangedName: getFieldBool('appl.changedSurnameCheck') || Boolean(getFieldStr('appl.prev_surname') || getFieldStr('appl.prev_name')),
+      previousSurname: getFieldStr('appl.prev_surname'),
+      previousName: getFieldStr('appl.prev_name'),
+      previousGivenNames: getFieldStr('appl.prev_name'),
       gender: (() => {
         const g = getFieldStr('appl.applsex')?.toLowerCase()
         if (g === 'male' || g === 'm') return 'male'
