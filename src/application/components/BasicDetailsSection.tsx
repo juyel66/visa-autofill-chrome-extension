@@ -44,12 +44,22 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
     return false
   }
 
+  const normalizeToBangladesh = (val?: string): string => {
+    if (!val) return 'BANGLADESH'
+    const upper = val.trim().toUpperCase()
+    if (upper === 'BANGLADESHI' || upper === 'BGD' || upper === 'BANGLADESH') return 'BANGLADESH'
+    return upper
+  }
+
   const missionCode = getVal('appl.missioncode') || 'BANGLADESH-RAJSHAHI'
   const tempAppId = application?.applicantId
     ? `APPL-${application.applicantId.substring(0, 8).toUpperCase()}`
     : '4XA4AXX5YTV4RFB'
 
-  const hasChangedName = getBool('appl.changedSurnameCheck')
+  const hasChangedName =
+    fields['appl.changedSurnameCheck'] !== undefined
+      ? getBool('appl.changedSurnameCheck')
+      : Boolean(getVal('appl.prev_surname').trim() || getVal('appl.prev_name').trim())
   const hasOtherPassport = getVal('appl.oth_ppt').toLowerCase() === 'yes'
 
   return (
@@ -191,22 +201,95 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
 
             {/* 3. Name change checkbox */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-1.5 rounded">
-              <div className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
+              <label htmlFor="chk_prev_name" className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2 cursor-pointer select-none">
                 Have you ever changed your name? If yes, click the box
-              </div>
+              </label>
               <div className="sm:col-span-5 flex items-center gap-2">
                 <input
                   type="checkbox"
+                  id="chk_prev_name"
                   checked={hasChangedName}
-                  onChange={(e) => onFieldChange('appl.changedSurnameCheck', e.target.checked)}
-                  className="rounded border-slate-400 text-purple-600 focus:ring-purple-500"
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    onFieldChange('appl.changedSurnameCheck', checked)
+                    if (!checked) {
+                      onFieldChange('appl.prev_surname', '')
+                      onFieldChange('appl.prev_name', '')
+                    }
+                  }}
+                  className="rounded border-slate-400 text-purple-600 focus:ring-purple-500 cursor-pointer w-4 h-4"
                 />
-                <span className="text-[11px] text-slate-600">and give details.</span>
+                <label htmlFor="chk_prev_name" className="text-[11px] text-slate-600 cursor-pointer select-none">
+                  and give details.
+                </label>
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">
                 If You have ever changed your Name Please tell us.
               </div>
             </div>
+
+            {/* 3a & 3b. Conditional Previous Surname & Previous Name */}
+            {hasChangedName && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#fdf8fd] py-1 rounded">
+                  <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
+                    Previous Surname <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      id="prev_surname"
+                      value={getVal('appl.prev_surname')}
+                      onChange={(e) => onFieldChange('appl.prev_surname', e.target.value.toUpperCase())}
+                      placeholder="PREVIOUS SURNAME"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                    />
+                    {renderSourceBadge(fields['appl.prev_surname'])}
+                    {fields['appl.prev_surname']?.isUserEdited && (
+                      <button
+                        onClick={() => onResetField('appl.prev_surname')}
+                        className="text-slate-400 hover:text-blue-600 text-xs px-1"
+                        title="Reset to extracted value"
+                      >
+                        ↺
+                      </button>
+                    )}
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">
+                    Previous Surname
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#fdf8fd] py-1 rounded">
+                  <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
+                    Previous Name <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      id="prev_name"
+                      value={getVal('appl.prev_name')}
+                      onChange={(e) => onFieldChange('appl.prev_name', e.target.value.toUpperCase())}
+                      placeholder="PREVIOUS NAME"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                    />
+                    {renderSourceBadge(fields['appl.prev_name'])}
+                    {fields['appl.prev_name']?.isUserEdited && (
+                      <button
+                        onClick={() => onResetField('appl.prev_name')}
+                        className="text-slate-400 hover:text-blue-600 text-xs px-1"
+                        title="Reset to extracted value"
+                      >
+                        ↺
+                      </button>
+                    )}
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">
+                    Previous given name
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* 4. Gender */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
@@ -394,7 +477,7 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('appl.nationality') || 'BANGLADESH'}
+                  value={normalizeToBangladesh(getVal('appl.nationality'))}
                   onChange={(e) => onFieldChange('appl.nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#7c3aed]"
                 >
@@ -531,7 +614,18 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                     type="radio"
                     name="oth_ppt_radio"
                     checked={hasOtherPassport}
-                    onChange={() => onFieldChange('appl.oth_ppt', 'Yes')}
+                    onChange={() => {
+                      onFieldChange('appl.oth_ppt', 'Yes')
+                      if (!getVal('appl.oth_ppt_issue_place')) {
+                        onFieldChange('appl.oth_ppt_issue_place', 'DHAKA')
+                      }
+                      if (!getVal('appl.other_ppt_nationality')) {
+                        onFieldChange('appl.other_ppt_nationality', 'BANGLADESH')
+                      }
+                      if (!getVal('appl.prev_passport_country_issue')) {
+                        onFieldChange('appl.prev_passport_country_issue', 'BANGLADESH')
+                      }
+                    }}
                     className="text-purple-600 focus:ring-purple-500"
                   />
                   Yes
@@ -560,7 +654,7 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5">
                     <select
-                      value={getVal('appl.prev_passport_country_issue')}
+                      value={normalizeToBangladesh(getVal('appl.prev_passport_country_issue'))}
                       onChange={(e) => onFieldChange('appl.prev_passport_country_issue', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                     >
@@ -613,7 +707,7 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   <div className="sm:col-span-5">
                     <input
                       type="text"
-                      value={getVal('appl.oth_ppt_issue_place')}
+                      value={getVal('appl.oth_ppt_issue_place') || 'DHAKA'}
                       onChange={(e) => onFieldChange('appl.oth_ppt_issue_place', e.target.value.toUpperCase())}
                       placeholder="PLACE OF ISSUE"
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -627,7 +721,7 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5">
                     <select
-                      value={getVal('appl.other_ppt_nationality')}
+                      value={normalizeToBangladesh(getVal('appl.other_ppt_nationality'))}
                       onChange={(e) => onFieldChange('appl.other_ppt_nationality', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                     >
