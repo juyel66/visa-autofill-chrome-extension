@@ -11,6 +11,8 @@ export type ApplicantProfileFieldPath =
   | 'personalInfo.givenNames'
   | 'personalInfo.hasChangedName'
   | 'personalInfo.previousName'
+  | 'personalInfo.previousSurname'
+  | 'personalInfo.previousGivenNames'
   | 'personalInfo.dateOfBirth'
   | 'personalInfo.townCityOfBirth'
   | 'personalInfo.countryOfBirth'
