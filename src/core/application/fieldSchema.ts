@@ -2,6 +2,7 @@ import {
   PORTAL_COUNTRY_OPTIONS,
   PORTAL_MISSION_OPTIONS,
   PORTAL_NATIONALITY_OPTIONS,
+  PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS,
 } from '../../countries/india/options/registrationOptions'
 
 export interface ApplicationFieldDef {
@@ -154,6 +155,8 @@ export const WORKSPACE_DEFAULT_VISIBLE_FIELDS: string[] = [
 
 export const WORKSPACE_HIDDEN_FIELDS: string[] = [
   'appl.changedSurnameCheck', // Personal Details conditional
+  'appl.prev_surname',        // Personal Details conditional (if changedSurnameCheck is true)
+  'appl.prev_name',           // Personal Details conditional (if changedSurnameCheck is true)
   'state_name',               // Present Address legacy/combined field
   'appl.email_re',            // Present Address technical duplicate
   'appl.missioncode',         // Present Address / Registration technical field
@@ -211,6 +214,8 @@ export const WORKSPACE_PAGES: WorkspacePageDef[] = [
       'appl.surname',
       'appl.applname',
       'appl.changedSurnameCheck',
+      'appl.prev_surname',
+      'appl.prev_name',
       'appl.applsex',
       'appl.birthdate',
       'appl.placbrth',
@@ -381,6 +386,8 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
       'appl.surname',
       'appl.applname',
       'appl.changedSurnameCheck',
+      'appl.prev_surname',
+      'appl.prev_name',
       'appl.applsex',
       'appl.birthdate',
       'appl.placbrth',
@@ -722,6 +729,28 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'checkbox',
         targetMappingField: 'appl.changedSurnameCheck',
         sourceApplicantPath: 'personalInfo.hasChangedName',
+        visibleByDefault: false,
+      },
+      {
+        key: 'appl.prev_surname',
+        label: 'Previous Surname',
+        section: 'basicDetails',
+        subsection: 'Personal Details',
+        inputType: 'text',
+        targetMappingField: 'appl.prev_surname',
+        sourceApplicantPath: 'personalInfo.previousSurname',
+        requiredInPortal: false,
+        visibleByDefault: false,
+      },
+      {
+        key: 'appl.prev_name',
+        label: 'Previous Name',
+        section: 'basicDetails',
+        subsection: 'Personal Details',
+        inputType: 'text',
+        targetMappingField: 'appl.prev_name',
+        sourceApplicantPath: 'personalInfo.previousGivenNames',
+        requiredInPortal: false,
         visibleByDefault: false,
       },
       {
@@ -1680,18 +1709,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'select',
         targetMappingField: 'entrypoint',
         sourceApplicantPath: 'travel.entryPoint',
-        options: [
-          { value: 'BY ROAD PHULBARI', label: 'BY ROAD PHULBARI' },
-          { value: 'HARIDASPUR RAIL', label: 'HARIDASPUR RAIL' },
-          { value: 'HARIDASPUR ROAD', label: 'HARIDASPUR ROAD (BENAPOLE)' },
-          { value: 'CHANGRIBANDHA ROAD', label: 'CHANGRIBANDHA ROAD' },
-          { value: 'DAWKI ROAD', label: 'DAWKI ROAD' },
-          { value: 'GELEPHU ROAD', label: 'GELEPHU ROAD' },
-          { value: 'HILI ROAD', label: 'HILI ROAD' },
-          { value: 'KOLKATA AIRPORT', label: 'KOLKATA AIRPORT' },
-          { value: 'DELHI AIRPORT', label: 'DELHI AIRPORT' },
-          { value: 'CHENNAI AIRPORT', label: 'CHENNAI AIRPORT' },
-        ],
+        options: PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS,
         visibleByDefault: true,
       },
       {
@@ -1702,15 +1720,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'select',
         targetMappingField: 'exitpoint',
         sourceApplicantPath: 'travel.exitPoint',
-        options: [
-          { value: 'BY ROAD PHULBARI', label: 'BY ROAD PHULBARI' },
-          { value: 'HARIDASPUR RAIL', label: 'HARIDASPUR RAIL' },
-          { value: 'HARIDASPUR ROAD', label: 'HARIDASPUR ROAD (BENAPOLE)' },
-          { value: 'CHANGRIBANDHA ROAD', label: 'CHANGRIBANDHA ROAD' },
-          { value: 'DAWKI ROAD', label: 'DAWKI ROAD' },
-          { value: 'KOLKATA AIRPORT', label: 'KOLKATA AIRPORT' },
-          { value: 'DELHI AIRPORT', label: 'DELHI AIRPORT' },
-        ],
+        options: PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS,
         visibleByDefault: true,
       },
 
