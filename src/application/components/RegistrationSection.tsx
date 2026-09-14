@@ -3,6 +3,7 @@ import type { SavedApplication, ApplicationFieldValue } from '../../core/applica
 import {
   PORTAL_COUNTRY_OPTIONS,
   PORTAL_NATIONALITY_OPTIONS,
+  PORTAL_PURPOSE_OF_VISIT_OPTIONS,
   getMissionOptionsForCountry,
   type PortalSelectOption,
 } from '../../countries/india/options/registrationOptions'
@@ -16,6 +17,9 @@ export interface RegistrationSectionProps {
   onNextPage?: () => void
 }
 
+
+
+
 interface SearchableSelectProps {
   id: string
   name: string
@@ -24,6 +28,7 @@ interface SearchableSelectProps {
   placeholder?: string
   onChange: (value: string) => void
   className?: string
+  dropUp?: boolean
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -34,6 +39,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   placeholder = 'Select...',
   onChange,
   className = '',
+  dropUp = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [filterText, setFilterText] = useState('')
@@ -66,12 +72,15 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       <div
         id={`${id}_trigger`}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full bg-white text-slate-800 border border-[#a0aec0] hover:border-slate-500 rounded px-2.5 py-1 text-xs font-medium flex items-center justify-between cursor-pointer shadow-xs transition-colors"
+        title={selectedOption ? selectedOption.label : placeholder}
+        className="w-full min-h-[28px] bg-white text-slate-800 border border-[#a0aec0] hover:border-slate-500 rounded px-2.5 py-1 text-xs font-medium flex items-center justify-between cursor-pointer shadow-xs transition-colors"
       >
-        <span className={selectedOption ? 'text-slate-900 font-semibold' : 'text-slate-500 font-normal'}>
+        <span className={`truncate text-left flex-1 min-w-0 ${selectedOption ? 'text-slate-900 font-semibold' : 'text-slate-500 font-normal'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <span className="text-[9px] text-slate-500 ml-2">▼</span>
+        <span className="text-[9px] text-slate-500 ml-2 flex-shrink-0">
+          {dropUp ? (isOpen ? '▼' : '▲') : (isOpen ? '▲' : '▼')}
+        </span>
       </div>
 
       {/* Hidden native select for accessibility & form testing */}
@@ -102,7 +111,11 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
               setFilterText('')
             }}
           />
-          <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-[#a0aec0] rounded shadow-xl max-h-56 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+          <div
+            className={`absolute left-0 right-0 ${
+              dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
+            } z-50 bg-white border border-[#a0aec0] rounded shadow-2xl max-h-60 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100`}
+          >
             <div className="p-1.5 border-b border-slate-200 bg-slate-50">
               <input
                 type="text"
@@ -110,11 +123,11 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 placeholder="Search option..."
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded px-2 py-0.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+                className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
-            <div className="overflow-y-auto flex-1 p-1 divide-y divide-slate-100">
+            <div className="overflow-y-auto flex-1 p-1 divide-y divide-slate-100 max-h-52">
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((opt) => {
                   const isSelected = selectedOption?.value === opt.value
@@ -122,19 +135,20 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                     <button
                       key={opt.value}
                       type="button"
+                      title={opt.label}
                       onClick={() => {
                         onChange(opt.value)
                         setIsOpen(false)
                         setFilterText('')
                       }}
-                      className={`w-full text-left px-2.5 py-1 text-xs rounded transition-colors flex items-center justify-between cursor-pointer ${
+                      className={`w-full text-left px-2.5 py-1.5 text-xs rounded transition-colors flex items-center justify-between cursor-pointer ${
                         isSelected
                           ? 'bg-blue-50 text-blue-700 font-bold'
                           : 'text-slate-800 hover:bg-slate-100'
                       }`}
                     >
-                      <span className="truncate">{opt.label}</span>
-                      {isSelected && <span className="text-blue-600 text-xs ml-2">✓</span>}
+                      <span className="truncate pr-2">{opt.label}</span>
+                      {isSelected && <span className="text-blue-600 text-xs flex-shrink-0">✓</span>}
                     </button>
                   )
                 })
@@ -162,24 +176,17 @@ export const RegistrationSection: React.FC<RegistrationSectionProps> = ({
   // Extract canonical field values
   const countryVal = String(application?.fields['appl.countryname']?.value || application?.fields['present_country']?.value || 'BANGLADESH')
   const missionVal = String(application?.fields['appl.missioncode']?.value || '')
-  const nationalityVal = String(application?.fields['appl.nationality']?.value || 'BANGLADESH')
+  const nationalityVal = (() => {
+    const raw = String(application?.fields['appl.nationality']?.value || '')
+    const upper = raw.trim().toUpperCase()
+    if (!upper || upper === 'BANGLADESHI' || upper === 'BGD' || upper === 'BANGLADESH') return 'BANGLADESH'
+    return raw
+  })()
   const dobVal = String(application?.fields['appl.birthdate']?.value || '')
   const emailVal = String(application?.fields['appl.email']?.value || '')
   const emailReVal = String(application?.fields['appl.email_re']?.value || application?.fields['appl.email']?.value || '')
   const journeyVal = String(application?.fields['appl.journeydate']?.value || application?.fields['journeydate']?.value || '')
-
-  // State for simulated captcha
-  const [captchaCode, setCaptchaCode] = useState<string>('e3d5hq')
-  const [captchaInput, setCaptchaInput] = useState<string>('')
-
-  const handleRefreshCaptcha = () => {
-    const chars = '23456789abcdefghkmnpqrstuvwxyz'
-    let newCode = ''
-    for (let i = 0; i < 6; i++) {
-      newCode += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    setCaptchaCode(newCode)
-  }
+  const purposeVal = String(application?.fields['purpose']?.value || application?.fields['appl.purpose']?.value || '')
 
   // Mission options prioritized for selected country
   const missionOptions = useMemo(() => {
@@ -443,30 +450,42 @@ export const RegistrationSection: React.FC<RegistrationSectionProps> = ({
             </div>
           </div>
 
-          {/* Row 8: Captcha Box (Image 1 faithful reproduction) */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center pt-1">
-            <div className="sm:col-span-6" />
-      
-          </div>
-
-          {/* Row 9: Please enter above text* */}
+          {/* Row 8: Visiting India for* */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-            <label htmlFor="captcha_input_id" className="sm:col-span-6 text-left sm:text-right text-xs sm:text-sm font-normal text-[#222222] pr-2">
-              Please enter above text<span className="text-red-600 font-bold">*</span>
+            <label htmlFor="purpose_id" className="sm:col-span-6 text-left sm:text-right text-xs sm:text-sm font-normal text-[#222222] pr-2">
+              Visiting India for<span className="text-red-600 font-bold">*</span>
             </label>
-            <div className="sm:col-span-6">
-              <input
-                type="text"
-                id="captcha_input_id"
-                value={captchaInput}
-                onChange={(e) => setCaptchaInput(e.target.value)}
-                placeholder=""
-                className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-blue-600"
-              />
+            <div className="sm:col-span-6 flex items-center gap-1.5">
+              <div className="flex-1 min-w-0">
+                <SearchableSelect
+                  id="purpose_id"
+                  name="appl.purpose"
+                  value={purposeVal}
+                  options={PORTAL_PURPOSE_OF_VISIT_OPTIONS}
+                  placeholder="Select Purpose"
+                  dropUp={true}
+                  onChange={(val) => onFieldChange('purpose', val)}
+                />
+              </div>
+              {renderBadge('purpose') || renderBadge('appl.purpose')}
+              {(application?.fields['purpose']?.isUserEdited || application?.fields['appl.purpose']?.isUserEdited) && onResetField && (
+                <button
+                  title="Reset to original extracted value"
+                  onClick={() => {
+                    if (onResetField) {
+                      onResetField('purpose')
+                      onResetField('appl.purpose')
+                    }
+                  }}
+                  className="text-xs text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                >
+                  ↺
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Row 10: Continue Button (Image 1 authentic orange button) */}
+          {/* Continue Button */}
           <div className="flex justify-center pt-3">
             <button
               type="button"
