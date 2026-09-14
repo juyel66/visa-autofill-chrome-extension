@@ -1,3 +1,9 @@
+import {
+  PORTAL_COUNTRY_OPTIONS,
+  PORTAL_MISSION_OPTIONS,
+  PORTAL_NATIONALITY_OPTIONS,
+} from '../../countries/india/options/registrationOptions'
+
 export interface ApplicationFieldDef {
   key: string
   label: string
@@ -48,13 +54,14 @@ export const WORKSPACE_DEFAULT_VISIBLE_FIELDS: string[] = [
   'appl.edu_id',
   'marital_status',
 
-  // 2. Passport Details (9)
+  // 2. Passport Details (10)
   'appl.passport_number',
   'appl.passport_issue_place',
   'appl.passport_issue_date',
   'appl.passport_expiry_date',
   'appl.oth_ppt',
   'appl.oth_pptno',
+  'appl.oth_ppt_issue_date',
   'appl.oth_ppt_issue_place',
   'appl.prev_passport_country_issue',
   'appl.other_ppt_nationality',
@@ -167,8 +174,30 @@ export const WORKSPACE_HIDDEN_FIELDS: string[] = [
 
 export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   {
+    id: 'registration',
+    title: '1. Registration',
+    subtitle: 'Initial application configuration and portal registration fields',
+    iconName: 'FileText',
+    manualNotices: [
+      {
+        title: 'CAPTCHA Security Verification',
+        message: 'CAPTCHA must be solved manually on the Indian Visa website. Extension does not collect or solve CAPTCHA.',
+      },
+    ],
+    fieldKeys: [
+      'appl.countryname',
+      'appl.missioncode',
+      'appl.nationality',
+      'appl.birthdate',
+      'appl.email',
+      'appl.email_re',
+      'appl.journeydate',
+      'purpose',
+    ],
+  },
+  {
     id: 'personalDetails',
-    title: '1. Personal Details',
+    title: '2. Personal Details',
     subtitle: 'Primary applicant identity, birth details, religion, and education',
     iconName: 'User',
     fieldKeys: [
@@ -190,7 +219,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   },
   {
     id: 'passportDetails',
-    title: '2. Passport Details',
+    title: '3. Passport Details',
     subtitle: 'Passport number, validity, issue details, and secondary passports',
     iconName: 'BookOpen',
     fieldKeys: [
@@ -200,6 +229,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
       'appl.passport_expiry_date',
       'appl.oth_ppt',
       'appl.oth_pptno',
+      'appl.oth_ppt_issue_date',
       'appl.oth_ppt_issue_place',
       'appl.prev_passport_country_issue',
       'appl.other_ppt_nationality',
@@ -207,7 +237,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   },
   {
     id: 'presentAddress',
-    title: '3. Present Address & Contact',
+    title: '4. Present Address & Contact',
     subtitle: 'Current domicile address, phone numbers, email, and Indian Mission',
     iconName: 'Home',
     manualNotices: [
@@ -235,7 +265,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   },
   {
     id: 'permanentAddress',
-    title: '4. Permanent Address',
+    title: '5. Permanent Address',
     subtitle: 'Permanent address in home country (matches present address if same)',
     iconName: 'MapPin',
     manualNotices: [
@@ -257,7 +287,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   },
   {
     id: 'familyDetails',
-    title: '5. Family Details',
+    title: '6. Family Details',
     subtitle: 'Father, mother, spouse details, and Pakistan ancestry disclosure',
     iconName: 'Users',
     fieldKeys: [
@@ -282,7 +312,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   },
   {
     id: 'professionEmployment',
-    title: '6. Profession / Employment',
+    title: '7. Profession / Employment',
     subtitle: 'Present occupation, employer information, and military/security service',
     iconName: 'Briefcase',
     fieldKeys: [
@@ -301,7 +331,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   },
   {
     id: 'visaDetails',
-    title: '7. Visa Details & References',
+    title: '8. Visa Details & References',
     subtitle: 'Visa duration, port of arrival/exit, and Indian & Bangladesh references',
     iconName: 'Compass',
     fieldKeys: [
@@ -326,7 +356,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   },
   {
     id: 'previousVisitVisa',
-    title: '8. Previous Visit / Visa',
+    title: '9. Previous Visit / Visa',
     subtitle: 'Prior Indian visas, stay addresses, and previously visited cities',
     iconName: 'History',
     manualNotices: [
@@ -348,7 +378,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   },
   {
     id: 'additionalQuestions',
-    title: '9. Additional Questions',
+    title: '10. Additional Questions',
     subtitle: 'Legal and security questionnaire (Questions 1 to 6)',
     iconName: 'ShieldAlert',
     manualNotices: [
@@ -374,7 +404,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSectionCardDef[] = [
   },
   {
     id: 'photoUpload',
-    title: '10. Photo Section',
+    title: '11. Photo Section',
     subtitle: 'Applicant photograph management and preview',
     iconName: 'Camera',
     manualNotices: [
@@ -402,58 +432,40 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
     fields: [
       {
         key: 'appl.countryname',
-        label: 'Country / Region applying visa from',
+        label: 'Country/Region you are applying visa from',
         section: 'registration',
         inputType: 'select',
         targetMappingField: 'appl.countryname',
         sourceApplicantPath: 'presentAddress.country',
         requiredInPortal: true,
-        options: [
-          { value: 'BANGLADESH', label: 'BANGLADESH' },
-          { value: 'INDIA', label: 'INDIA' },
-          { value: 'USA', label: 'UNITED STATES OF AMERICA' },
-          { value: 'UK', label: 'UNITED KINGDOM' },
-        ],
+        options: PORTAL_COUNTRY_OPTIONS,
         visibleByDefault: true,
       },
       {
         key: 'appl.missioncode',
-        label: 'Indian Mission / Office',
+        label: 'Indian Mission/Office',
         section: 'registration',
         inputType: 'select',
         targetMappingField: 'appl.missioncode',
         sourceApplicantPath: 'registration.indianMission',
         requiredInPortal: true,
-        options: [
-          { value: 'BANGLADESH-DHAKA', label: 'BANGLADESH - DHAKA' },
-          { value: 'BANGLADESH-CHITTAGONG', label: 'BANGLADESH - CHITTAGONG' },
-          { value: 'BANGLADESH-RAJSHAHI', label: 'BANGLADESH - RAJSHAHI' },
-          { value: 'BANGLADESH-SYLHET', label: 'BANGLADESH - SYLHET' },
-          { value: 'BANGLADESH-KHULNA', label: 'BANGLADESH - KHULNA' },
-        ],
+        options: PORTAL_MISSION_OPTIONS,
         visibleByDefault: false,
       },
       {
         key: 'appl.nationality',
-        label: 'Nationality / Region',
+        label: 'Nationality/Region',
         section: 'registration',
         inputType: 'select',
         targetMappingField: 'appl.nationality',
         sourceApplicantPath: 'personalInfo.nationality',
         requiredInPortal: true,
-        options: [
-          { value: 'BANGLADESH', label: 'BANGLADESH' },
-          { value: 'INDIA', label: 'INDIA' },
-          { value: 'PAKISTAN', label: 'PAKISTAN' },
-          { value: 'NEPAL', label: 'NEPAL' },
-          { value: 'SRI LANKA', label: 'SRI LANKA' },
-          { value: 'USA', label: 'UNITED STATES OF AMERICA' },
-        ],
+        options: PORTAL_NATIONALITY_OPTIONS,
         visibleByDefault: true,
       },
       {
         key: 'appl.birthdate',
-        label: 'Date of Birth (DD/MM/YYYY)',
+        label: 'Date of Birth',
         section: 'registration',
         inputType: 'date',
         targetMappingField: 'appl.birthdate',
@@ -486,7 +498,7 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
       },
       {
         key: 'appl.journeydate',
-        label: 'Expected Date of Arrival (DD/MM/YYYY)',
+        label: 'Expected Date of Arrival',
         section: 'registration',
         inputType: 'date',
         targetMappingField: 'appl.journeydate',
@@ -723,6 +735,17 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         inputType: 'text',
         targetMappingField: 'appl.oth_pptno',
         sourceApplicantPath: 'passport.otherPassportDetails.passportNumber',
+        visibleByDefault: true,
+      },
+      {
+        key: 'appl.oth_ppt_issue_date',
+        label: 'Other Passport Date of Issue',
+        section: 'basicDetails',
+        subsection: 'Other Passport Details',
+        inputType: 'date',
+        targetMappingField: 'appl.oth_ppt_issue_date',
+        sourceApplicantPath: 'passport.otherPassportDetails.issueDate',
+        placeholder: 'DD/MM/YYYY',
         visibleByDefault: true,
       },
       {
