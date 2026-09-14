@@ -54,8 +54,8 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
   }
   assert(
     emptyProfile.applicantId === profileId &&
-      emptyProfile.personalInfo === undefined &&
-      emptyProfile.passport === undefined,
+    emptyProfile.personalInfo === undefined &&
+    emptyProfile.passport === undefined,
     'Subtest 1: Profile remains an identifier-only container without personal data fallback'
   )
 
@@ -160,15 +160,15 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
 
   assert(
     initialApp.fields['appl.surname']?.value === 'RAHMAN' &&
-      initialApp.fields['appl.surname']?.source === 'passport' &&
-      initialApp.fields['appl.passport_number']?.value === 'A12345678',
+    initialApp.fields['appl.surname']?.source === 'passport' &&
+    initialApp.fields['appl.passport_number']?.value === 'A12345678',
     'Subtest 4: Confirmed passport extraction populates workspace identity fields'
   )
 
   assert(
     initialApp.fields['fthrname']?.value === '' &&
-      initialApp.fields['fthrname']?.source === 'missing' &&
-      initialApp.fields['mother_name']?.value === '',
+    initialApp.fields['fthrname']?.source === 'missing' &&
+    initialApp.fields['mother_name']?.value === '',
     'Subtest 5: Fields missing from document stay blank without fallback to fake profile data'
   )
 
@@ -198,8 +198,8 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
 
   assert(
     editedApp.fields['appl.birthdate']?.value === '16/05/1990' &&
-      editedApp.fields['appl.birthdate']?.isUserEdited === true &&
-      editedApp.fields['fthrname']?.value === 'MUSTAFIZUR RAHMAN',
+    editedApp.fields['appl.birthdate']?.isUserEdited === true &&
+    editedApp.fields['fthrname']?.value === 'MUSTAFIZUR RAHMAN',
     'Subtest 6: User manual edit overrides extracted value and marks isUserEdited'
   )
 
@@ -210,9 +210,9 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
   const reloadedApp = await getSavedApplicationByApplicantId(profileId)
   assert(
     reloadedApp !== null &&
-      reloadedApp.applicantId === profileId &&
-      reloadedApp.fields['appl.birthdate']?.value === '16/05/1990' &&
-      reloadedApp.fields['fthrname']?.value === 'MUSTAFIZUR RAHMAN',
+    reloadedApp.applicantId === profileId &&
+    reloadedApp.fields['appl.birthdate']?.value === '16/05/1990' &&
+    reloadedApp.fields['fthrname']?.value === 'MUSTAFIZUR RAHMAN',
     'Subtest 7, 8, 9, 10: Saved application persists under profile and preserves manual edits on reopen'
   )
 
@@ -225,18 +225,18 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
   })
   assert(
     reMerged.fields['appl.birthdate']?.value === '16/05/1990' &&
-      reMerged.fields['fthrname']?.value === 'MUSTAFIZUR RAHMAN',
+    reMerged.fields['fthrname']?.value === 'MUSTAFIZUR RAHMAN',
     'Subtest 10b: Re-merging from documents preserves user manual edits'
   )
 
   // --- Subtest 11 & 12: Passport + OGD provenance separate & OGD does not overwrite current passport identity ---
   assert(
     initialApp.fields['appl.passport_number']?.value === 'A12345678' &&
-      initialApp.fields['appl.passport_number']?.source === 'passport' &&
-      initialApp.fields['appl.surname']?.value === 'RAHMAN' &&
-      initialApp.fields['old_visa_no']?.value === 'V987654321' &&
-      initialApp.fields['old_visa_no']?.source === 'ogd' &&
-      initialApp.fields['prv_visit_add1']?.value === 'HOTEL TAJ, KOLKATA',
+    initialApp.fields['appl.passport_number']?.source === 'passport' &&
+    initialApp.fields['appl.surname']?.value === 'RAHMAN' &&
+    initialApp.fields['old_visa_no']?.value === 'V987654321' &&
+    initialApp.fields['old_visa_no']?.source === 'ogd' &&
+    initialApp.fields['prv_visit_add1']?.value === 'HOTEL TAJ, KOLKATA',
     'Subtest 11 & 12: OGD historical data merges correctly while passport identity is strictly protected'
   )
 
@@ -249,11 +249,11 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
 
   assert(
     candRes.status === 'READY' &&
-      candRes.applicant !== undefined &&
-      candRes.applicant.personalInfo?.surname === 'RAHMAN' &&
-      candRes.applicant.personalInfo?.dateOfBirth === '1990-05-16' &&
-      candRes.applicant.family?.father?.name === 'MUSTAFIZUR RAHMAN' &&
-      candRes.applicant.previousVisa?.visaNumber === 'V987654321',
+    candRes.applicant !== undefined &&
+    candRes.applicant.personalInfo?.surname === 'RAHMAN' &&
+    candRes.applicant.personalInfo?.dateOfBirth === '1990-05-16' &&
+    candRes.applicant.family?.father?.name === 'MUSTAFIZUR RAHMAN' &&
+    candRes.applicant.previousVisa?.visaNumber === 'V987654321',
     'Subtest 13: Candidate resolver resolves complete profile from SavedApplication'
   )
 
@@ -392,7 +392,7 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
     Sex / Sexe: M
     Place of Birth / Lieu de naissance: DHAKA, BGD
     Date of Issue / Date de délivrance: 27 JAN 2021
-    Issuing Authority / Autorité: DIP/DHAKA
+    Issuing Authority / Autorité: DHAKA
     Date of Expiry / Date d'expiration: 26 JAN 2031
 
     P<BGDAHMED<<KHOKON<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -402,16 +402,16 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
   const extractedKhokon = extractFromPdfText(simulatedKhokonPdfText)
   assert(
     extractedKhokon.personal?.lastName?.value === 'AHMED' &&
-      extractedKhokon.personal?.firstName?.value === 'KHOKON' &&
-      extractedKhokon.personal?.dateOfBirth?.value === '1995-05-15' &&
-      extractedKhokon.personal?.gender?.value === 'male' &&
-      extractedKhokon.personal?.nationality?.value === 'BANGLADESH' &&
-      extractedKhokon.personal?.townCityOfBirth?.value === 'DHAKA' &&
-      extractedKhokon.personal?.countryOfBirth?.value === 'BANGLADESH' &&
-      extractedKhokon.passport?.passportNumber?.value === 'A1234567' &&
-      extractedKhokon.passport?.placeOfIssue?.value === 'DIP/DHAKA' &&
-      extractedKhokon.passport?.issueDate?.value === '2021-01-27' &&
-      extractedKhokon.passport?.expiryDate?.value === '2031-01-26',
+    extractedKhokon.personal?.firstName?.value === 'KHOKON' &&
+    extractedKhokon.personal?.dateOfBirth?.value === '1995-05-15' &&
+    extractedKhokon.personal?.gender?.value === 'male' &&
+    extractedKhokon.personal?.nationality?.value === 'BANGLADESH' &&
+    extractedKhokon.personal?.townCityOfBirth?.value === 'DHAKA' &&
+    extractedKhokon.personal?.countryOfBirth?.value === 'BANGLADESH' &&
+    extractedKhokon.passport?.passportNumber?.value === 'A1234567' &&
+    extractedKhokon.passport?.placeOfIssue?.value === 'DHAKA' &&
+    extractedKhokon.passport?.issueDate?.value === '2021-01-27' &&
+    extractedKhokon.passport?.expiryDate?.value === '2031-01-26',
     'Subtest 25a: Passport multi-line PDF text extracts all identity, date, and passport details'
   )
 
@@ -439,25 +439,25 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
 
   assert(
     khokonApp.fields['appl.surname']?.value === 'AHMED' &&
-      khokonApp.fields['appl.applname']?.value === 'KHOKON' &&
-      khokonApp.fields['appl.birthdate']?.value === '15/05/1995' &&
-      khokonApp.fields['appl.nationality']?.value === 'BANGLADESH' &&
-      khokonApp.fields['appl.countryname']?.value === 'BANGLADESH' &&
-      khokonApp.fields['appl.placbrth']?.value === 'DHAKA' &&
-      khokonApp.fields['appl.country_of_birth']?.value === 'BANGLADESH' &&
-      khokonApp.fields['appl.passport_number']?.value === 'A1234567' &&
-      khokonApp.fields['appl.passport_issue_date']?.value === '27/01/2021' &&
-      khokonApp.fields['appl.passport_expiry_date']?.value === '26/01/2031' &&
-      khokonApp.fields['appl.nationality_by']?.value === 'Birth' &&
-      khokonApp.fields['appl.oth_ppt']?.value === 'No',
+    khokonApp.fields['appl.applname']?.value === 'KHOKON' &&
+    khokonApp.fields['appl.birthdate']?.value === '15/05/1995' &&
+    khokonApp.fields['appl.nationality']?.value === 'BANGLADESH' &&
+    khokonApp.fields['appl.countryname']?.value === 'BANGLADESH' &&
+    khokonApp.fields['appl.placbrth']?.value === 'DHAKA' &&
+    khokonApp.fields['appl.country_of_birth']?.value === 'BANGLADESH' &&
+    khokonApp.fields['appl.passport_number']?.value === 'A1234567' &&
+    khokonApp.fields['appl.passport_issue_date']?.value === '27/01/2021' &&
+    khokonApp.fields['appl.passport_expiry_date']?.value === '26/01/2031' &&
+    khokonApp.fields['appl.nationality_by']?.value === 'Birth' &&
+    khokonApp.fields['appl.oth_ppt']?.value === 'No',
     'Subtest 25b: Passport PDF data directly auto-populates all corresponding application workspace fields'
   )
 
   assert(
     khokonApp.fields['fthrname']?.value === '' &&
-      khokonApp.fields['mother_name']?.value === '' &&
-      khokonApp.fields['empname']?.value === '' &&
-      khokonApp.fields['old_visa_no']?.value === '',
+    khokonApp.fields['mother_name']?.value === '' &&
+    khokonApp.fields['empname']?.value === '' &&
+    khokonApp.fields['old_visa_no']?.value === '',
     'Subtest 25c: Missing fields legitimately remain blank without fallback to fake profile values'
   )
 
@@ -468,31 +468,31 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
   const hiddenFields = getDefaultHiddenSchemaFields()
 
   assert(
-    allFields.length === 114,
-    `Subtest 26a: Total registered schema fields is 114 (got ${allFields.length})`
+    allFields.length === 115,
+    `Subtest 26a: Total registered schema fields is 115 (got ${allFields.length})`
   )
   assert(
-    visibleFields.length === 95,
-    `Subtest 26b: Default visible fields count is 95 (got ${visibleFields.length})`
+    visibleFields.length === 96,
+    `Subtest 26b: Default visible fields count is 96 (got ${visibleFields.length})`
   )
   assert(
     hiddenFields.length === 19,
     `Subtest 26c: Default hidden fields count is 19 (got ${hiddenFields.length})`
   )
   assert(
-    WORKSPACE_DEFAULT_VISIBLE_FIELDS.length === 93 && WORKSPACE_HIDDEN_FIELDS.length === 17,
-    'Subtest 26d: WORKSPACE_DEFAULT_VISIBLE_FIELDS (93) and WORKSPACE_HIDDEN_FIELDS (17) explicitly configured'
+    WORKSPACE_DEFAULT_VISIBLE_FIELDS.length === 94 && WORKSPACE_HIDDEN_FIELDS.length === 17,
+    'Subtest 26d: WORKSPACE_DEFAULT_VISIBLE_FIELDS (94) and WORKSPACE_HIDDEN_FIELDS (17) explicitly configured'
   )
 
-  // Subtest 26e: All 10 Workspace Sections defined and cover all workspace fields
+  // Subtest 26e: All Workspace Sections defined and cover all workspace fields
   assert(
-    WORKSPACE_SECTIONS.length === 10,
-    `Subtest 26e: Workspace has exactly 10 sections for single full-page rendering (got ${WORKSPACE_SECTIONS.length})`
+    WORKSPACE_SECTIONS.length === 11,
+    `Subtest 26e: Workspace has exactly 11 sections for single full-page rendering (got ${WORKSPACE_SECTIONS.length})`
   )
   const totalSectionFields = WORKSPACE_SECTIONS.flatMap((s) => s.fieldKeys)
   assert(
-    totalSectionFields.length === 110,
-    `Subtest 26f: All 10 Workspace sections map to all 110 section fields (got ${totalSectionFields.length})`
+    totalSectionFields.length === 119,
+    `Subtest 26f: All 11 Workspace sections map to all 119 section fields (got ${totalSectionFields.length})`
   )
 
   // Subtest 27: Hidden fields remain in SavedApplication and retain populated values
@@ -525,8 +525,8 @@ export async function runApplicationWorkspaceTests(): Promise<TestResult> {
   await saveApplication(khokonApp)
   const reloadedKhokon = await getSavedApplicationByApplicantId('KHOKON_001')
   assert(
-    reloadedKhokon !== null && Object.keys(reloadedKhokon.fields).length === 111,
-    'Subtest 28a: SavedApplication preserves all 111 unique fields in storage'
+    reloadedKhokon !== null && Object.keys(reloadedKhokon.fields).length === 112,
+    'Subtest 28a: SavedApplication preserves all 112 unique fields in storage'
   )
   assert(
     reloadedKhokon?.fields['appl.surname']?.value === 'AHMED',
