@@ -219,14 +219,14 @@ export async function runBangladeshSelectorTests(): Promise<{ passed: boolean; t
   const photoControls = getBangladeshPageControls('DOCUMENT_UPLOAD')
 
   if (
-    totalVerifiedCount !== 103 ||
+    totalVerifiedCount !== 105 ||
     regControls.length !== 9 ||
-    basicControls.length !== 21 ||
+    basicControls.length !== 23 ||
     familyControls.length !== 39 ||
     travelControls.length !== 27 ||
     qControls.length !== 15 ||
     photoControls.length !== 4 ||
-    BANGLADESH_FIELD_REGISTRY.length !== 115
+    BANGLADESH_FIELD_REGISTRY.length !== 117
   ) {
     failures.push(`Test 13 Failed: Registry did not return expected control counts. Total verified: ${totalVerifiedCount}, total: ${BANGLADESH_FIELD_REGISTRY.length}`)
   }
@@ -266,8 +266,8 @@ export async function runBangladeshSelectorTests(): Promise<{ passed: boolean; t
   testCount++
   const stats = getCoverageMatrixStats()
   if (
-    stats.total !== 114 ||
-    stats.verifiedAutofillable !== 101 ||
+    stats.total !== 116 ||
+    stats.verifiedAutofillable !== 103 ||
     stats.securityManual !== 6 ||
     stats.technicalIgnored !== 7 ||
     stats.directlyExtracted !== 66
