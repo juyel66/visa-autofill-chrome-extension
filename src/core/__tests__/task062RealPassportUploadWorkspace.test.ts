@@ -102,7 +102,7 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   assert(extracted.passport?.passportNumber?.value === 'A01234567', 'Extracted passportNumber is A01234567')
   assert(extracted.passport?.issueDate?.value === '2020-01-10', 'Extracted passport issueDate is 2020-01-10')
   assert(extracted.passport?.expiryDate?.value === '2030-01-09', 'Extracted passport expiryDate is 2030-01-09')
-  assert(extracted.passport?.placeOfIssue?.value === 'DIP/DHAKA', 'Extracted placeOfIssue is DIP/DHAKA')
+  assert(extracted.passport?.placeOfIssue?.value === 'DHAKA', 'Extracted placeOfIssue is DHAKA')
   assert(extracted.passport?.holdsOtherPassport?.value === true, 'Extracted holdsOtherPassport is true')
   assert(extracted.passport?.otherPassportDetails?.passportNumber?.value === 'BK1234567', 'Extracted previous passport is BK1234567')
   assert(extracted.family?.father?.name?.value === 'MOHAMMAD KHURSHED ALAM', 'Extracted father name is MOHAMMAD KHURSHED ALAM')
@@ -116,13 +116,13 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
   // -------------------------------------------------------------
   assert(
     !extracted.personal?.visibleIdentificationMarks?.value ||
-      !extracted.personal.visibleIdentificationMarks.value.includes('BANGLADESH'),
+    !extracted.personal.visibleIdentificationMarks.value.includes('BANGLADESH'),
     'Zero Contamination: Nationality does not appear in Visible Identification Marks'
   )
   assert(
     extracted.contact?.phone?.value === '+8801711111111' &&
-      extracted.contact?.isdCode?.value === '880' &&
-      extracted.contact?.mobile?.value === '1711111111',
+    extracted.contact?.isdCode?.value === '880' &&
+    extracted.contact?.mobile?.value === '1711111111',
     'TASK 074: Passport emergency contact telephone falls back into applicant contact phone, isdCode, and mobile'
   )
   assert(
@@ -178,7 +178,7 @@ export async function runTask062RealPassportUploadWorkspaceTests(): Promise<{
     'appl.nationality_by': { value: 'Birth', source: 'passport' },
     'appl.nic_no': { value: '1990123456', source: 'passport' },
     'appl.passport_number': { value: 'A01234567', source: 'passport' },
-    'appl.passport_issue_place': { value: 'DIP/DHAKA', source: 'passport' },
+    'appl.passport_issue_place': { value: 'DHAKA', source: 'passport' },
     'appl.passport_issue_date': { value: '10/01/2020', source: 'passport' },
     'appl.passport_expiry_date': { value: '09/01/2030', source: 'passport' },
     'fthrname': { value: 'MOHAMMAD KHURSHED ALAM', source: 'passport' },
