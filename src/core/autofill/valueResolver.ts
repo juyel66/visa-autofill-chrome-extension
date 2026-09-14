@@ -148,6 +148,29 @@ export function resolveApplicantValue(
     return resolveRegistrationEmail(applicant, options).email
   }
 
+  // Previous Name & Surname
+  if (path === 'personalInfo.previousSurname' || path === 'appl.prev_surname' || path === 'prev_surname') {
+    if (applicant.personalInfo?.previousSurname && applicant.personalInfo.previousSurname.trim() !== '') {
+      return applicant.personalInfo.previousSurname.trim()
+    }
+    return undefined
+  }
+
+  if (
+    path === 'personalInfo.previousGivenNames' ||
+    path === 'personalInfo.previousName' ||
+    path === 'appl.prev_name' ||
+    path === 'prev_name'
+  ) {
+    if (applicant.personalInfo?.previousGivenNames && applicant.personalInfo.previousGivenNames.trim() !== '') {
+      return applicant.personalInfo.previousGivenNames.trim()
+    }
+    if (applicant.personalInfo?.previousName && applicant.personalInfo.previousName.trim() !== '') {
+      return applicant.personalInfo.previousName.trim()
+    }
+    return undefined
+  }
+
   // Date of Birth
   if (path === 'personalInfo.dateOfBirth' || path === 'appl.birthdate' || path === 'birthdate') {
     if (applicant.personalInfo?.dateOfBirth && applicant.personalInfo.dateOfBirth.trim() !== '') {
