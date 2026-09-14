@@ -301,6 +301,7 @@ export const BANGLADESH_BASIC_DETAILS_FIXTURE_HTML = `
     <input type="radio" id="other_ppt_2" name="appl.oth_ppt" value="N" />
     <input type="text" id="other_ppt_no" name="appl.oth_pptno" value="" />
     <input type="text" id="other_ppt_issue_place" name="appl.other_ppt_issue_place" value="" />
+    <input type="text" id="other_ppt_issue_date" name="appl.oth_ppt_issue_date" placeholder="DD/MM/YYYY" value="" />
     <select id="other_ppt_country_issue" name="appl.prev_passport_country_issue">
       <option value="">Select Country...</option>
       <option value="BGD">BANGLADESH</option>
