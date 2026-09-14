@@ -2,6 +2,7 @@ import React from 'react'
 import type { SavedApplication, ApplicationFieldValue } from '../../core/application/types'
 import {
   PORTAL_PURPOSE_OF_VISIT_OPTIONS,
+  PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS,
 } from '../../countries/india/options/registrationOptions'
 
 export interface VisaDetailsSectionProps {
@@ -210,13 +211,22 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 Port of Arrival in India <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={getVal('entrypoint') || 'HARIDASPUR'}
-                  onChange={(e) => onFieldChange('entrypoint', e.target.value.toUpperCase())}
-                  placeholder="PORT OF ARRIVAL (e.g. HARIDASPUR)"
-                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
-                />
+                <select
+                  value={getVal('entrypoint') || 'BY AIR/ HARIDASPUR'}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    onFieldChange('entrypoint', val)
+                    onFieldChange('exitpoint', val)
+                  }}
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#7c3aed]"
+                >
+                  <option value="">Select entry point</option>
+                  {PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
                 {renderBadge(fields['entrypoint'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Port of Arrival</div>
@@ -228,13 +238,18 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 Expected Port of Exit from India <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={getVal('exitpoint') || 'HARIDASPUR'}
-                  onChange={(e) => onFieldChange('exitpoint', e.target.value.toUpperCase())}
-                  placeholder="PORT OF EXIT"
-                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
-                />
+                <select
+                  value={getVal('exitpoint') || getVal('entrypoint') || 'BY AIR/ HARIDASPUR'}
+                  onChange={(e) => onFieldChange('exitpoint', e.target.value)}
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#7c3aed]"
+                >
+                  <option value="">Select exit point</option>
+                  {PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
                 {renderBadge(fields['exitpoint'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Port of Exit</div>
