@@ -126,7 +126,9 @@ export interface PersonalInfo {
   surname?: string
   givenNames?: string
   hasChangedName?: boolean
+  previousSurname?: string
   previousName?: string
+  previousGivenNames?: string
   gender?: Gender
   dateOfBirth?: string // YYYY-MM-DD
   townCityOfBirth?: string
