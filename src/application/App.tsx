@@ -9,8 +9,7 @@ import {
 import { saveApplicant } from '../core/storage'
 import {
   getAllSchemaFields,
-  WORKSPACE_SECTIONS,
-  type ApplicationFieldDef,
+  WORKSPACE_PAGES,
 } from '../core/application/fieldSchema'
 import type {
   SavedApplication,
@@ -31,6 +30,7 @@ import { RegistrationSection } from './components/RegistrationSection'
 import { BasicDetailsSection } from './components/BasicDetailsSection'
 import { FamilyDetailsSection } from './components/FamilyDetailsSection'
 import { VisaDetailsSection } from './components/VisaDetailsSection'
+import { AdditionalQuestionsSection } from './components/AdditionalQuestionsSection'
 
 export const App: React.FC = () => {
   const [applicantId, setApplicantId] = useState<string>('')
@@ -46,14 +46,6 @@ export const App: React.FC = () => {
   const [showAiModal, setShowAiModal] = useState<boolean>(false)
   const [apiKeyInput, setApiKeyInput] = useState<string>(DEFAULT_GEMINI_API_KEY)
   const [savingApiKey, setSavingApiKey] = useState<boolean>(false)
-
-  // Map of all field definitions indexed by key for quick lookup
-  const fieldDefMap = useMemo(() => {
-    const all = getAllSchemaFields()
-    const map = new Map<string, ApplicationFieldDef>()
-    all.forEach((f) => map.set(f.key, f))
-    return map
-  }, [])
 
   const loadApplicationForApplicant = useCallback(
     async (targetId: string, appList: ApplicantProfile[], allDocs: DocumentRecord[]) => {
@@ -527,17 +519,6 @@ export const App: React.FC = () => {
     showToast('Removed photograph.', 'info')
   }
 
-  // Check if a field should be visible in UI
-  const isFieldVisibleInUI = useCallback(
-    (field: ApplicationFieldDef): boolean => {
-      if (searchQuery.trim()) return true
-      if (showAllFields) return true
-      if (field.visibleByDefault === false) return false
-      return true
-    },
-    [searchQuery, showAllFields]
-  )
-
   // Calculate statistics across all 100 canonical fields
   const stats = useMemo(() => {
     if (!application) return { total: 0, visible: 0, hidden: 0, filled: 0, edited: 0, missing: 0 }
@@ -642,91 +623,6 @@ export const App: React.FC = () => {
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800/80 text-amber-400/90 border border-slate-700">
         <span>⚠</span> Manual Entry
       </span>
-    )
-  }
-
-  const renderFieldInput = (field: ApplicationFieldDef) => {
-    if (!application) return null
-    const fieldValue = application.fields[field.key]
-    const rawVal = fieldValue?.value ?? ''
-
-    if (field.inputType === 'checkbox') {
-      const checked = Boolean(rawVal)
-      return (
-        <label className="flex items-center gap-3 cursor-pointer mt-1 select-none">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={(e) => handleFieldChange(field.key, e.target.checked)}
-            className="w-4 h-4 rounded bg-slate-800 border-slate-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
-          />
-          <span className="text-sm font-medium text-slate-200">{field.label}</span>
-        </label>
-      )
-    }
-
-    if (field.inputType === 'radio' && field.options) {
-      const strVal = String(rawVal)
-      return (
-        <div className="flex flex-wrap gap-4 mt-1.5">
-          {field.options.map((opt) => (
-            <label key={opt.value} className="flex items-center gap-2 cursor-pointer text-sm text-slate-200 select-none">
-              <input
-                type="radio"
-                name={field.key}
-                value={opt.value}
-                checked={strVal.toLowerCase() === opt.value.toLowerCase()}
-                onChange={() => handleFieldChange(field.key, opt.value)}
-                className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 focus:ring-blue-500"
-              />
-              <span>{opt.label}</span>
-            </label>
-          ))}
-        </div>
-      )
-    }
-
-    if (field.inputType === 'select' && field.options) {
-      const strVal = String(rawVal)
-      return (
-        <select
-          value={strVal}
-          onChange={(e) => handleFieldChange(field.key, e.target.value)}
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-        >
-          <option value="">-- Select {field.label} --</option>
-          {field.options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      )
-    }
-
-    if (field.inputType === 'textarea') {
-      const strVal = String(rawVal)
-      return (
-        <textarea
-          rows={2}
-          value={strVal}
-          onChange={(e) => handleFieldChange(field.key, e.target.value)}
-          placeholder={field.placeholder || `Enter ${field.label}...`}
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-slate-500"
-        />
-      )
-    }
-
-    // Default text or date input
-    const strVal = String(rawVal)
-    return (
-      <input
-        type="text"
-        value={strVal}
-        onChange={(e) => handleFieldChange(field.key, e.target.value)}
-        placeholder={field.placeholder || (field.inputType === 'date' ? 'DD/MM/YYYY' : `Enter ${field.label}...`)}
-        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-slate-500"
-      />
     )
   }
 
@@ -904,46 +800,52 @@ export const App: React.FC = () => {
               />
             </div>
 
-            {/* Jump-to-Section Navigation */}
-            <nav className="bg-slate-900/90 rounded-xl p-2 border border-slate-800 shadow-sm space-y-1">
+            {/* Jump-to-Section Navigation: Exactly 5 Authentic Portal Pages */}
+            <nav className="bg-slate-900/90 rounded-xl p-2 border border-slate-800 shadow-sm space-y-1.5">
               <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Jump to Section
+                Application Pages
               </div>
-              {WORKSPACE_SECTIONS.map((sec) => {
-                const isActive = activeNavId === sec.id
-                // Count filled fields in this section
-                let filledInSec = 0
-                sec.fieldKeys.forEach((k) => {
+              {WORKSPACE_PAGES.map((page) => {
+                const isActive = activeNavId === page.id
+                // Count filled fields in this page
+                let filledInPage = 0
+                page.fieldKeys.forEach((k) => {
                   const val = application?.fields[k]?.value
-                  if (val !== '' && val !== undefined && val !== null && val !== false) filledInSec++
+                  if (val !== '' && val !== undefined && val !== null && val !== false) filledInPage++
                 })
-                const isPhoto = sec.id === 'photoUpload'
 
                 return (
                   <button
-                    key={sec.id}
-                    onClick={() => scrollToSection(sec.id)}
-                    className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-between cursor-pointer ${
+                    key={page.id}
+                    onClick={() => scrollToSection(page.id)}
+                    className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-medium transition-all flex items-center justify-between cursor-pointer border ${
                       isActive
-                        ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                        ? 'bg-blue-600 text-white font-bold border-blue-500 shadow-md shadow-blue-500/20'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-transparent'
                     }`}
                   >
-                    <span className="truncate">{sec.title}</span>
+                    <div className="flex items-center gap-2 truncate">
+                      <span
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                          isActive ? 'bg-white text-blue-700' : 'bg-slate-800 text-slate-300'
+                        }`}
+                      >
+                        {page.pageNumber}
+                      </span>
+                      <span className="truncate">{page.title.replace(/^\d+\.\s*/, '')}</span>
+                    </div>
                     <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${
                         isActive
                           ? 'bg-blue-800 text-blue-100'
-                          : filledInSec > 0
-                          ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/50'
+                          : filledInPage >= page.fieldKeys.length
+                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/60'
+                          : filledInPage > 0
+                          ? 'bg-amber-950/80 text-amber-300 border border-amber-700/50'
                           : 'bg-slate-800 text-slate-400'
                       }`}
                     >
-                      {isPhoto
-                        ? application?.photograph?.dataUrl
-                          ? 'Attached'
-                          : 'None'
-                        : `${filledInSec}/${sec.fieldKeys.length}`}
+                      {filledInPage}/{page.fieldKeys.length}
                     </span>
                   </button>
                 )
@@ -959,7 +861,7 @@ export const App: React.FC = () => {
               <p className="text-slate-400 text-[11px] leading-relaxed">
                 {showAllFields
                   ? 'Showing all 100 canonical fields including conditional & technical items.'
-                  : 'Showing practical Indian Visa fields. Hidden items remain saved & autofillable.'}
+                  : 'Showing 5 authentic Indian Visa portal pages with live data synchronization.'}
               </p>
               <button
                 onClick={() => setShowAllFields((prev) => !prev)}
@@ -971,291 +873,86 @@ export const App: React.FC = () => {
           </div>
         </aside>
 
-        {/* Right Area: Single Scrollable Page with 10 Section Cards */}
-        <main className="flex-1 min-w-0 space-y-6">
-          {WORKSPACE_SECTIONS.map((sec) => {
-            const isPhotoSection = sec.id === 'photoUpload'
-            const fieldDefs = sec.fieldKeys
-              .map((k) => fieldDefMap.get(k))
-              .filter((f): f is ApplicationFieldDef => Boolean(f))
+        {/* Right Area: Exactly 5 Sequential Authentic Portal Pages */}
+        <main className="flex-1 min-w-0 space-y-8">
+          {/* PAGE 1: Registration Form */}
+          <section id="sec-registration" className="scroll-mt-28">
+            <RegistrationSection
+              application={application}
+              onFieldChange={handleFieldChange}
+              onResetField={handleResetToExtracted}
+              renderSourceBadge={renderFieldSourceBadge}
+              onContinue={async () => {
+                await handleSave()
+                scrollToSection('basicDetails')
+              }}
+              onNextPage={() => scrollToSection('basicDetails')}
+            />
+          </section>
 
-            const visibleFields = fieldDefs.filter(isFieldVisibleInUI)
-            const filteredFields = visibleFields.filter((f) =>
-              searchQuery
-                ? f.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  f.key.toLowerCase().includes(searchQuery.toLowerCase())
-                : true
-            )
+          {/* PAGE 2: Basic Details & Passport Form */}
+          <section id="sec-basicDetails" className="scroll-mt-28">
+            <BasicDetailsSection
+              application={application}
+              onFieldChange={handleFieldChange}
+              onResetField={handleResetToExtracted}
+              renderSourceBadge={renderFieldSourceBadge}
+              onSaveAndContinue={async () => {
+                await handleSave()
+                scrollToSection('familyDetails')
+              }}
+              onSaveTemporarily={handleSave}
+              onPreviousPage={() => scrollToSection('registration')}
+            />
+          </section>
 
-            const hiddenCount = fieldDefs.length - visibleFields.length
+          {/* PAGE 3: Family Details & Address Form */}
+          <section id="sec-familyDetails" className="scroll-mt-28">
+            <FamilyDetailsSection
+              application={application}
+              onFieldChange={handleFieldChange}
+              onResetField={handleResetToExtracted}
+              renderSourceBadge={renderFieldSourceBadge}
+              onCopyPresentToPermanent={handleCopyPresentToPermanent}
+              onSaveAndContinue={async () => {
+                await handleSave()
+                scrollToSection('visaDetails')
+              }}
+              onSaveTemporarily={handleSave}
+              onPreviousPage={() => scrollToSection('basicDetails')}
+            />
+          </section>
 
-            if (sec.id === 'registration') {
-              return (
-                <section
-                  key={sec.id}
-                  id={`sec-${sec.id}`}
-                  className="scroll-mt-28"
-                >
-                  <RegistrationSection
-                    application={application}
-                    onFieldChange={handleFieldChange}
-                    onResetField={handleResetToExtracted}
-                    renderSourceBadge={renderFieldSourceBadge}
-                  />
-                </section>
-              )
-            }
+          {/* PAGE 4: Visa Details & References Form */}
+          <section id="sec-visaDetails" className="scroll-mt-28">
+            <VisaDetailsSection
+              application={application}
+              onFieldChange={handleFieldChange}
+              onResetField={handleResetToExtracted}
+              renderSourceBadge={renderFieldSourceBadge}
+              onUploadPhoto={handlePhotoUpload}
+              onRemovePhoto={handleRemovePhoto}
+              onSaveAndContinue={async () => {
+                await handleSave()
+                scrollToSection('additionalQuestions')
+              }}
+              onSaveTemporarily={handleSave}
+              onPreviousPage={() => scrollToSection('familyDetails')}
+            />
+          </section>
 
-            if (sec.id === 'personalDetails') {
-              return (
-                <section
-                  key={sec.id}
-                  id={`sec-${sec.id}`}
-                  className="scroll-mt-28"
-                >
-                  <BasicDetailsSection
-                    application={application}
-                    onFieldChange={handleFieldChange}
-                    onResetField={handleResetToExtracted}
-                    renderSourceBadge={renderFieldSourceBadge}
-                  />
-                </section>
-              )
-            }
-
-            if (sec.id === 'presentAddress') {
-              return (
-                <section
-                  key={sec.id}
-                  id={`sec-${sec.id}`}
-                  className="scroll-mt-28"
-                >
-                  <FamilyDetailsSection
-                    application={application}
-                    onFieldChange={handleFieldChange}
-                    onResetField={handleResetToExtracted}
-                    renderSourceBadge={renderFieldSourceBadge}
-                    onCopyPresentToPermanent={handleCopyPresentToPermanent}
-                  />
-                </section>
-              )
-            }
-
-            if (sec.id === 'visaDetails') {
-              return (
-                <section
-                  key={sec.id}
-                  id={`sec-${sec.id}`}
-                  className="scroll-mt-28"
-                >
-                  <VisaDetailsSection
-                    application={application}
-                    onFieldChange={handleFieldChange}
-                    onResetField={handleResetToExtracted}
-                    renderSourceBadge={renderFieldSourceBadge}
-                    onUploadPhoto={handlePhotoUpload}
-                    onRemovePhoto={handleRemovePhoto}
-                  />
-                </section>
-              )
-            }
-
-            // Subsections 3, 5, 6, 7, 9, 10, 11 are embedded inside the 4 authentic portal pages above
-            if (
-              sec.id === 'passportDetails' ||
-              sec.id === 'permanentAddress' ||
-              sec.id === 'familyDetails' ||
-              sec.id === 'professionEmployment' ||
-              sec.id === 'previousVisitVisa' ||
-              sec.id === 'additionalQuestions' ||
-              sec.id === 'photoUpload'
-            ) {
-              return null
-            }
-
-            if (!isPhotoSection && filteredFields.length === 0 && searchQuery) {
-              return null
-            }
-
-            return (
-              <section
-                key={sec.id}
-                id={`sec-${sec.id}`}
-                className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 sm:p-6 shadow-sm scroll-mt-28"
-              >
-                {/* Section Card Header */}
-                <div className="border-b border-slate-800 pb-3 mb-5 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-                      <span>{sec.title}</span>
-                    </h2>
-                    <p className="text-xs text-slate-400 mt-0.5">{sec.subtitle}</p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* Special quick action for Permanent Address: Copy from Present */}
-                    {sec.id === 'permanentAddress' && (
-                      <button
-                        onClick={handleCopyPresentToPermanent}
-                        className="bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 font-semibold px-3 py-1 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1"
-                        title="Copy Address Line 1, 2, and City from Present Address"
-                      >
-                        📋 Same as Present Address
-                      </button>
-                    )}
-
-                    {hiddenCount > 0 && !showAllFields && (
-                      <button
-                        onClick={() => setShowAllFields(true)}
-                        className="text-xs text-slate-400 hover:text-blue-400 underline cursor-pointer bg-slate-800/60 px-2.5 py-1 rounded-md border border-slate-700/60"
-                      >
-                        + {hiddenCount} hidden field{hiddenCount > 1 ? 's' : ''} (Show)
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Section Manual Security Notices (if any) */}
-                {sec.manualNotices && sec.manualNotices.length > 0 && (
-                  <div className="space-y-2 mb-5">
-                    {sec.manualNotices.map((notice, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-amber-950/40 border border-amber-700/60 rounded-xl p-3.5 flex items-start gap-3 text-amber-200"
-                      >
-                        <span className="text-lg flex-shrink-0">⚠️</span>
-                        <div className="text-xs space-y-0.5">
-                          <strong className="font-bold text-amber-100 block">{notice.title}</strong>
-                          <p className="text-amber-300/90 leading-relaxed">{notice.message}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Section 10: Photograph Upload & Preview */}
-                {isPhotoSection && (
-                  <div className="space-y-4">
-                    <p className="text-xs text-slate-400">
-                      Attach the applicant photograph for workspace preview and validation. Portal file chooser interaction remains manual.
-                    </p>
-
-                    {application?.photograph?.dataUrl ? (
-                      <div className="flex flex-col sm:flex-row items-center gap-6 bg-slate-950/70 p-4 rounded-xl border border-slate-800">
-                        <img
-                          src={application.photograph.dataUrl}
-                          alt="Applicant Photograph"
-                          className="w-32 h-40 object-cover rounded-lg border-2 border-slate-700 shadow-md"
-                        />
-                        <div className="space-y-2 text-xs text-slate-300">
-                          <div>
-                            <strong>File Name:</strong> {application.photograph.fileName || 'applicant_photo.jpg'}
-                          </div>
-                          <div>
-                            <strong>Size:</strong>{' '}
-                            {application.photograph.fileSize
-                              ? `${(application.photograph.fileSize / 1024).toFixed(1)} KB`
-                              : 'Valid'}
-                          </div>
-                          <div className="text-emerald-400 font-medium">✓ Photograph attached to Application Workspace</div>
-                          <div className="pt-2">
-                            <button
-                              onClick={handleRemovePhoto}
-                              className="bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700/60 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                            >
-                              Remove Photograph
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center bg-slate-950/40">
-                        <div className="text-3xl mb-2">📷</div>
-                        <p className="text-sm font-medium text-slate-300 mb-0.5">No photograph attached yet</p>
-                        <p className="text-xs text-slate-500 mb-3">Upload a passport-size applicant photo (JPEG / PNG)</p>
-                        <label className="inline-block bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-4 py-2 rounded-lg cursor-pointer transition-colors shadow">
-                          Choose Photo
-                          <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Regular 2-Column Field Grid */}
-                {!isPhotoSection && filteredFields.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    {filteredFields.map((field) => {
-                      const isEdited = application?.fields[field.key]?.isUserEdited
-                      const isHiddenByDefault = field.visibleByDefault === false
-                      const isFullSpan =
-                        field.inputType === 'textarea' ||
-                        field.inputType === 'checkbox' ||
-                        field.key.includes('flag') ||
-                        field.key.includes('oth_ppt')
-
-                      return (
-                        <div
-                          key={field.key}
-                          className={`bg-slate-950/70 rounded-xl p-3.5 border transition-all ${
-                            isFullSpan ? 'md:col-span-2' : ''
-                          } ${
-                            isEdited
-                              ? 'border-amber-700/60 bg-amber-950/10'
-                              : isHiddenByDefault
-                              ? 'border-indigo-900/60 bg-indigo-950/15'
-                              : 'border-slate-800/90 hover:border-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 flex-wrap">
-                              <span>{field.label}</span>
-                              {field.requiredInPortal && <span className="text-rose-400">*</span>}
-                              {isHiddenByDefault && (
-                                <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-400 border border-indigo-800/60">
-                                  Advanced
-                                </span>
-                              )}
-                            </label>
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              {renderFieldSourceBadge(field.key)}
-                              {isEdited && (
-                                <button
-                                  title="Reset to original extracted value"
-                                  onClick={() => handleResetToExtracted(field.key)}
-                                  className="text-xs text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
-                                >
-                                  ↺
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {renderFieldInput(field)}
-
-                          {application?.fields[field.key]?.hasConflict && (
-                            <div className="mt-2 p-2 rounded-lg bg-amber-950/60 border border-amber-600/70 text-amber-200 text-xs flex items-start gap-2">
-                              <span className="text-amber-400 font-bold text-sm">⚠</span>
-                              <div>
-                                <strong className="text-amber-100 font-semibold block">Conflict detected</strong>
-                                <p className="text-amber-300/90 text-[11px] leading-tight">
-                                  {application.fields[field.key]?.conflictDetails || 'Current passport value takes precedence. Please verify manually.'}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {field.description && (
-                            <p className="text-[11px] text-slate-500 mt-1">{field.description}</p>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </section>
-            )
-          })}
+          {/* PAGE 5: Additional Questions & Declarations */}
+          <section id="sec-additionalQuestions" className="scroll-mt-28">
+            <AdditionalQuestionsSection
+              application={application}
+              onFieldChange={handleFieldChange}
+              onResetField={handleResetToExtracted}
+              renderSourceBadge={renderFieldSourceBadge}
+              onSaveAndFinish={handleSave}
+              onSaveTemporarily={handleSave}
+              onPreviousPage={() => scrollToSection('visaDetails')}
+            />
+          </section>
 
           {/* Bottom Save Action Bar */}
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5 shadow-md flex flex-wrap items-center justify-between gap-4">
