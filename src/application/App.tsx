@@ -229,109 +229,113 @@ export const App: React.FC = () => {
   }
 
   const handleFieldChange = (key: string, value: string | boolean) => {
-    if (!application) return
+    setApplication((prevApp) => {
+      if (!prevApp) return prevApp
 
-    const currentField = application.fields[key] || {
-      value: '',
-      source: 'missing',
-    }
+      const currentField = prevApp.fields[key] || {
+        value: '',
+        source: 'missing',
+      }
 
-    const updatedField: ApplicationFieldValue = {
-      ...currentField,
-      value,
-      source: 'manual',
-      isUserEdited: true,
-    }
+      const updatedField: ApplicationFieldValue = {
+        ...currentField,
+        value,
+        source: 'manual',
+        isUserEdited: true,
+      }
 
-    const updatedFields = {
-      ...application.fields,
-      [key]: updatedField,
-    }
-    const updatedManualEdits = {
-      ...application.manualEdits,
-      [key]: true,
-    }
+      const updatedFields = {
+        ...prevApp.fields,
+        [key]: updatedField,
+      }
+      const updatedManualEdits = {
+        ...prevApp.manualEdits,
+        [key]: true,
+      }
 
-    // Keep aliases and dual fields in sync
-    if (key === 'purpose') {
-      updatedFields['appl.purpose'] = { ...updatedField }
-      updatedManualEdits['appl.purpose'] = true
-    } else if (key === 'appl.purpose') {
-      updatedFields['purpose'] = { ...updatedField }
-      updatedManualEdits['purpose'] = true
-    } else if (key === 'appl.countryname') {
-      updatedFields['present_country'] = { ...updatedField }
-      updatedManualEdits['present_country'] = true
-    } else if (key === 'present_country') {
-      updatedFields['appl.countryname'] = { ...updatedField }
-      updatedManualEdits['appl.countryname'] = true
-    } else if (key === 'appl.journeydate') {
-      updatedFields['journeydate'] = { ...updatedField }
-      updatedManualEdits['journeydate'] = true
-    } else if (key === 'journeydate') {
-      updatedFields['appl.journeydate'] = { ...updatedField }
-      updatedManualEdits['appl.journeydate'] = true
-    }
+      // Keep aliases and dual fields in sync
+      if (key === 'purpose') {
+        updatedFields['appl.purpose'] = { ...updatedField }
+        updatedManualEdits['appl.purpose'] = true
+      } else if (key === 'appl.purpose') {
+        updatedFields['purpose'] = { ...updatedField }
+        updatedManualEdits['purpose'] = true
+      } else if (key === 'appl.countryname') {
+        updatedFields['present_country'] = { ...updatedField }
+        updatedManualEdits['present_country'] = true
+      } else if (key === 'present_country') {
+        updatedFields['appl.countryname'] = { ...updatedField }
+        updatedManualEdits['appl.countryname'] = true
+      } else if (key === 'appl.journeydate') {
+        updatedFields['journeydate'] = { ...updatedField }
+        updatedManualEdits['journeydate'] = true
+      } else if (key === 'journeydate') {
+        updatedFields['appl.journeydate'] = { ...updatedField }
+        updatedManualEdits['appl.journeydate'] = true
+      }
 
-    setApplication({
-      ...application,
-      fields: updatedFields,
-      manualEdits: updatedManualEdits,
-      status: 'ready_for_autofill',
+      return {
+        ...prevApp,
+        fields: updatedFields,
+        manualEdits: updatedManualEdits,
+        status: 'ready_for_autofill',
+      }
     })
   }
 
   const handleResetToExtracted = (key: string) => {
-    if (!application) return
-    const currentField = application.fields[key]
-    if (!currentField) return
+    setApplication((prevApp) => {
+      if (!prevApp) return prevApp
+      const currentField = prevApp.fields[key]
+      if (!currentField) return prevApp
 
-    const originalVal = currentField.originalExtractedValue
-    const restoredSource: ApplicationFieldSource = currentField.documentId
-      ? currentField.source === 'ogd'
-        ? 'ogd'
-        : 'passport'
-      : 'missing'
+      const originalVal = currentField.originalExtractedValue
+      const restoredSource: ApplicationFieldSource = currentField.documentId
+        ? currentField.source === 'ogd'
+          ? 'ogd'
+          : 'passport'
+        : 'missing'
 
-    const updatedManualEdits = { ...application.manualEdits }
-    delete updatedManualEdits[key]
+      const updatedManualEdits = { ...prevApp.manualEdits }
+      delete updatedManualEdits[key]
 
-    const restoredField: ApplicationFieldValue = {
-      ...currentField,
-      value: originalVal !== undefined ? originalVal : '',
-      source: restoredSource,
-      isUserEdited: false,
-    }
+      const restoredField: ApplicationFieldValue = {
+        ...currentField,
+        value: originalVal !== undefined ? originalVal : '',
+        source: restoredSource,
+        isUserEdited: false,
+      }
 
-    const updatedFields = {
-      ...application.fields,
-      [key]: restoredField,
-    }
+      const updatedFields = {
+        ...prevApp.fields,
+        [key]: restoredField,
+      }
 
-    if (key === 'purpose') {
-      delete updatedManualEdits['appl.purpose']
-      updatedFields['appl.purpose'] = { ...restoredField }
-    } else if (key === 'appl.purpose') {
-      delete updatedManualEdits['purpose']
-      updatedFields['purpose'] = { ...restoredField }
-    } else if (key === 'appl.countryname') {
-      delete updatedManualEdits['present_country']
-      updatedFields['present_country'] = { ...restoredField }
-    } else if (key === 'present_country') {
-      delete updatedManualEdits['appl.countryname']
-      updatedFields['appl.countryname'] = { ...restoredField }
-    } else if (key === 'appl.journeydate') {
-      delete updatedManualEdits['journeydate']
-      updatedFields['journeydate'] = { ...restoredField }
-    } else if (key === 'journeydate') {
-      delete updatedManualEdits['appl.journeydate']
-      updatedFields['appl.journeydate'] = { ...restoredField }
-    }
+      if (key === 'purpose') {
+        delete updatedManualEdits['appl.purpose']
+        updatedFields['appl.purpose'] = { ...restoredField }
+      } else if (key === 'appl.purpose') {
+        delete updatedManualEdits['purpose']
+        updatedFields['purpose'] = { ...restoredField }
+      } else if (key === 'appl.countryname') {
+        delete updatedManualEdits['present_country']
+        updatedFields['present_country'] = { ...restoredField }
+      } else if (key === 'present_country') {
+        delete updatedManualEdits['appl.countryname']
+        updatedFields['appl.countryname'] = { ...restoredField }
+      } else if (key === 'appl.journeydate') {
+        delete updatedManualEdits['journeydate']
+        updatedFields['journeydate'] = { ...restoredField }
+      } else if (key === 'journeydate') {
+        delete updatedManualEdits['appl.journeydate']
+        updatedFields['appl.journeydate'] = { ...restoredField }
+      }
 
-    setApplication({
-      ...application,
-      fields: updatedFields,
-      manualEdits: updatedManualEdits,
+      return {
+        ...prevApp,
+        fields: updatedFields,
+        manualEdits: updatedManualEdits,
+      }
     })
     showToast(`Restored "${key}" to original extracted value.`, 'info')
   }
