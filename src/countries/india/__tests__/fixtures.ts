@@ -244,6 +244,8 @@ export const BANGLADESH_BASIC_DETAILS_FIXTURE_HTML = `
     <input type="text" id="surname" name="appl.surname" value="" />
     <input type="text" id="givenName" name="appl.applname" value="" />
     <input type="checkbox" id="changedSurnameCheck" name="appl.changedSurnameCheck" />
+    <input type="text" id="prev_surname" name="appl.prev_surname" value="" />
+    <input type="text" id="prev_name" name="appl.prev_name" value="" />
 
     <!-- Gender -->
     <select id="gender" name="appl.applsex">
