@@ -128,6 +128,22 @@ export const BANGLADESH_FIELD_REGISTRY: BangladeshRegisteredControl[] = [
     description: 'Changed Surname checkbox (#changedSurnameCheck)',
   },
   {
+    controlId: 'basic_prev_surname',
+    page: 'BASIC_DETAILS',
+    category: 'verified-selector',
+    eligibility: 'autofillable',
+    selectors: BANGLADESH_BASIC_DETAILS_SELECTORS.previousSurname,
+    description: 'Previous Surname (#prev_surname)',
+  },
+  {
+    controlId: 'basic_prev_name',
+    page: 'BASIC_DETAILS',
+    category: 'verified-selector',
+    eligibility: 'autofillable',
+    selectors: BANGLADESH_BASIC_DETAILS_SELECTORS.previousGivenName,
+    description: 'Previous Given Name (#prev_name)',
+  },
+  {
     controlId: 'basic_gender',
     page: 'BASIC_DETAILS',
     category: 'verified-selector',
