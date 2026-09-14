@@ -24,6 +24,7 @@ export interface BangladeshBasicDetailsSelectors {
   expiryDate: IndiaFieldSelector[]
   otherPassportFlag: IndiaFieldSelector[]
   otherPassportNumber: IndiaFieldSelector[]
+  otherPassportDateOfIssue: IndiaFieldSelector[]
   otherPassportPlaceOfIssue: IndiaFieldSelector[]
   otherPassportCountryOfIssue: IndiaFieldSelector[]
   otherPassportNationality: IndiaFieldSelector[]
@@ -115,6 +116,13 @@ export const BANGLADESH_BASIC_DETAILS_SELECTORS: BangladeshBasicDetailsSelectors
     { strategy: 'id', value: 'other_ppt_no' },
     { strategy: 'name', value: 'appl.oth_pptno' },
     { strategy: 'css', value: 'input[name="appl.oth_pptno"], input#other_ppt_no' },
+  ],
+  otherPassportDateOfIssue: [
+    { strategy: 'id', value: 'other_ppt_issue_date' },
+    { strategy: 'id', value: 'other_ppt_issuedt' },
+    { strategy: 'name', value: 'appl.other_ppt_issue_date' },
+    { strategy: 'name', value: 'appl.oth_ppt_issue_date' },
+    { strategy: 'css', value: 'input[name="appl.other_ppt_issue_date"], input[name="appl.oth_ppt_issue_date"], input#other_ppt_issue_date, input#other_ppt_issuedt' },
   ],
   otherPassportPlaceOfIssue: [
     { strategy: 'id', value: 'other_ppt_issue_place' },
