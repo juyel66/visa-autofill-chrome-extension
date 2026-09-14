@@ -28,10 +28,26 @@ import { runRegistrationAutofillTests } from '../src/countries/india/__tests__/r
 import { runContentScriptInjectionTests } from '../src/core/messaging/__tests__/contentScriptInjection.test'
 import { runTask083PurposeOfVisitTests } from '../src/core/__tests__/task083PurposeOfVisit.test'
 import { runTask084PurposeDebugTests } from '../src/core/__tests__/task084PurposeDebug.test'
+import { runTask087RegistrationWorkspaceRedesignTests } from '../src/core/__tests__/task087RegistrationWorkspaceRedesign.test'
+import { runTask088FullWorkspacePortalRedesignTests } from '../src/core/__tests__/task088FullWorkspacePortalRedesign.test'
 import { runTask086FirstClickRegistrationDefinitiveTests } from '../src/core/__tests__/task086FirstClickRegistrationDefinitive.test'
 import { runTask085FirstClickRegistrationAutofillTests } from '../src/core/__tests__/task085FirstClickRegistrationAutofill.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 088: ALL 4 PORTAL PAGES WORKSPACE REDESIGN TESTS ---')
+  const task088Res = await runTask088FullWorkspacePortalRedesignTests()
+  console.log(`Passed: ${task088Res.passed}, Count: ${task088Res.totalSubtests}`)
+  if (!task088Res.passed) {
+    console.error('Failures:', task088Res.failures)
+  }
+
+  console.log('--- RUNNING TASK 087: APPLICATION WORKSPACE REGISTRATION PAGE REDESIGN TESTS ---')
+  const task087Res = await runTask087RegistrationWorkspaceRedesignTests()
+  console.log(`Passed: ${task087Res.passed}, Count: ${task087Res.totalSubtests}`)
+  if (!task087Res.passed) {
+    console.error('Failures:', task087Res.failures)
+  }
+
   console.log('--- RUNNING TASK 086: DEFINITIVE FIRST-CLICK REGISTRATION AUTOFILL TESTS ---')
   const task086Res = await runTask086FirstClickRegistrationDefinitiveTests()
   const task086Passed = task086Res.failedTests === 0
@@ -243,6 +259,8 @@ async function execute() {
   }
 
   const results = {
+    task088: task088Res.passed,
+    task087: task087Res.passed,
     task086: task086Passed,
     task085: task085Res.passed,
     task084: task084Res.passed,
