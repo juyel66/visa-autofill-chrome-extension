@@ -31,7 +31,7 @@ Telephone No: +8801744777846
 জন্মস্থান / Place of Birth: THAKURGAON
 National ID / other: 983640
 প্রদানের তারিখ / Date of Issue: 20 JAN 2026
-প্রদানকারী কর্তৃপক্ষ / Issuing Authority: DIP/DHAKA
+প্রদানকারী কর্তৃপক্ষ / Issuing Authority: DHAKA
 মেয়াদোত্তীর্ণের তারিখ / Date of Expiry: 19 JAN 2031
 স্বাক্ষর / Holder's Signature: জ্যোতির্ময় রায়
 P<BGDRAY<<SHREE<JOTIMOY<<<<<<<<<<<<<<<<<<<
