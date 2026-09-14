@@ -27,13 +27,17 @@ import {
   saveGeminiApiKey,
   DEFAULT_GEMINI_API_KEY,
 } from '../core/extraction/ai/geminiExtractor'
+import { RegistrationSection } from './components/RegistrationSection'
+import { BasicDetailsSection } from './components/BasicDetailsSection'
+import { FamilyDetailsSection } from './components/FamilyDetailsSection'
+import { VisaDetailsSection } from './components/VisaDetailsSection'
 
 export const App: React.FC = () => {
   const [applicantId, setApplicantId] = useState<string>('')
   const [applicants, setApplicants] = useState<ApplicantProfile[]>([])
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [application, setApplication] = useState<SavedApplication | null>(null)
-  const [activeNavId, setActiveNavId] = useState<string>('personalDetails')
+  const [activeNavId, setActiveNavId] = useState<string>('registration')
   const [loading, setLoading] = useState<boolean>(true)
   const [saving, setSaving] = useState<boolean>(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
@@ -247,16 +251,40 @@ export const App: React.FC = () => {
       isUserEdited: true,
     }
 
+    const updatedFields = {
+      ...application.fields,
+      [key]: updatedField,
+    }
+    const updatedManualEdits = {
+      ...application.manualEdits,
+      [key]: true,
+    }
+
+    // Keep aliases and dual fields in sync
+    if (key === 'purpose') {
+      updatedFields['appl.purpose'] = { ...updatedField }
+      updatedManualEdits['appl.purpose'] = true
+    } else if (key === 'appl.purpose') {
+      updatedFields['purpose'] = { ...updatedField }
+      updatedManualEdits['purpose'] = true
+    } else if (key === 'appl.countryname') {
+      updatedFields['present_country'] = { ...updatedField }
+      updatedManualEdits['present_country'] = true
+    } else if (key === 'present_country') {
+      updatedFields['appl.countryname'] = { ...updatedField }
+      updatedManualEdits['appl.countryname'] = true
+    } else if (key === 'appl.journeydate') {
+      updatedFields['journeydate'] = { ...updatedField }
+      updatedManualEdits['journeydate'] = true
+    } else if (key === 'journeydate') {
+      updatedFields['appl.journeydate'] = { ...updatedField }
+      updatedManualEdits['appl.journeydate'] = true
+    }
+
     setApplication({
       ...application,
-      fields: {
-        ...application.fields,
-        [key]: updatedField,
-      },
-      manualEdits: {
-        ...application.manualEdits,
-        [key]: true,
-      },
+      fields: updatedFields,
+      manualEdits: updatedManualEdits,
       status: 'ready_for_autofill',
     })
   }
@@ -276,17 +304,41 @@ export const App: React.FC = () => {
     const updatedManualEdits = { ...application.manualEdits }
     delete updatedManualEdits[key]
 
+    const restoredField: ApplicationFieldValue = {
+      ...currentField,
+      value: originalVal !== undefined ? originalVal : '',
+      source: restoredSource,
+      isUserEdited: false,
+    }
+
+    const updatedFields = {
+      ...application.fields,
+      [key]: restoredField,
+    }
+
+    if (key === 'purpose') {
+      delete updatedManualEdits['appl.purpose']
+      updatedFields['appl.purpose'] = { ...restoredField }
+    } else if (key === 'appl.purpose') {
+      delete updatedManualEdits['purpose']
+      updatedFields['purpose'] = { ...restoredField }
+    } else if (key === 'appl.countryname') {
+      delete updatedManualEdits['present_country']
+      updatedFields['present_country'] = { ...restoredField }
+    } else if (key === 'present_country') {
+      delete updatedManualEdits['appl.countryname']
+      updatedFields['appl.countryname'] = { ...restoredField }
+    } else if (key === 'appl.journeydate') {
+      delete updatedManualEdits['journeydate']
+      updatedFields['journeydate'] = { ...restoredField }
+    } else if (key === 'journeydate') {
+      delete updatedManualEdits['appl.journeydate']
+      updatedFields['appl.journeydate'] = { ...restoredField }
+    }
+
     setApplication({
       ...application,
-      fields: {
-        ...application.fields,
-        [key]: {
-          ...currentField,
-          value: originalVal !== undefined ? originalVal : '',
-          source: restoredSource,
-          isUserEdited: false,
-        },
-      },
+      fields: updatedFields,
       manualEdits: updatedManualEdits,
     })
     showToast(`Restored "${key}" to original extracted value.`, 'info')
@@ -538,9 +590,14 @@ export const App: React.FC = () => {
     }
   }
 
-  const renderFieldSourceBadge = (fieldKey: string) => {
-    if (!application) return null
-    const f = application.fields[fieldKey]
+  const renderFieldSourceBadge = (fieldKeyOrValue?: string | ApplicationFieldValue) => {
+    if (!application || !fieldKeyOrValue) return null
+    let f: ApplicationFieldValue | undefined
+    if (typeof fieldKeyOrValue === 'string') {
+      f = application.fields[fieldKeyOrValue]
+    } else {
+      f = fieldKeyOrValue
+    }
     if (!f || f.value === '' || f.value === undefined || f.value === null || f.value === false) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800/80 text-amber-400/90 border border-slate-700">
@@ -931,6 +988,90 @@ export const App: React.FC = () => {
             )
 
             const hiddenCount = fieldDefs.length - visibleFields.length
+
+            if (sec.id === 'registration') {
+              return (
+                <section
+                  key={sec.id}
+                  id={`sec-${sec.id}`}
+                  className="scroll-mt-28"
+                >
+                  <RegistrationSection
+                    application={application}
+                    onFieldChange={handleFieldChange}
+                    onResetField={handleResetToExtracted}
+                    renderSourceBadge={renderFieldSourceBadge}
+                  />
+                </section>
+              )
+            }
+
+            if (sec.id === 'personalDetails') {
+              return (
+                <section
+                  key={sec.id}
+                  id={`sec-${sec.id}`}
+                  className="scroll-mt-28"
+                >
+                  <BasicDetailsSection
+                    application={application}
+                    onFieldChange={handleFieldChange}
+                    onResetField={handleResetToExtracted}
+                    renderSourceBadge={renderFieldSourceBadge}
+                  />
+                </section>
+              )
+            }
+
+            if (sec.id === 'presentAddress') {
+              return (
+                <section
+                  key={sec.id}
+                  id={`sec-${sec.id}`}
+                  className="scroll-mt-28"
+                >
+                  <FamilyDetailsSection
+                    application={application}
+                    onFieldChange={handleFieldChange}
+                    onResetField={handleResetToExtracted}
+                    renderSourceBadge={renderFieldSourceBadge}
+                    onCopyPresentToPermanent={handleCopyPresentToPermanent}
+                  />
+                </section>
+              )
+            }
+
+            if (sec.id === 'visaDetails') {
+              return (
+                <section
+                  key={sec.id}
+                  id={`sec-${sec.id}`}
+                  className="scroll-mt-28"
+                >
+                  <VisaDetailsSection
+                    application={application}
+                    onFieldChange={handleFieldChange}
+                    onResetField={handleResetToExtracted}
+                    renderSourceBadge={renderFieldSourceBadge}
+                    onUploadPhoto={handlePhotoUpload}
+                    onRemovePhoto={handleRemovePhoto}
+                  />
+                </section>
+              )
+            }
+
+            // Subsections 3, 5, 6, 7, 9, 10, 11 are embedded inside the 4 authentic portal pages above
+            if (
+              sec.id === 'passportDetails' ||
+              sec.id === 'permanentAddress' ||
+              sec.id === 'familyDetails' ||
+              sec.id === 'professionEmployment' ||
+              sec.id === 'previousVisitVisa' ||
+              sec.id === 'additionalQuestions' ||
+              sec.id === 'photoUpload'
+            ) {
+              return null
+            }
 
             if (!isPhotoSection && filteredFields.length === 0 && searchQuery) {
               return null
