@@ -254,10 +254,11 @@ export const BANGLADESH_FAMILY_DETAILS_SELECTORS: BangladeshFamilyDetailsSelecto
     { strategy: 'css', value: 'select[name="appl.spouse_prev_nationality"], select#spouse_prev_nationality, select#spouse_previous_nationality' },
   ],
   grandparentFlag: [
-    { strategy: 'id', value: 'grandparent_flag1' },
+    { strategy: 'css', value: 'input[name="appl.grandparent_flag"], input[name="grandparent_flag"], input#grandparent_flag2, input#grandparent_flag1' },
     { strategy: 'id', value: 'grandparent_flag2' },
+    { strategy: 'id', value: 'grandparent_flag1' },
     { strategy: 'name', value: 'appl.grandparent_flag' },
-    { strategy: 'css', value: 'input[name="appl.grandparent_flag"]' },
+    { strategy: 'name', value: 'grandparent_flag' },
   ],
   grandparentDetails: [
     { strategy: 'id', value: 'grandparent_details' },
@@ -300,10 +301,11 @@ export const BANGLADESH_FAMILY_DETAILS_SELECTORS: BangladeshFamilyDetailsSelecto
     { strategy: 'css', value: 'select[name="appl.previous_occupation"], input#previous_occupation' },
   ],
   previousOrgFlag: [
-    { strategy: 'id', value: 'prev_org1' },
+    { strategy: 'css', value: 'input[name="appl.prev_org"], input[name="prev_org"], input#prev_org2, input#prev_org1' },
     { strategy: 'id', value: 'prev_org2' },
+    { strategy: 'id', value: 'prev_org1' },
     { strategy: 'name', value: 'appl.prev_org' },
-    { strategy: 'css', value: 'input[name="appl.prev_org"]' },
+    { strategy: 'name', value: 'prev_org' },
   ],
   previousOrganization: [
     { strategy: 'id', value: 'previous_organization' },
