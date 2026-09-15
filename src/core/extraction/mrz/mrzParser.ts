@@ -109,11 +109,35 @@ function parseMrzNames(nameField: string): { surname: string; givenNames: string
   const rawSurname = parts[0] || ''
   const rawGiven = parts.slice(1).join('<<')
 
-  const surname = rawSurname.replace(/</g, ' ').trim()
-  
+  let surname = rawSurname.replace(/</g, ' ').replace(/\s+/g, ' ').trim()
+  surname = surname.replace(/\s+(?:[L1I|KX_~=-]{2,}|(.)\1{2,})$/i, '').trim()
+
   // Replace single < with space, strip trailing fillers
-  const givenParts = rawGiven.split('<').filter((p) => p.length > 0)
-  const givenNames = givenParts.join(' ').trim()
+  const rawTokens = rawGiven.split('<').map((t) => t.trim()).filter((p) => p.length > 0)
+  
+  const cleanTokens: string[] = []
+  for (let i = 0; i < rawTokens.length; i++) {
+    const tok = rawTokens[i]
+    // Stop if token is OCR filler noise (e.g. repeated character >= 3 times like LLLLLLL, or noise sequence)
+    const isRepeatedFiller = /(.)\1{2,}/.test(tok)
+    const isNoisePattern = /^[L1I|KX_~=\-]{2,}$/i.test(tok)
+    
+    if (isRepeatedFiller || isNoisePattern) {
+      break
+    }
+    
+    // Check if token is a stray single-character artifact right before filler noise (e.g. "K" before "LLLLLL")
+    if (tok.length === 1 && i < rawTokens.length - 1) {
+      const nextTok = rawTokens[i + 1]
+      if (/(.)\1{2,}/.test(nextTok) || /^[L1I|KX_~=\-]{2,}$/i.test(nextTok)) {
+        break
+      }
+    }
+
+    cleanTokens.push(tok)
+  }
+
+  const givenNames = cleanTokens.join(' ').trim()
 
   return { surname, givenNames }
 }
@@ -135,7 +159,8 @@ function cleanMrzLine1(raw: string): string {
   }
   // In TD3 Line 1, surname and given names are separated by '<<'.
   // Trailing filler characters (<) often get misread by OCR as 'L', '1', '|', '(', ')', '{', '}', etc.
-  // We locate the end of the given names and strip all trailing filler noise.
+  // We strip trailing filler noise patterns:
+  l1 = l1.replace(/(?:<{1,}[L1I|KX_~=\-]{2,}|[L1I|KX_~=\-]{3,}|(?:<[A-Z0-9])?<[L1I|KX_~=\-]{2,}).*$/i, '')
   const nameMatch = l1.match(/^(P[<A-Z0-9]{4,}[A-Z0-9]+<{2}[A-Z0-9]+(?:<[A-Z0-9]+)*?)(?:<{2,}|<[L1|(){}[\]]+|[L1|(){}[\]]{3,}.*)$/)
   if (nameMatch) {
     l1 = nameMatch[1]
