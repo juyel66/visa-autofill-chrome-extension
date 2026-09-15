@@ -296,7 +296,7 @@ chrome.runtime.onMessage.addListener(
             mappings,
             applicant: tempProfile,
             options: {
-              policy: 'fill-empty',
+              policy: 'overwrite',
               validatePageConsistency: () => {
                 const currentDet = detectIndiaVisaPage()
                 return currentDet.matched && currentDet.page === detection.page
@@ -577,7 +577,7 @@ async function attemptAutomaticAutofill() {
       mappings,
       applicant: tempProfile,
       options: {
-        policy: 'fill-empty',
+        policy: 'overwrite',
         validatePageConsistency: () => {
           const currentDet = detectIndiaVisaPage()
           return currentDet.matched && currentDet.page === detection.page
