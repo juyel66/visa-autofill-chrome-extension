@@ -429,8 +429,8 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   // 5. Permanent Address
   const perm = (raw.permanentAddress || {}) as Record<string, unknown>
   let permLine1 = perm.addressLine1 ? String(perm.addressLine1).trim() : undefined
-  let permCity = perm.villageTownCity ? String(perm.villageTownCity).trim() : (perm.addressLine2 ? String(perm.addressLine2).trim() : undefined)
-  let permLine2 = perm.addressLine2 ? String(perm.addressLine2).trim() : (perm.villageTownCity ? String(perm.villageTownCity).trim() : undefined)
+  let permCity = presCity || (perm.villageTownCity ? String(perm.villageTownCity).trim() : (perm.addressLine2 ? String(perm.addressLine2).trim() : undefined))
+  let permLine2 = presCity || (perm.addressLine2 ? String(perm.addressLine2).trim() : (perm.villageTownCity ? String(perm.villageTownCity).trim() : undefined))
   let permDist = perm.district ? String(perm.district).trim().toUpperCase() : (perm.stateProvince ? String(perm.stateProvince).trim().toUpperCase() : undefined)
   let permState = perm.stateProvince ? String(perm.stateProvince).trim().toUpperCase() : (perm.district ? String(perm.district).trim().toUpperCase() : undefined)
   let permPin = perm.postalCode ? String(perm.postalCode).trim() : undefined
@@ -449,7 +449,7 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   if (rawPermStr && (!permLine1 || !permDist)) {
     const reParsed = parseStructuredAddress(rawPermStr, { nationality: p.nationality ? String(p.nationality) : undefined })
     if (reParsed.addressLine1) permLine1 = reParsed.addressLine1
-    if (reParsed.villageTownCity) {
+    if (reParsed.villageTownCity && !presCity) {
       permCity = reParsed.villageTownCity
       permLine2 = reParsed.villageTownCity
     }
@@ -495,6 +495,12 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
       postalCode: result.presentAddress.postalCode ? { ...result.presentAddress.postalCode } : undefined,
       country: result.presentAddress.country ? { ...result.presentAddress.country } : { value: 'BANGLADESH', source },
     }
+  }
+
+  // Ensure Permanent Address villageTownCity and line2 match Present Address villageTownCity
+  if (result.presentAddress?.villageTownCity?.value) {
+    result.permanentAddress!.villageTownCity = { ...result.presentAddress.villageTownCity }
+    result.permanentAddress!.addressLine2 = { ...result.presentAddress.villageTownCity }
   }
 
   // 6. Family
