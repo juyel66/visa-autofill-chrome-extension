@@ -169,12 +169,18 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
-                  value={getVal('village_town_city')}
-                  onChange={(e) => onFieldChange('village_town_city', e.target.value.toUpperCase())}
+                  value={getVal('village_town_city') || getVal('pres_addr2')}
+                  onChange={(e) => {
+                    onFieldChange('village_town_city', e.target.value.toUpperCase())
+                    onFieldChange('pres_addr2', e.target.value.toUpperCase())
+                  }}
                   placeholder="VILLAGE / TOWN / CITY"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['village_town_city'])}
+                {renderSourceBadge(fields['village_town_city'] || fields['pres_addr2'])}
+                {(fields['village_town_city']?.isUserEdited || fields['pres_addr2']?.isUserEdited) && (
+                  <button onClick={() => { onResetField('village_town_city'); onResetField('pres_addr2'); }} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Village/Town/City</div>
             </div>
@@ -198,6 +204,9 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   ))}
                 </select>
                 {renderSourceBadge(fields['present_country'])}
+                {fields['present_country']?.isUserEdited && (
+                  <button onClick={() => onResetField('present_country')} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Country</div>
             </div>
@@ -219,6 +228,9 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderSourceBadge(fields['district'] || fields['state_province'])}
+                {(fields['district']?.isUserEdited || fields['state_province']?.isUserEdited) && (
+                  <button onClick={() => { onResetField('district'); onResetField('state_province'); }} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">State/Province/District</div>
             </div>
@@ -237,6 +249,9 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderSourceBadge(fields['pincode'])}
+                {fields['pincode']?.isUserEdited && (
+                  <button onClick={() => onResetField('pincode')} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Postal/Zip Code</div>
             </div>
@@ -255,6 +270,9 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderSourceBadge(fields['pres_phone'])}
+                {fields['pres_phone']?.isUserEdited && (
+                  <button onClick={() => onResetField('pres_phone')} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">One Contact No is Mandatory</div>
             </div>
@@ -280,6 +298,9 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   className="flex-1 bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderSourceBadge(fields['mobile'])}
+                {(fields['mobile']?.isUserEdited || fields['isd_code']?.isUserEdited) && (
+                  <button onClick={() => { onResetField('mobile'); onResetField('isd_code'); }} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Mobile number.</div>
             </div>
@@ -301,6 +322,9 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderSourceBadge(fields['appl.email'])}
+                {fields['appl.email']?.isUserEdited && (
+                  <button onClick={() => { onResetField('appl.email'); onResetField('appl.email_re'); }} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Email Address</div>
             </div>
@@ -324,6 +348,9 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderSourceBadge(fields['perm_add1'])}
+                {fields['perm_add1']?.isUserEdited && (
+                  <button onClick={() => onResetField('perm_add1')} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">
                 Applicant's Permanent Address(with Postal/Zip Code)
@@ -338,12 +365,18 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
-                  value={getVal('permanent_village_town_city')}
-                  onChange={(e) => onFieldChange('permanent_village_town_city', e.target.value.toUpperCase())}
+                  value={getVal('permanent_village_town_city') || getVal('perm_add2')}
+                  onChange={(e) => {
+                    onFieldChange('permanent_village_town_city', e.target.value.toUpperCase())
+                    onFieldChange('perm_add2', e.target.value.toUpperCase())
+                  }}
                   placeholder="VILLAGE / TOWN / CITY"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['permanent_village_town_city'])}
+                {renderSourceBadge(fields['permanent_village_town_city'] || fields['perm_add2'])}
+                {(fields['permanent_village_town_city']?.isUserEdited || fields['perm_add2']?.isUserEdited) && (
+                  <button onClick={() => { onResetField('permanent_village_town_city'); onResetField('perm_add2'); }} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Village/Town/City</div>
             </div>
@@ -365,6 +398,9 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderSourceBadge(fields['permanent_district'] || fields['permanent_state_province'])}
+                {(fields['permanent_district']?.isUserEdited || fields['permanent_state_province']?.isUserEdited) && (
+                  <button onClick={() => { onResetField('permanent_district'); onResetField('permanent_state_province'); }} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
+                )}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">State/Province/District</div>
             </div>
