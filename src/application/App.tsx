@@ -272,6 +272,34 @@ export const App: React.FC = () => {
       } else if (key === 'journeydate') {
         updatedFields['appl.journeydate'] = { ...updatedField }
         updatedManualEdits['appl.journeydate'] = true
+      } else if (key === 'village_town_city') {
+        updatedFields['pres_addr2'] = { ...updatedField }
+        updatedManualEdits['pres_addr2'] = true
+      } else if (key === 'pres_addr2') {
+        updatedFields['village_town_city'] = { ...updatedField }
+        updatedManualEdits['village_town_city'] = true
+      } else if (key === 'district') {
+        updatedFields['state_province'] = { ...updatedField }
+        updatedFields['state_name'] = { ...updatedField }
+        updatedManualEdits['state_province'] = true
+        updatedManualEdits['state_name'] = true
+      } else if (key === 'state_province' || key === 'state_name') {
+        updatedFields['district'] = { ...updatedField }
+        updatedManualEdits['district'] = true
+      } else if (key === 'permanent_village_town_city') {
+        updatedFields['perm_add2'] = { ...updatedField }
+        updatedManualEdits['perm_add2'] = true
+      } else if (key === 'perm_add2') {
+        updatedFields['permanent_village_town_city'] = { ...updatedField }
+        updatedManualEdits['permanent_village_town_city'] = true
+      } else if (key === 'permanent_district') {
+        updatedFields['permanent_state_province'] = { ...updatedField }
+        updatedFields['perm_add3'] = { ...updatedField }
+        updatedManualEdits['permanent_state_province'] = true
+        updatedManualEdits['perm_add3'] = true
+      } else if (key === 'permanent_state_province' || key === 'perm_add3') {
+        updatedFields['permanent_district'] = { ...updatedField }
+        updatedManualEdits['permanent_district'] = true
       }
 
       return {
@@ -329,6 +357,34 @@ export const App: React.FC = () => {
       } else if (key === 'journeydate') {
         delete updatedManualEdits['appl.journeydate']
         updatedFields['appl.journeydate'] = { ...restoredField }
+      } else if (key === 'village_town_city') {
+        delete updatedManualEdits['pres_addr2']
+        updatedFields['pres_addr2'] = { ...restoredField }
+      } else if (key === 'pres_addr2') {
+        delete updatedManualEdits['village_town_city']
+        updatedFields['village_town_city'] = { ...restoredField }
+      } else if (key === 'district') {
+        delete updatedManualEdits['state_province']
+        delete updatedManualEdits['state_name']
+        updatedFields['state_province'] = { ...restoredField }
+        updatedFields['state_name'] = { ...restoredField }
+      } else if (key === 'state_province' || key === 'state_name') {
+        delete updatedManualEdits['district']
+        updatedFields['district'] = { ...restoredField }
+      } else if (key === 'permanent_village_town_city') {
+        delete updatedManualEdits['perm_add2']
+        updatedFields['perm_add2'] = { ...restoredField }
+      } else if (key === 'perm_add2') {
+        delete updatedManualEdits['permanent_village_town_city']
+        updatedFields['permanent_village_town_city'] = { ...restoredField }
+      } else if (key === 'permanent_district') {
+        delete updatedManualEdits['permanent_state_province']
+        delete updatedManualEdits['perm_add3']
+        updatedFields['permanent_state_province'] = { ...restoredField }
+        updatedFields['perm_add3'] = { ...restoredField }
+      } else if (key === 'permanent_state_province' || key === 'perm_add3') {
+        delete updatedManualEdits['permanent_district']
+        updatedFields['permanent_district'] = { ...restoredField }
       }
 
       return {
