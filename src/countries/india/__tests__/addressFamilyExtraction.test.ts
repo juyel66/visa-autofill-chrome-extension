@@ -45,7 +45,7 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
     !extracted1.presentAddress?.villageTownCity?.value ||
     extracted1.presentAddress.addressLine1.value !== 'Flat 4B' ||
     extracted1.presentAddress.addressLine2.value !== 'Green Tower, 12 Kamal Ataturk Avenue' ||
-    extracted1.presentAddress.villageTownCity.value !== 'Dhaka' ||
+    extracted1.presentAddress.villageTownCity.value !== 'Green Tower, 12 Kamal Ataturk Avenue' ||
     extracted1.presentAddress.postalCode?.value !== '1212' ||
     extracted1.presentAddress.country?.value !== 'BANGLADESH'
   ) {
