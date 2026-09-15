@@ -325,6 +325,12 @@ export function populateApplicationFromDocuments(options: {
     const passportPob =
       activeProfile?.personalInfo?.townCityOfBirth ||
       passportDoc?.extractedData?.personal?.townCityOfBirth?.value ||
+      activeProfile?.presentAddress?.district ||
+      activeProfile?.permanentAddress?.district ||
+      passportDoc?.extractedData?.presentAddress?.district?.value ||
+      passportDoc?.extractedData?.permanentAddress?.district?.value ||
+      activeProfile?.passport?.placeOfIssue?.replace(/^DIP\s*\/\s*/i, '') ||
+      passportDoc?.extractedData?.passport?.placeOfIssue?.value?.replace(/^DIP\s*\/\s*/i, '') ||
       ''
 
     const hasSpouse = Boolean(
@@ -369,8 +375,8 @@ export function populateApplicationFromDocuments(options: {
         key === 'appl.placbrth' || key === 'placbrth'
       ) {
         if (passportPob) {
-          resolvedValue = passportPob
-          source = activeSource
+          resolvedValue = passportPob.toUpperCase()
+          source = (activeProfile?.personalInfo?.townCityOfBirth || passportDoc?.extractedData?.personal?.townCityOfBirth?.value) ? activeSource : 'derived'
           docId = activeDocId
         }
       } else if (
@@ -427,6 +433,47 @@ export function populateApplicationFromDocuments(options: {
           resolvedValue = 'DHAKA'
           source = 'derived'
           docId = activeDocId
+        }
+      } else if (
+        key === 'appl.passport_issue_date' ||
+        key === 'passport_issue_date' ||
+        key === 'appl.issuedate' ||
+        key === 'issuedate'
+      ) {
+        const rawIssueDate =
+          activeProfile.passport?.issueDate ||
+          passportDoc?.extractedData?.passport?.issueDate?.value
+        if (rawIssueDate) {
+          resolvedValue = rawIssueDate
+          source = activeSource
+          docId = activeDocId
+        } else {
+          // Derive 10-year validity issue date from expiry date
+          const rawExpiry =
+            activeProfile.passport?.expiryDate ||
+            passportDoc?.extractedData?.passport?.expiryDate?.value
+          if (rawExpiry) {
+            const expParts = rawExpiry.split(/[-/]/)
+            if (expParts.length === 3) {
+              if (expParts[0].length === 4) {
+                // ISO YYYY-MM-DD
+                const expYear = parseInt(expParts[0], 10)
+                if (!isNaN(expYear)) {
+                  resolvedValue = `${expYear - 10}-${expParts[1]}-${expParts[2]}`
+                  source = 'derived'
+                  docId = activeDocId
+                }
+              } else if (expParts[2].length === 4) {
+                // DD/MM/YYYY
+                const expYear = parseInt(expParts[2], 10)
+                if (!isNaN(expYear)) {
+                  resolvedValue = `${expParts[0]}/${expParts[1]}/${expYear - 10}`
+                  source = 'derived'
+                  docId = activeDocId
+                }
+              }
+            }
+          }
         }
       } else if (key === 'pres_phone' || key === 'appl.pres_phone') {
         const rawPhone =
