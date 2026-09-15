@@ -648,15 +648,16 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
             {/* Secondary Passport Conditional Sub-Fields */}
             {hasOtherPassport && (
               <div className="bg-[#f3e8f3] border border-[#d8c0d8] rounded p-3 space-y-3 mt-2">
+                {/* 1. Country/Region of Issue */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                     Country/Region of Issue <span className="text-red-600 font-bold">*</span>
                   </label>
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
                     <select
                       value={normalizeToBangladesh(getVal('appl.prev_passport_country_issue'))}
                       onChange={(e) => onFieldChange('appl.prev_passport_country_issue', e.target.value)}
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                     >
                       <option value="">Select Country</option>
                       {PORTAL_COUNTRY_OPTIONS.map((c) => (
@@ -665,24 +666,48 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                         </option>
                       ))}
                     </select>
+                    {renderSourceBadge(fields['appl.prev_passport_country_issue'])}
+                    {fields['appl.prev_passport_country_issue']?.isUserEdited && (
+                      <button
+                        onClick={() => onResetField('appl.prev_passport_country_issue')}
+                        className="text-slate-400 hover:text-blue-600 text-xs px-1"
+                        title="Reset to extracted value"
+                      >
+                        ↺
+                      </button>
+                    )}
                   </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Country of Issue</div>
                 </div>
 
+                {/* 2. Passport/IC No. */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                     Passport/IC No. <span className="text-red-600 font-bold">*</span>
                   </label>
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
                       type="text"
                       value={getVal('appl.oth_pptno')}
                       onChange={(e) => onFieldChange('appl.oth_pptno', e.target.value.toUpperCase())}
                       placeholder="OTHER PASSPORT NO"
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                     />
+                    {renderSourceBadge(fields['appl.oth_pptno'])}
+                    {fields['appl.oth_pptno']?.isUserEdited && (
+                      <button
+                        onClick={() => onResetField('appl.oth_pptno')}
+                        className="text-slate-400 hover:text-blue-600 text-xs px-1"
+                        title="Reset to extracted value"
+                      >
+                        ↺
+                      </button>
+                    )}
                   </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Passport or IC Number</div>
                 </div>
 
+                {/* 3. Date of Issue */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                     Date of Issue <span className="text-red-600 font-bold">*</span>
@@ -693,37 +718,59 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                       value={getVal('appl.oth_ppt_issue_date')}
                       onChange={(e) => onFieldChange('appl.oth_ppt_issue_date', e.target.value)}
                       placeholder="DD/MM/YYYY"
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                     />
                     {renderSourceBadge(fields['appl.oth_ppt_issue_date'])}
+                    {fields['appl.oth_ppt_issue_date']?.isUserEdited && (
+                      <button
+                        onClick={() => onResetField('appl.oth_ppt_issue_date')}
+                        className="text-slate-400 hover:text-blue-600 text-xs px-1"
+                        title="Reset to extracted value"
+                      >
+                        ↺
+                      </button>
+                    )}
                   </div>
                   <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">in DD/MM/YYYY format</div>
                 </div>
 
+                {/* 4. Place of Issue */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                     Place of Issue <span className="text-red-600 font-bold">*</span>
                   </label>
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
                       type="text"
                       value={getVal('appl.oth_ppt_issue_place') || 'DHAKA'}
                       onChange={(e) => onFieldChange('appl.oth_ppt_issue_place', e.target.value.toUpperCase())}
                       placeholder="PLACE OF ISSUE"
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                     />
+                    {renderSourceBadge(fields['appl.oth_ppt_issue_place'])}
+                    {fields['appl.oth_ppt_issue_place']?.isUserEdited && (
+                      <button
+                        onClick={() => onResetField('appl.oth_ppt_issue_place')}
+                        className="text-slate-400 hover:text-blue-600 text-xs px-1"
+                        title="Reset to extracted value"
+                      >
+                        ↺
+                      </button>
+                    )}
                   </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Place of Issue</div>
                 </div>
 
+                {/* 5. Nationality mentioned therein */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                     Nationality mentioned therein <span className="text-red-600 font-bold">*</span>
                   </label>
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
                     <select
                       value={normalizeToBangladesh(getVal('appl.other_ppt_nationality'))}
                       onChange={(e) => onFieldChange('appl.other_ppt_nationality', e.target.value)}
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                     >
                       <option value="">Select Nationality</option>
                       {PORTAL_NATIONALITY_OPTIONS.map((n) => (
@@ -732,7 +779,18 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                         </option>
                       ))}
                     </select>
+                    {renderSourceBadge(fields['appl.other_ppt_nationality'])}
+                    {fields['appl.other_ppt_nationality']?.isUserEdited && (
+                      <button
+                        onClick={() => onResetField('appl.other_ppt_nationality')}
+                        className="text-slate-400 hover:text-blue-600 text-xs px-1"
+                        title="Reset to extracted value"
+                      >
+                        ↺
+                      </button>
+                    )}
                   </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Nationality in Passport</div>
                 </div>
               </div>
             )}
