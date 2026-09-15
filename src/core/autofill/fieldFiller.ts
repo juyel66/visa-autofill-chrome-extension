@@ -28,10 +28,10 @@ export function fillField(
 
   // 1. Guard against Disabled / Readonly
   if (
-    element instanceof HTMLInputElement ||
-    element instanceof HTMLSelectElement ||
-    element instanceof HTMLTextAreaElement ||
-    element instanceof HTMLButtonElement
+    (typeof HTMLInputElement !== 'undefined' && element instanceof HTMLInputElement) ||
+    (typeof HTMLSelectElement !== 'undefined' && element instanceof HTMLSelectElement) ||
+    (typeof HTMLTextAreaElement !== 'undefined' && element instanceof HTMLTextAreaElement) ||
+    (typeof HTMLButtonElement !== 'undefined' && element instanceof HTMLButtonElement)
   ) {
     if (element.disabled) {
       return {
@@ -43,7 +43,10 @@ export function fillField(
     }
   }
 
-  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+  if (
+    (typeof HTMLInputElement !== 'undefined' && element instanceof HTMLInputElement) ||
+    (typeof HTMLTextAreaElement !== 'undefined' && element instanceof HTMLTextAreaElement)
+  ) {
     if (element.readOnly) {
       return {
         fieldId,
@@ -55,7 +58,7 @@ export function fillField(
   }
 
   // 2. Check for Unsupported / Password / File fields
-  if (element instanceof HTMLInputElement) {
+  if (typeof HTMLInputElement !== 'undefined' && element instanceof HTMLInputElement) {
     const typeLower = element.type.toLowerCase()
     if (typeLower === 'password' || typeLower === 'file' || mapping.inputType === 'file') {
       return {
