@@ -9,13 +9,17 @@ import type { IndiaFieldSelector } from '../../mapping.types'
 export interface BangladeshFamilyDetailsSelectors {
   presentAddress1: IndiaFieldSelector[]
   presentAddress2: IndiaFieldSelector[]
+  presentCountry: IndiaFieldSelector[]
   presentStateCity: IndiaFieldSelector[]
   presentPostalCode: IndiaFieldSelector[]
   presentPhone: IndiaFieldSelector[]
+  isdCode: IndiaFieldSelector[]
   mobile: IndiaFieldSelector[]
+  email: IndiaFieldSelector[]
   sameAddress: IndiaFieldSelector[]
   permanentAddress1: IndiaFieldSelector[]
   permanentAddress2: IndiaFieldSelector[]
+  permanentCountry: IndiaFieldSelector[]
   permanentStateCity: IndiaFieldSelector[]
   fatherName: IndiaFieldSelector[]
   fatherPlaceOfBirth: IndiaFieldSelector[]
@@ -61,6 +65,15 @@ export const BANGLADESH_FAMILY_DETAILS_SELECTORS: BangladeshFamilyDetailsSelecto
     { strategy: 'name', value: 'pres_addr2' },
     { strategy: 'css', value: 'input[name="appl.pres_add2"], input#pres_add2' },
   ],
+  presentCountry: [
+    { strategy: 'id', value: 'pres_country' },
+    { strategy: 'id', value: 'country_id' },
+    { strategy: 'id', value: 'country' },
+    { strategy: 'name', value: 'appl.pres_country' },
+    { strategy: 'name', value: 'appl.countryname' },
+    { strategy: 'name', value: 'pres_country' },
+    { strategy: 'css', value: 'select[name="appl.pres_country"], select#pres_country, select[name="appl.countryname"], select#country_id' },
+  ],
   presentStateCity: [
     { strategy: 'id', value: 'pres_add3' },
     { strategy: 'name', value: 'appl.state_name' },
@@ -79,11 +92,27 @@ export const BANGLADESH_FAMILY_DETAILS_SELECTORS: BangladeshFamilyDetailsSelecto
     { strategy: 'name', value: 'phone_no' },
     { strategy: 'css', value: 'input[name="appl.pres_phone"], input#pres_phone' },
   ],
+  isdCode: [
+    { strategy: 'id', value: 'mobile_isd' },
+    { strategy: 'id', value: 'pres_phone_isd' },
+    { strategy: 'id', value: 'isd_code' },
+    { strategy: 'name', value: 'appl.isd_code' },
+    { strategy: 'name', value: 'appl.mobile_isd' },
+    { strategy: 'name', value: 'appl.pres_phone_isd' },
+    { strategy: 'name', value: 'isd_code' },
+    { strategy: 'css', value: 'select[name="appl.isd_code"], select#mobile_isd, select#isd_code, select[name="appl.mobile_isd"], select[name="appl.pres_phone_isd"], select#pres_phone_isd, select[name="isd_code"], input[name="appl.isd_code"], input#mobile_isd, input#isd_code, input#pres_phone_isd' },
+  ],
   mobile: [
     { strategy: 'id', value: 'mobile' },
     { strategy: 'name', value: 'appl.mobile' },
     { strategy: 'name', value: 'mobile_no' },
     { strategy: 'css', value: 'input[name="appl.mobile"], input#mobile' },
+  ],
+  email: [
+    { strategy: 'id', value: 'email' },
+    { strategy: 'id', value: 'email_id' },
+    { strategy: 'name', value: 'appl.email' },
+    { strategy: 'css', value: 'input[name="appl.email"], input#email, input#email_id' },
   ],
   sameAddress: [
     { strategy: 'id', value: 'sameAddress_id' },
@@ -93,21 +122,35 @@ export const BANGLADESH_FAMILY_DETAILS_SELECTORS: BangladeshFamilyDetailsSelecto
   ],
   permanentAddress1: [
     { strategy: 'id', value: 'perm_address1' },
+    { strategy: 'id', value: 'perm_add1' },
     { strategy: 'name', value: 'appl.perm_add1' },
     { strategy: 'name', value: 'perm_addr1' },
-    { strategy: 'css', value: 'input[name="appl.perm_add1"], input#perm_address1' },
+    { strategy: 'name', value: 'perm_add1' },
+    { strategy: 'css', value: 'input[name="appl.perm_add1"], input#perm_address1, input#perm_add1' },
   ],
   permanentAddress2: [
     { strategy: 'id', value: 'perm_address2' },
+    { strategy: 'id', value: 'perm_add2' },
     { strategy: 'name', value: 'appl.perm_add2' },
     { strategy: 'name', value: 'perm_addr2' },
-    { strategy: 'css', value: 'input[name="appl.perm_add2"], input#perm_address2' },
+    { strategy: 'name', value: 'perm_add2' },
+    { strategy: 'css', value: 'input[name="appl.perm_add2"], input#perm_address2, input#perm_add2' },
+  ],
+  permanentCountry: [
+    { strategy: 'id', value: 'perm_country' },
+    { strategy: 'id', value: 'perm_country_id' },
+    { strategy: 'name', value: 'appl.perm_country' },
+    { strategy: 'name', value: 'perm_country' },
+    { strategy: 'css', value: 'select[name="appl.perm_country"], select#perm_country' },
   ],
   permanentStateCity: [
     { strategy: 'id', value: 'perm_address3' },
+    { strategy: 'id', value: 'perm_add3' },
     { strategy: 'name', value: 'appl.perm_add3' },
+    { strategy: 'name', value: 'appl.perm_state' },
     { strategy: 'name', value: 'perm_city' },
-    { strategy: 'css', value: 'input[name="appl.perm_add3"], input#perm_address3' },
+    { strategy: 'name', value: 'perm_add3' },
+    { strategy: 'css', value: 'input[name="appl.perm_add3"], input#perm_address3, input#perm_add3' },
   ],
   fatherName: [
     { strategy: 'id', value: 'fthrname' },
