@@ -578,7 +578,7 @@ export function extractFromOgdVisaApplication(
 
   // --- SECTION 3: CONTACT & ADDRESS DETAILS ---
   // Present Address Block
-  const presBlockMatch = text.match(/(?:present\s*address)[:\s]+([\s\S]+?)(?=(?:phone\s*no|mobile\s*no|email|permanent\s*address|family\s*details|$))/i)
+  const presBlockMatch = text.match(/(?:present\s*address)[:\s]+([\s\S]+?)(?=(?:phone\s*no|mobile\s*no|email|permanent\s*address|emergency|relationship|relation|spouse|legal\s*guardian|family\s*details|\d+[\.\+\)]\s*(?:relationship|relation|emergency)|$))/i)
   if (presBlockMatch) {
     const parsedPres = parseStructuredAddress(presBlockMatch[1], { nationality: result.personal?.nationality?.value })
     if (parsedPres.addressLine1) result.presentAddress!.addressLine1 = { value: parsedPres.addressLine1, source, confidence: baseConfidence }
@@ -591,7 +591,7 @@ export function extractFromOgdVisaApplication(
   }
 
   // Permanent Address Block
-  const permBlockMatch = text.match(/(?:permanent\s*address)[:\s]+([\s\S]+?)(?=(?:emergency(?:\s*contact)?|family\s*details|father|mother|marital|profession|occupation|employer|details\s*of|reference|$))/i)
+  const permBlockMatch = text.match(/(?:permanent\s*address)[:\s]+([\s\S]+?)(?=(?:emergency(?:\s*contact)?|relationship|relation|spouse|legal\s*guardian|family\s*details|father|mother|marital|profession|occupation|employer|details\s*of|reference|\d+[\.\+\)]\s*(?:relationship|relation|emergency)|$))/i)
   if (permBlockMatch) {
     const parsedPerm = parseStructuredAddress(permBlockMatch[1], { nationality: result.personal?.nationality?.value })
     if (parsedPerm.addressLine1) result.permanentAddress!.addressLine1 = { value: parsedPerm.addressLine1, source, confidence: baseConfidence }
@@ -911,6 +911,19 @@ export interface ParsedContactResult {
  * - Postal / Pincode: Separate Postal / Pincode
  * - Country: Country (e.g. BANGLADESH)
  */
+export const BANGLADESH_DISTRICTS = new Set([
+  'BAGERHAT', 'BANDARBAN', 'BARGUNA', 'BARISAL', 'BARISHAL', 'BHOLA', 'BOGRA', 'BOGURA',
+  'BRAHMANBARIA', 'CHANDPUR', 'CHAPAINAWABGANJ', 'CHITTAGONG', 'CHATTOGRAM', 'CHUADANGA',
+  'COMILLA', 'CUMILLA', "COX'S BAZAR", 'COXS BAZAR', 'DHAKA', 'DINAJPUR', 'FARIDPUR',
+  'FENI', 'GAIBANDHA', 'GAZIPUR', 'GOPALGANJ', 'HABIGANJ', 'JAMALPUR', 'JASHORE', 'JESSORE',
+  'JHALOKATI', 'JHENAIDAH', 'JOYPURHAT', 'KHAGRACHARI', 'KHULNA', 'KISHOREGANJ', 'KURIGRAM',
+  'KUSHTIA', 'LAKSHMIPUR', 'LALMONIRHAT', 'MADARIPUR', 'MAGURA', 'MANIKGANJ', 'MAULVIBAZAR',
+  'MOULVIBAZAR', 'MEHERPUR', 'MUNSHIGANJ', 'MYMENSINGH', 'NAOGAON', 'NARAIL', 'NARAYANGANJ',
+  'NARSINGDI', 'NATORE', 'NETROKONA', 'NILPHAMARI', 'NOAKHALI', 'PABNA', 'PANCHAGARH',
+  'PATUAKHALI', 'PIROJPUR', 'RAJBARI', 'RAJSHAHI', 'RANGAMATI', 'RANGPUR', 'SATKHIRA',
+  'SHARIATPUR', 'SHERPUR', 'SIRAJGANJ', 'SUNAMGANJ', 'SYLHET', 'TANGAIL', 'THAKURGAON'
+])
+
 export function parseStructuredAddress(
   rawText?: string,
   context?: { nationality?: string }
@@ -926,6 +939,11 @@ export function parseStructuredAddress(
   text = text.replace(/\s*[-=]\s*(?:pres\s*\d*|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/gim, '')
   text = text.replace(/\s*-\s*=n.*$/gim, '')
 
+  // Strip trailing noise sections (Emergency contact, Relationship, Spouse, Father, Mother, Telephone, etc.)
+  text = text.replace(/(?:\r?\n|^)[\s\d.+*)\-—_~=]*(?:emergency(?:\s*contact)?|relationship|relation|legal(?:\s*guardian)?|spouse|father|mother|tel(?:\s*no)?|telephone|mobile|phone)[\s:=-][\s\S]*$/i, '')
+  text = text.replace(/\b\d+[\.\+\)]\s*(?:relationship|relation|emergency|legal|spouse|father|mother|name|tel)[\s:=-].*$/gim, '')
+  text = text.replace(/\b(?:relationship|relation|emergency\s*contact|legal\s*guardian)\b[\s:=-].*$/gim, '')
+
   // Strip leading list/bullet noise like "i.", "ii.", "1.", "*", etc.
   text = text.replace(/^(?:i\.|ii\.|iii\.|\*|\d+\.|\d+\))\s*/gim, '')
 
@@ -938,8 +956,8 @@ export function parseStructuredAddress(
   text = text.replace(/\bCOLON\b(?=\s*,\s*[A-Z])/gi, 'COLONI')
   text = text.replace(/\bCOLON\b(?=\s+[A-Z]{3,})/gi, 'COLONI')
 
-  // Clean OCR noise words like "ME, " before district or trailing dashes/symbols (e.g. "ME, THAKURGAON —" -> "THAKURGAON")
-  text = text.replace(/\bME\s*,\s*(?=[A-Za-z]+)/gi, '')
+  // Clean OCR noise words like "ME, ", "FE, ", "PO, " before district or trailing dashes/symbols
+  text = text.replace(/\b(?:ME|FE|PO|FT|FO|PO-)\s*,\s*(?=[A-Za-z]+)/gi, '')
   text = text.replace(/[—_~=]+$/g, '')
 
   // Strip leading noise prefixes on continuation lines (WE, VE, NE, ETY, HE., U0, LT, THU, P\d, 2.5.5, etc.)
@@ -974,10 +992,10 @@ export function parseStructuredAddress(
     .split(/[\r\n,]+/)
     .map((s) =>
       s
-        .replace(/^(?:\d+\.|\d+\)|\(\d+\))\s*/, '')
+        .replace(/^(?:\d+\.|\d+\)|\(\d+\)|\d+\+\.)\s*/, '')
         .replace(/\s*[-=]\s*(?:pres|aa|aa\]|bb|cc|dd|\d{2,3}\s*;).*$/i, '')
         .replace(/^(?:(?:present|permanent)?\s*(?:address\s*line\s*[12]|address|country|district|state(?:\/province)?|province|village(?:\/town\/city)?|town|city|postal\s*code|pin|zip|phone|mobile|telephone|email))\s*[:=]\s*/i, '')
-        .replace(/^(?:WE|VE|NE|ETY|HE\.?|U0|LT|THU|P\d|2\.5\.5)\s+/i, '')
+        .replace(/^(?:WE|VE|NE|ETY|HE\.?|U0|LT|THU|P\d|2\.5\.5|FE|ME|FT|FO)\s+/i, '')
         .replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '')
         .trim()
     )
@@ -985,7 +1003,8 @@ export function parseStructuredAddress(
       if (s.length < 2) return false
       if (/^[\s\-—_+=./\\,;]+$/.test(s)) return false
       if (/^\d{4,}$/.test(s)) return false
-      if (/^(?:present|permanent|address|residential|emergency|telephone|phone|email|country|district|state|province|pin|zip)$/i.test(s)) return false
+      if (/^(?:present|permanent|address|residential|emergency(?:\s*contact)?|relationship|relation|spouse|father|mother|legal(?:\s*guardian)?|telephone|phone|mobile|email|country|district|state|province|pin|zip)$/i.test(s)) return false
+      if (/^(?:\d+[\.\+\)]\s*)?(?:relationship|relation|emergency|legal|spouse)/i.test(s)) return false
       if (/[—_+=]/.test(s) && s.length < 15) return false
       return true
     })
@@ -1010,18 +1029,33 @@ export function parseStructuredAddress(
     }
   }
 
-  const segments = cleanRawSegments.filter((s) => {
+  // Clean and filter segments for country or known district tokens
+  const segments: string[] = []
+  for (const s of cleanRawSegments) {
     if (s.toUpperCase() === 'BANGLADESH' || s.toUpperCase() === 'INDIA' || s.toUpperCase() === 'USA') {
       if (!result.country) result.country = s.toUpperCase()
-      return false
+      continue
     }
     const divMatch = s.match(/^([A-Za-z]+)\s*(?:division|state|province)$/i)
     if (divMatch) {
       if (!result.stateProvince) result.stateProvince = divMatch[1].trim()
-      return false
+      continue
     }
-    return true
-  })
+
+    // Check if segment has leading OCR prefix attached to a Bangladesh District (e.g. "Fe THAKURGAON" -> "THAKURGAON")
+    let cleanedSeg = s
+    const words = s.split(/\s+/)
+    if (words.length >= 2) {
+      const lastWord = words[words.length - 1].toUpperCase()
+      if (BANGLADESH_DISTRICTS.has(lastWord)) {
+        if (words.length === 2 && /^(?:FE|ME|PO|FT|FO|WE|VE|NE|DIST|DISTRICT)$/i.test(words[0])) {
+          cleanedSeg = lastWord
+        }
+      }
+    }
+
+    segments.push(cleanedSeg)
+  }
 
   // 5. Semantic Assignment based on user-specified structure:
   // - Address Line 1 (House No./Street): FIRST logical address component (before 1st comma)
@@ -1037,33 +1071,60 @@ export function parseStructuredAddress(
       result.addressLine1 = segments[0]
     }
 
-    if (segments.length === 1) {
-      if (!result.villageTownCity) result.villageTownCity = segments[0]
-      if (!result.addressLine2) result.addressLine2 = segments[0]
-      if (!result.district) result.district = segments[0]
-      if (!result.stateProvince) result.stateProvince = segments[0]
-    } else if (segments.length === 2) {
-      if (!result.villageTownCity) result.villageTownCity = segments[1]
-      if (!result.addressLine2) result.addressLine2 = segments[1]
-      if (!result.district) result.district = segments[1]
-      if (!result.stateProvince) result.stateProvince = segments[1]
-    } else if (segments.length === 3) {
-      if (!result.villageTownCity) result.villageTownCity = segments[1]
-      if (!result.addressLine2) result.addressLine2 = segments[1]
-      if (!result.district) result.district = segments[2]
-      if (!result.stateProvince) result.stateProvince = segments[2]
-    } else if (segments.length === 4) {
-      const middleTwo = `${segments[1]}, ${segments[2]}`
-      if (!result.villageTownCity) result.villageTownCity = middleTwo
-      if (!result.addressLine2) result.addressLine2 = middleTwo
-      if (!result.district) result.district = segments[3]
-      if (!result.stateProvince) result.stateProvince = segments[3]
-    } else if (segments.length >= 5) {
-      const middleAll = segments.slice(1, -1).join(', ')
-      if (!result.villageTownCity) result.villageTownCity = middleAll
-      if (!result.addressLine2) result.addressLine2 = middleAll
-      if (!result.district) result.district = segments[segments.length - 1]
-      if (!result.stateProvince) result.stateProvince = segments[segments.length - 1]
+    // Check if one of the segments is explicitly a known Bangladesh District
+    let explicitDistrictIdx = -1
+    for (let i = segments.length - 1; i >= 0; i--) {
+      if (BANGLADESH_DISTRICTS.has(segments[i].toUpperCase())) {
+        explicitDistrictIdx = i
+        break
+      }
+    }
+
+    if (explicitDistrictIdx > 0) {
+      // We found a recognized district!
+      const districtName = segments[explicitDistrictIdx].toUpperCase()
+      if (!result.district) result.district = districtName
+      if (!result.stateProvince) result.stateProvince = districtName
+
+      const middleSegments = segments.slice(1, explicitDistrictIdx)
+      if (middleSegments.length > 0) {
+        const middleJoined = middleSegments.join(', ')
+        if (!result.villageTownCity) result.villageTownCity = middleJoined
+        if (!result.addressLine2) result.addressLine2 = middleJoined
+      } else {
+        if (!result.villageTownCity) result.villageTownCity = segments[explicitDistrictIdx]
+        if (!result.addressLine2) result.addressLine2 = segments[explicitDistrictIdx]
+      }
+    } else {
+      // Standard segment positional assignment
+      if (segments.length === 1) {
+        if (!result.villageTownCity) result.villageTownCity = segments[0]
+        if (!result.addressLine2) result.addressLine2 = segments[0]
+        if (!result.district) result.district = segments[0]
+        if (!result.stateProvince) result.stateProvince = segments[0]
+      } else if (segments.length === 2) {
+        if (!result.villageTownCity) result.villageTownCity = segments[1]
+        if (!result.addressLine2) result.addressLine2 = segments[1]
+        if (!result.district) result.district = segments[1]
+        if (!result.stateProvince) result.stateProvince = segments[1]
+      } else if (segments.length === 3) {
+        if (!result.villageTownCity) result.villageTownCity = segments[1]
+        if (!result.addressLine2) result.addressLine2 = segments[1]
+        if (!result.district) result.district = segments[2]
+        if (!result.stateProvince) result.stateProvince = segments[2]
+      } else if (segments.length === 4) {
+        const middleTwo = `${segments[1]}, ${segments[2]}`
+        if (!result.villageTownCity) result.villageTownCity = middleTwo
+        if (!result.addressLine2) result.addressLine2 = middleTwo
+        if (!result.district) result.district = segments[3]
+        if (!result.stateProvince) result.stateProvince = segments[3]
+      } else if (segments.length >= 5) {
+        const middleAll = segments.slice(1, -1).join(', ')
+        if (!result.villageTownCity) result.villageTownCity = middleAll
+        if (!result.addressLine2) result.addressLine2 = middleAll
+        if (!result.district) result.district = segments[segments.length - 1]
+        if (!result.stateProvince) result.stateProvince = segments[segments.length - 1]
+      }
     }
   }
 
@@ -1122,7 +1183,7 @@ export function parseApplicantContact(text: string): ParsedContactResult {
   const candidateIsds: string[] = []
   const candidateEmergencyPhones: string[] = []
 
-  const TEL_REGEX = /(?:telephone|tel|phone|mobile|cell|contact)(?:\s*(?:no|number|num))?\.?[\s:=.-]+(\+?[\d\s-]{7,25})/i
+  const TEL_REGEX = /(?:telephone|t[ée]l[ée]phone|tel|phone|mobile|cell|contact)(?:\s*(?:no|number|num|\.|n°|\/)*)?\.?[\s:=.-]+(\+?[\d\s-]{7,25})/i
 
   for (const rawLine of lines) {
     const line = rawLine.trim()
@@ -1177,6 +1238,11 @@ export function parseApplicantContact(text: string): ParsedContactResult {
       const emergTelMatch = line.match(TEL_REGEX)
       if (emergTelMatch && emergTelMatch[1]) {
         candidateEmergencyPhones.push(emergTelMatch[1].trim())
+      } else if (/^(?:telephone|t[ée]l[ée]phone|tel|phone|mobile|cell|contact)/i.test(line)) {
+        const digitsMatch = line.match(/(\+?880\d{8,11}|01[3-9]\d{8}|\+?\d{8,15})/)
+        if (digitsMatch) {
+          candidateEmergencyPhones.push(digitsMatch[1].trim())
+        }
       }
       continue
     }
@@ -1209,7 +1275,7 @@ export function parseApplicantContact(text: string): ParsedContactResult {
 
     // 2. Explicit Mobile line
     const mobileMatch = line.match(
-      /(?:present\s*mobile|applicant\s*mobile|mobile\s*(?:no|number|num)?|mobile|cell(?:\s*phone)?)\.?[\s:=.-]+(\+?[\d\s-]{7,25})/i
+      /(?:present\s*mobile|applicant\s*mobile|mobile\s*(?:no|number|num|\.|n°|\/)?|mobile|cell(?:\s*phone)?)\.?[\s:=.-]+(\+?[\d\s-]{7,25})/i
     )
     if (mobileMatch && mobileMatch[1]) {
       candidateMobiles.push(mobileMatch[1].trim())
@@ -1218,7 +1284,7 @@ export function parseApplicantContact(text: string): ParsedContactResult {
 
     // 3. Explicit Phone line (telephone / landline)
     const phoneMatch = line.match(
-      /(?:present\s*phone|applicant\s*phone|phone\s*(?:no|number|num)?|present\s*tel|telephone(?:\s*(?:no|number|num))?|tel\s*(?:no|number|num)?|telephone|contact(?:\s*(?:no|number|num))?)\.?[\s:=.-]+(\+?[\d\s-]{7,25})/i
+      /(?:present\s*phone|applicant\s*phone|phone\s*(?:no|number|num|\.|n°|\/)?|present\s*tel|telephone(?:\s*(?:no|number|num|\.|n°|\/)*)?|t[ée]l[ée]phone(?:\s*(?:no|number|num|\.|n°|\/)*)?|tel\s*(?:no|number|num|\.|n°|\/)?|telephone|contact(?:\s*(?:no|number|num|\.|n°|\/)?))\.?[\s:=.-]+(\+?[\d\s-]{7,25})/i
     )
     if (phoneMatch && phoneMatch[1]) {
       candidatePhones.push(phoneMatch[1].trim())
@@ -1253,6 +1319,10 @@ export function parseApplicantContact(text: string): ParsedContactResult {
     } else if (cleanDigits.startsWith('880') && cleanDigits.length >= 12) {
       if (!result.isdCode) result.isdCode = '880'
       if (!result.mobile) result.mobile = cleanDigits.slice(3)
+    } else if (cleanDigits.startsWith('01') && cleanDigits.length === 11) {
+      if (!result.isdCode) result.isdCode = '880'
+      if (!result.mobile) result.mobile = cleanDigits.slice(1)
+      if (!result.phone || !result.phone.startsWith('+')) result.phone = `+88${cleanDigits}`
     } else if (cleanWithPlus.startsWith('+91')) {
       if (!result.isdCode) result.isdCode = '91'
       if (!result.mobile) result.mobile = cleanDigits.slice(2)
@@ -1280,6 +1350,11 @@ export function parseApplicantContact(text: string): ParsedContactResult {
       const local = cleanDigits.slice(3)
       result.mobile = local
       if (!result.phone) result.phone = '+' + cleanDigits
+    } else if (cleanDigits.startsWith('01') && cleanDigits.length === 11) {
+      if (!result.isdCode) result.isdCode = '880'
+      const local = cleanDigits.slice(1) // 01XXXXXXXXX -> 1XXXXXXXXX
+      result.mobile = local
+      if (!result.phone) result.phone = `+88${cleanDigits}`
     } else if (cleanWithPlus.startsWith('+91')) {
       if (!result.isdCode) result.isdCode = '91'
       const local = cleanDigits.slice(2)
@@ -1314,6 +1389,14 @@ export function parseApplicantContact(text: string): ParsedContactResult {
       result.isdCode = '880'
       result.mobile = cleanDigits.slice(3)
       result.phone = '+' + cleanDigits
+    } else if (cleanDigits.startsWith('01') && cleanDigits.length === 11) {
+      result.isdCode = '880'
+      result.mobile = cleanDigits.slice(1)
+      result.phone = `+88${cleanDigits}`
+    } else if (cleanDigits.length === 10 && cleanDigits.startsWith('1')) {
+      result.isdCode = '880'
+      result.mobile = cleanDigits
+      result.phone = `+880${cleanDigits}`
     } else if (cleanWithPlus.startsWith('+')) {
       const intlMatch = cleanWithPlus.match(/^\+(\d{1,4})(\d{6,14})$/)
       if (intlMatch) {
@@ -1338,12 +1421,13 @@ export function parseApplicantContact(text: string): ParsedContactResult {
       if (cleanLocal.length === 10) {
         result.mobile = cleanLocal
         result.phone = `+880${cleanLocal}`
+        result.isdCode = '880'
       }
     }
   }
 
   if (result.mobile && !result.phone) {
-    result.phone = result.mobile
+    result.phone = result.mobile.startsWith('+') ? result.mobile : `+880${result.mobile.replace(/^0+/, '')}`
   }
 
   return result
@@ -1511,25 +1595,35 @@ export function extractFromRawText(
   }
 
   // 6. Place of Birth & Country of Birth
-  const pobMatch = text.match(
-    /(?:place\s*of\s*birth(?:\s*\/\s*lieu\s*de\s*naissance)?|town\s*of\s*birth|city\s*of\s*birth|birth\s*place|pob)[:\s]+([A-Za-z0-9 .,'-]{2,50})/i
-  )
+  const pobMatch =
+    text.match(
+      /(?:place\s*of\s*birth(?:\s*[\/\\]\s*lieu\s*de\s*naissance)?|town\s*of\s*birth|city\s*of\s*birth|birth\s*place|lieu\s*de\s*naissance|pob)[:\s]+([A-Za-z0-9 .,'-]{2,50})/i
+    ) ||
+    text.match(
+      /(?:place\s*of\s*birth(?:\s*[\/\\]\s*lieu\s*de\s*naissance)?|town\s*of\s*birth|city\s*of\s*birth|birth\s*place|lieu\s*de\s*naissance)\s*[\r\n]+\s*([A-Za-z0-9 .,'-]{2,50})/i
+    )
   if (pobMatch && pobMatch[1]) {
-    const rawPob = pobMatch[1].trim().toUpperCase()
+    const rawPob = pobMatch[1].replace(/^[:\s/]+/, '').trim().toUpperCase()
     const parts = rawPob.split(/[,/]/).map((p) => p.trim())
-    result.personal = {
-      ...result.personal,
-      townCityOfBirth: { value: parts[0], source, confidence: baseConfidence },
+    const candidatePob = parts[0].replace(/^(BGD|BANGLADESH|BANGLADESHI)\b/i, '').trim() || parts[0]
+    if (candidatePob && candidatePob.length >= 2 && !/^(NOT|NONE|NA|NIL)$/i.test(candidatePob)) {
+      result.personal = {
+        ...result.personal,
+        townCityOfBirth: { value: candidatePob, source, confidence: baseConfidence },
+      }
     }
     if (parts.length > 1 && !result.personal?.countryOfBirth) {
       let cob = parts[1]
       if (cob === 'BGD' || cob === 'BANGLADESHI') cob = 'BANGLADESH'
-      result.personal.countryOfBirth = { value: cob, source, confidence: baseConfidence }
+      result.personal = {
+        ...result.personal,
+        countryOfBirth: { value: cob, source, confidence: baseConfidence },
+      }
     }
   }
 
   const cobMatch = text.match(
-    /(?:country\s*of\s*birth(?:\s*\/\s*pays\s*de\s*naissance)?)[:\s]+([A-Za-z .,'-]{2,40})/i
+    /(?:country\s*of\s*birth(?:\s*[\/\\]\s*pays\s*de\s*naissance)?)[:\s]+([A-Za-z .,'-]{2,40})/i
   )
   if (cobMatch && cobMatch[1]) {
     let cob = cobMatch[1].trim().toUpperCase()
@@ -1552,9 +1646,13 @@ export function extractFromRawText(
   }
 
   // 8. Passport Dates (Issue & Expiry) & Place of Issue
-  const issueDateMatch = text.match(
-    /(?:date\s*of\s*issue(?:\s*\/\s*date\s*de\s*d[ée]livrance)?|passport\s*issue\s*date|issue\s*date|issued\s*on)[:\s]+([0-9A-Za-z ./-]{8,25})/i
-  )
+  const issueDateMatch =
+    text.match(
+      /(?:date\s*of\s*issue(?:\s*[\/\\]\s*date\s*de\s*d[ée]livrance)?|date\s*de\s*d[ée]livrance|passport\s*issue\s*date|issue\s*date|issued\s*on|\bdoi\b)[:\s]+([0-9A-Za-z ./-]{8,25})/i
+    ) ||
+    text.match(
+      /(?:date\s*of\s*issue(?:\s*[\/\\]\s*date\s*de\s*d[ée]livrance)?|date\s*de\s*d[ée]livrance|passport\s*issue\s*date|issue\s*date)\s*[\r\n]+\s*([0-9A-Za-z ./-]{8,25})/i
+    )
   if (issueDateMatch && issueDateMatch[1]) {
     const parsedIssue = parseStandardIsoDate(issueDateMatch[1])
     if (parsedIssue) {
@@ -1577,15 +1675,37 @@ export function extractFromRawText(
     }
   }
 
-  const expiryDateMatch = text.match(
-    /(?:date\s*of\s*expiry(?:\s*\/\s*date\s*d['’]expiration)?|passport\s*expiry\s*date|expiry\s*date|expiration\s*date|expires\s*on)[:\s]+([0-9A-Za-z ./-]{8,25})/i
-  )
+  const expiryDateMatch =
+    text.match(
+      /(?:date\s*of\s*expiry(?:\s*[\/\\]\s*date\s*d['’]expiration)?|date\s*d['’]expiration|passport\s*expiry\s*date|expiry\s*date|expiration\s*date|expires\s*on)[:\s]+([0-9A-Za-z ./-]{8,25})/i
+    ) ||
+    text.match(
+      /(?:date\s*of\s*expiry(?:\s*[\/\\]\s*date\s*d['’]expiration)?|date\s*d['’]expiration|passport\s*expiry\s*date|expiry\s*date|expiration\s*date)\s*[\r\n]+\s*([0-9A-Za-z ./-]{8,25})/i
+    )
   if (expiryDateMatch && expiryDateMatch[1]) {
     const parsedExpiry = parseStandardIsoDate(expiryDateMatch[1])
     if (parsedExpiry) {
       result.passport = {
         ...result.passport,
         expiryDate: { value: parsedExpiry, source, confidence: baseConfidence },
+      }
+    }
+  }
+
+  // Deterministic Derivation of Issue Date from Expiry Date if Issue Date is missing
+  if (!result.passport?.issueDate && result.passport?.expiryDate?.value) {
+    const expIso = result.passport.expiryDate.value
+    const expParts = expIso.split('-')
+    if (expParts.length === 3) {
+      const expYear = parseInt(expParts[0], 10)
+      if (!isNaN(expYear)) {
+        const validityYears = 10
+        const issueYear = expYear - validityYears
+        const derivedIssue = `${issueYear}-${expParts[1]}-${expParts[2]}`
+        result.passport = {
+          ...result.passport,
+          issueDate: { value: derivedIssue, source, confidence: 85 },
+        }
       }
     }
   }
@@ -1705,7 +1825,7 @@ export function extractFromRawText(
   // 12. ADDRESS EXTRACTION (Present & Permanent)
   // Check explicit Present Address block (excluding line-labeled fields)
   const presAddrBlock = text.match(
-    /(?:present\s*address|residential\s*address|current\s*address|home\s*address|mailing\s*address|postal\s*address)(?!\s*(?:line\s*\d|city|town|village|district|state|country|pincode|postal\s*code|phone|mobile|isd))[:\s]+([\s\S]+?)(?=(?:postal\s*code|pin\s*code|country[:\s]|phone|mobile|permanent\s*address|emergency|legal|father|mother|marital|occupation|employer|previous|passport|$))/i
+    /(?:present\s*address|residential\s*address|current\s*address|home\s*address|mailing\s*address|postal\s*address)(?!\s*(?:line\s*\d|city|town|village|district|state|country|pincode|postal\s*code|phone|mobile|isd))[:\s]+([\s\S]+?)(?=(?:postal\s*code|pin\s*code|country[:\s]|phone|mobile|permanent\s*address|emergency|relationship|relation|spouse|legal(?:\s*guardian)?|father|mother|marital|occupation|employer|previous|passport|\d+[\.\+\)]\s*(?:relationship|relation|emergency)|$))/i
   )
   if (presAddrBlock && presAddrBlock[1]) {
     const parsedPres = parseStructuredAddress(presAddrBlock[1], { nationality: result.personal?.nationality?.value })
@@ -1755,7 +1875,7 @@ export function extractFromRawText(
 
   // Check Permanent Address Block (excluding line-labeled fields)
   const permAddrBlock = text.match(
-    /(?:permanent\s*address)(?!\s*(?:line\s*\d|city|town|village|district|state|country|pincode|postal\s*code|phone|mobile|isd))[:\s]+([\s\S]+?)(?=(?:emergency(?:\s*contact)?|permanent\s*(?:postal|country|phone|mobile)|postal\s*code|pin\s*code|country[:\s]|legal\s*guardian|telephone|tel\s*no|present|father|mother|marital|occupation|employer|previous|passport|$))/i
+    /(?:permanent\s*address)(?!\s*(?:line\s*\d|city|town|village|district|state|country|pincode|postal\s*code|phone|mobile|isd))[:\s]+([\s\S]+?)(?=(?:emergency(?:\s*contact)?|relationship|relation|spouse|permanent\s*(?:postal|country|phone|mobile)|postal\s*code|pin\s*code|country[:\s]|legal\s*guardian|telephone|tel\s*no|present|father|mother|marital|occupation|employer|previous|passport|\d+[\.\+\)]\s*(?:relationship|relation|emergency)|$))/i
   )
   if (permAddrBlock && permAddrBlock[1]) {
     const parsedPerm = parseStructuredAddress(permAddrBlock[1], { nationality: result.personal?.nationality?.value })
@@ -1852,6 +1972,20 @@ export function extractFromRawText(
       ...result.permanentAddress,
       villageTownCity: { ...result.presentAddress.villageTownCity },
       addressLine2: { ...result.presentAddress.villageTownCity },
+    }
+  }
+
+  // Fallback: Town/City of Birth from Address District / Place of Issue if not explicitly found in OCR
+  if (!result.personal?.townCityOfBirth) {
+    const fallbackDistrict =
+      result.permanentAddress?.district?.value ||
+      result.presentAddress?.district?.value ||
+      result.passport?.placeOfIssue?.value
+    if (fallbackDistrict && !fallbackDistrict.includes('/')) {
+      result.personal = {
+        ...result.personal,
+        townCityOfBirth: { value: fallbackDistrict, source, confidence: Math.max(60, baseConfidence - 10) },
+      }
     }
   }
 
@@ -2664,9 +2798,9 @@ export function extractApplicantDataFromDocuments(
 }
 
 const SOURCE_PRIORITY: Record<ExtractionSource, number> = {
-  ai: 1,
-  mrz: 2,
-  'pdf-text': 3,
+  mrz: 1,
+  'pdf-text': 2,
+  ai: 3,
   ocr: 4,
   'manual-review': 5,
 }
