@@ -98,22 +98,22 @@ Return ONLY a valid JSON object matching the following structure:
     "isdCode": "Country dialing code if present or null"
   },
   "presentAddress": {
-    "addressLine1": "First address component only (e.g. Village / House / Street name / Flat number) or null",
-    "addressLine2": "Remaining secondary local-area components (e.g. Area / Union / Upazila / Colony / Road / Thana) before city/town or null",
-    "villageTownCity": "City or Town name or null",
-    "district": "District name or null",
-    "stateProvince": "State or Province name or null",
-    "postalCode": "Postal code or Pincode or null",
-    "country": "Country or null"
+    "addressLine1": "First address component before 1st comma (e.g. House No. / Street / Village name) or null",
+    "villageTownCity": "Next two middle components after 1st comma joined with comma (e.g. Area, Upazila / Police Station / Colony) or null",
+    "addressLine2": "Next two middle components after 1st comma joined with comma or null",
+    "district": "Last component / District name (e.g. THAKURGAON, DHAKA, CHITTAGONG) or null",
+    "stateProvince": "District name (for Bangladesh, this is the District name, NEVER 'IN' or country code) or null",
+    "postalCode": "Postal code or Pincode (4-6 digits) or null",
+    "country": "Country name (e.g. BANGLADESH) or null"
   },
   "permanentAddress": {
-    "addressLine1": "First address component only (e.g. Permanent Village / House / Street name / Flat number) or null",
-    "addressLine2": "Remaining secondary local-area components (e.g. Area / Union / Upazila / Colony / Road / Thana) before city/town or null",
-    "villageTownCity": "City or Town name or null",
-    "district": "District name or null",
-    "stateProvince": "State or Province name or null",
-    "postalCode": "Postal code or Pincode or null",
-    "country": "Country or null"
+    "addressLine1": "First address component before 1st comma (e.g. Permanent House No. / Street / Village name) or null",
+    "villageTownCity": "Next two middle components after 1st comma joined with comma (e.g. Area, Upazila / Police Station / Colony) or null",
+    "addressLine2": "Next two middle components after 1st comma joined with comma or null",
+    "district": "Last component / District name (e.g. THAKURGAON, DHAKA, CHITTAGONG) or null",
+    "stateProvince": "District name (for Bangladesh, this is the District name, NEVER 'IN' or country code) or null",
+    "postalCode": "Postal code or Pincode (4-6 digits) or null",
+    "country": "Country name (e.g. BANGLADESH) or null"
   },
   "family": {
     "fatherName": "Father's full name as printed or null",
@@ -385,20 +385,35 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   // 4. Present Address
   const pres = (raw.presentAddress || {}) as Record<string, unknown>
   let presLine1 = pres.addressLine1 ? String(pres.addressLine1).trim() : undefined
-  let presLine2 = pres.addressLine2 ? String(pres.addressLine2).trim() : undefined
-  let presCity = pres.villageTownCity ? String(pres.villageTownCity).trim() : undefined
-  let presDist = pres.district ? String(pres.district).trim().toUpperCase() : undefined
-  const presState = pres.stateProvince ? String(pres.stateProvince).trim().toUpperCase() : undefined
+  let presCity = pres.villageTownCity ? String(pres.villageTownCity).trim() : (pres.addressLine2 ? String(pres.addressLine2).trim() : undefined)
+  let presLine2 = pres.addressLine2 ? String(pres.addressLine2).trim() : (pres.villageTownCity ? String(pres.villageTownCity).trim() : undefined)
+  let presDist = pres.district ? String(pres.district).trim().toUpperCase() : (pres.stateProvince ? String(pres.stateProvince).trim().toUpperCase() : undefined)
+  let presState = pres.stateProvince ? String(pres.stateProvince).trim().toUpperCase() : (pres.district ? String(pres.district).trim().toUpperCase() : undefined)
   let presPin = pres.postalCode ? String(pres.postalCode).trim() : undefined
-  let presCountry = pres.country ? String(pres.country).trim().toUpperCase() : undefined
+  let presCountry = pres.country ? String(pres.country).trim().toUpperCase() : 'BANGLADESH'
 
-  if (presLine1 && (!presLine2 || presLine1.includes(','))) {
-    const combinedPres = [presLine1, presLine2, presCity, presPin, presDist].filter(Boolean).join(', ')
-    const reParsed = parseStructuredAddress(combinedPres, { nationality: p.nationality ? String(p.nationality) : undefined })
+  const invalidTokens = new Set(['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'])
+  if (presState && (invalidTokens.has(presState) || presState.length <= 2)) {
+    presState = undefined
+  }
+  if (presDist && (invalidTokens.has(presDist) || presDist.length <= 2)) {
+    presDist = undefined
+  }
+  if (!presDist && presState) presDist = presState
+  if (!presState && presDist) presState = presDist
+
+  const rawPresStr = (pres.rawAddress || pres.fullAddress || pres.address) ? String(pres.rawAddress || pres.fullAddress || pres.address).trim() : undefined
+  if (rawPresStr && (!presLine1 || !presDist)) {
+    const reParsed = parseStructuredAddress(rawPresStr, { nationality: p.nationality ? String(p.nationality) : undefined })
     if (reParsed.addressLine1) presLine1 = reParsed.addressLine1
-    if (reParsed.addressLine2) presLine2 = reParsed.addressLine2
-    if (reParsed.villageTownCity) presCity = reParsed.villageTownCity
-    if (reParsed.district) presDist = reParsed.district
+    if (reParsed.villageTownCity) {
+      presCity = reParsed.villageTownCity
+      presLine2 = reParsed.villageTownCity
+    }
+    if (reParsed.district) {
+      presDist = reParsed.district
+      presState = reParsed.stateProvince || reParsed.district
+    }
     if (reParsed.postalCode && !presPin) presPin = reParsed.postalCode
     if (reParsed.country && !presCountry) presCountry = reParsed.country
   }
@@ -407,27 +422,41 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   if (presLine2) result.presentAddress!.addressLine2 = { value: presLine2, source }
   if (presCity) result.presentAddress!.villageTownCity = { value: presCity, source }
   if (presDist) result.presentAddress!.district = { value: presDist, source }
-  if (presState) result.presentAddress!.stateProvince = { value: presState, source }
+  if (presState || presDist) result.presentAddress!.stateProvince = { value: presState || presDist!, source }
   if (presPin) result.presentAddress!.postalCode = { value: presPin, source }
   if (presCountry) result.presentAddress!.country = { value: presCountry, source }
 
   // 5. Permanent Address
   const perm = (raw.permanentAddress || {}) as Record<string, unknown>
   let permLine1 = perm.addressLine1 ? String(perm.addressLine1).trim() : undefined
-  let permLine2 = perm.addressLine2 ? String(perm.addressLine2).trim() : undefined
-  let permCity = perm.villageTownCity ? String(perm.villageTownCity).trim() : undefined
-  let permDist = perm.district ? String(perm.district).trim().toUpperCase() : undefined
-  const permState = perm.stateProvince ? String(perm.stateProvince).trim().toUpperCase() : undefined
+  let permCity = perm.villageTownCity ? String(perm.villageTownCity).trim() : (perm.addressLine2 ? String(perm.addressLine2).trim() : undefined)
+  let permLine2 = perm.addressLine2 ? String(perm.addressLine2).trim() : (perm.villageTownCity ? String(perm.villageTownCity).trim() : undefined)
+  let permDist = perm.district ? String(perm.district).trim().toUpperCase() : (perm.stateProvince ? String(perm.stateProvince).trim().toUpperCase() : undefined)
+  let permState = perm.stateProvince ? String(perm.stateProvince).trim().toUpperCase() : (perm.district ? String(perm.district).trim().toUpperCase() : undefined)
   let permPin = perm.postalCode ? String(perm.postalCode).trim() : undefined
-  let permCountry = perm.country ? String(perm.country).trim().toUpperCase() : undefined
+  let permCountry = perm.country ? String(perm.country).trim().toUpperCase() : 'BANGLADESH'
 
-  if (permLine1 && (!permLine2 || permLine1.includes(','))) {
-    const combinedPerm = [permLine1, permLine2, permCity, permPin, permDist].filter(Boolean).join(', ')
-    const reParsed = parseStructuredAddress(combinedPerm, { nationality: p.nationality ? String(p.nationality) : undefined })
+  if (permState && (invalidTokens.has(permState) || permState.length <= 2)) {
+    permState = undefined
+  }
+  if (permDist && (invalidTokens.has(permDist) || permDist.length <= 2)) {
+    permDist = undefined
+  }
+  if (!permDist && permState) permDist = permState
+  if (!permState && permDist) permState = permDist
+
+  const rawPermStr = (perm.rawAddress || perm.fullAddress || perm.address) ? String(perm.rawAddress || perm.fullAddress || perm.address).trim() : undefined
+  if (rawPermStr && (!permLine1 || !permDist)) {
+    const reParsed = parseStructuredAddress(rawPermStr, { nationality: p.nationality ? String(p.nationality) : undefined })
     if (reParsed.addressLine1) permLine1 = reParsed.addressLine1
-    if (reParsed.addressLine2) permLine2 = reParsed.addressLine2
-    if (reParsed.villageTownCity) permCity = reParsed.villageTownCity
-    if (reParsed.district) permDist = reParsed.district
+    if (reParsed.villageTownCity) {
+      permCity = reParsed.villageTownCity
+      permLine2 = reParsed.villageTownCity
+    }
+    if (reParsed.district) {
+      permDist = reParsed.district
+      permState = reParsed.stateProvince || reParsed.district
+    }
     if (reParsed.postalCode && !permPin) permPin = reParsed.postalCode
     if (reParsed.country && !permCountry) permCountry = reParsed.country
   }
@@ -436,9 +465,37 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   if (permLine2) result.permanentAddress!.addressLine2 = { value: permLine2, source }
   if (permCity) result.permanentAddress!.villageTownCity = { value: permCity, source }
   if (permDist) result.permanentAddress!.district = { value: permDist, source }
-  if (permState) result.permanentAddress!.stateProvince = { value: permState, source }
+  if (permState || permDist) result.permanentAddress!.stateProvince = { value: permState || permDist!, source }
   if (permPin) result.permanentAddress!.postalCode = { value: permPin, source }
   if (permCountry) result.permanentAddress!.country = { value: permCountry, source }
+
+  // Sync: If present address is empty and permanent address is present, copy permanent to present
+  if (!result.presentAddress?.addressLine1 && result.permanentAddress?.addressLine1) {
+    result.presentAddress = {
+      ...result.presentAddress,
+      addressLine1: result.permanentAddress.addressLine1 ? { ...result.permanentAddress.addressLine1 } : undefined,
+      addressLine2: result.permanentAddress.addressLine2 ? { ...result.permanentAddress.addressLine2 } : undefined,
+      villageTownCity: result.permanentAddress.villageTownCity ? { ...result.permanentAddress.villageTownCity } : undefined,
+      district: result.permanentAddress.district ? { ...result.permanentAddress.district } : undefined,
+      stateProvince: result.permanentAddress.stateProvince ? { ...result.permanentAddress.stateProvince } : undefined,
+      postalCode: result.permanentAddress.postalCode ? { ...result.permanentAddress.postalCode } : undefined,
+      country: result.permanentAddress.country ? { ...result.permanentAddress.country } : { value: 'BANGLADESH', source },
+    }
+  }
+
+  // Sync: If permanent address is empty and present address is present, copy present to permanent
+  if (!result.permanentAddress?.addressLine1 && result.presentAddress?.addressLine1) {
+    result.permanentAddress = {
+      ...result.permanentAddress,
+      addressLine1: result.presentAddress.addressLine1 ? { ...result.presentAddress.addressLine1 } : undefined,
+      addressLine2: result.presentAddress.addressLine2 ? { ...result.presentAddress.addressLine2 } : undefined,
+      villageTownCity: result.presentAddress.villageTownCity ? { ...result.presentAddress.villageTownCity } : undefined,
+      district: result.presentAddress.district ? { ...result.presentAddress.district } : undefined,
+      stateProvince: result.presentAddress.stateProvince ? { ...result.presentAddress.stateProvince } : undefined,
+      postalCode: result.presentAddress.postalCode ? { ...result.presentAddress.postalCode } : undefined,
+      country: result.presentAddress.country ? { ...result.presentAddress.country } : { value: 'BANGLADESH', source },
+    }
+  }
 
   // 6. Family
   const fam = (raw.family || {}) as Record<string, unknown>
