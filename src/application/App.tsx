@@ -275,9 +275,17 @@ export const App: React.FC = () => {
       } else if (key === 'village_town_city') {
         updatedFields['pres_addr2'] = { ...updatedField }
         updatedManualEdits['pres_addr2'] = true
+        updatedFields['permanent_village_town_city'] = { ...updatedField }
+        updatedFields['perm_add2'] = { ...updatedField }
+        updatedManualEdits['permanent_village_town_city'] = true
+        updatedManualEdits['perm_add2'] = true
       } else if (key === 'pres_addr2') {
         updatedFields['village_town_city'] = { ...updatedField }
         updatedManualEdits['village_town_city'] = true
+        updatedFields['permanent_village_town_city'] = { ...updatedField }
+        updatedFields['perm_add2'] = { ...updatedField }
+        updatedManualEdits['permanent_village_town_city'] = true
+        updatedManualEdits['perm_add2'] = true
       } else if (key === 'district') {
         updatedFields['state_province'] = { ...updatedField }
         updatedFields['state_name'] = { ...updatedField }
@@ -359,10 +367,22 @@ export const App: React.FC = () => {
         updatedFields['appl.journeydate'] = { ...restoredField }
       } else if (key === 'village_town_city') {
         delete updatedManualEdits['pres_addr2']
+        delete updatedManualEdits['village_town_city']
+        delete updatedManualEdits['permanent_village_town_city']
+        delete updatedManualEdits['perm_add2']
         updatedFields['pres_addr2'] = { ...restoredField }
+        updatedFields['village_town_city'] = { ...restoredField }
+        updatedFields['permanent_village_town_city'] = { ...restoredField }
+        updatedFields['perm_add2'] = { ...restoredField }
       } else if (key === 'pres_addr2') {
         delete updatedManualEdits['village_town_city']
+        delete updatedManualEdits['pres_addr2']
+        delete updatedManualEdits['permanent_village_town_city']
+        delete updatedManualEdits['perm_add2']
         updatedFields['village_town_city'] = { ...restoredField }
+        updatedFields['pres_addr2'] = { ...restoredField }
+        updatedFields['permanent_village_town_city'] = { ...restoredField }
+        updatedFields['perm_add2'] = { ...restoredField }
       } else if (key === 'district') {
         delete updatedManualEdits['state_province']
         delete updatedManualEdits['state_name']
@@ -413,12 +433,11 @@ export const App: React.FC = () => {
       updatedFields['perm_add1'] = { value: pres1, source: 'manual', isUserEdited: true }
       updatedEdits['perm_add1'] = true
     }
-    if (pres2) {
-      updatedFields['perm_add2'] = { value: pres2, source: 'manual', isUserEdited: true }
+    if (presCity || pres2) {
+      const cityVal = presCity || pres2
+      updatedFields['perm_add2'] = { value: cityVal, source: 'manual', isUserEdited: true }
       updatedEdits['perm_add2'] = true
-    }
-    if (presCity) {
-      updatedFields['permanent_village_town_city'] = { value: presCity, source: 'manual', isUserEdited: true }
+      updatedFields['permanent_village_town_city'] = { value: cityVal, source: 'manual', isUserEdited: true }
       updatedEdits['permanent_village_town_city'] = true
     }
     if (presDistrict) {
