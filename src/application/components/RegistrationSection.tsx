@@ -240,7 +240,7 @@ export const RegistrationSection: React.FC<RegistrationSectionProps> = ({
 
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold tracking-widest text-[#d97706] uppercase">भारत गणराज्य</span>
+              <span className="text-xs font-bold tracking-widest text-[#d97706] uppercase">भारत गणराज्य</span> 
               <span className="text-xs font-semibold text-slate-500">|</span>
               <span className="text-xs font-bold tracking-wider text-[#1e3a8a] uppercase">REPUBLIC OF INDIA</span>
             </div>
