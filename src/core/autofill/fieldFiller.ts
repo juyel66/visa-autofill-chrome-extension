@@ -204,16 +204,59 @@ export function fillField(
       (element instanceof HTMLInputElement || element.tagName === 'INPUT') &&
       ((element as HTMLInputElement).type || '').toLowerCase() === 'radio'
     ) {
-      const radioGroup = Array.from(
+      const radioElementsSet = new Set<HTMLInputElement>()
+      if (element instanceof HTMLInputElement) {
+        radioElementsSet.add(element)
+      }
+
+      const elName = (element as HTMLInputElement).name
+      if (elName) {
         document.querySelectorAll<HTMLInputElement>(
-          `input[type="radio"][name="${safeCssEscape((element as HTMLInputElement).name)}"]`
-        )
-      )
+          `input[type="radio"][name="${safeCssEscape(elName)}"]`
+        ).forEach((r) => radioElementsSet.add(r))
+
+        const rawName = elName.replace(/^appl\./, '')
+        document.querySelectorAll<HTMLInputElement>(
+          `input[type="radio"][name="${safeCssEscape(rawName)}"], input[type="radio"][name="appl.${safeCssEscape(rawName)}"]`
+        ).forEach((r) => radioElementsSet.add(r))
+      }
+
+      // Specific known radio patterns on Indian visa portals
+      if (
+        mapping.targetField === 'grandparent_flag' ||
+        mapping.sourceField === 'family.hasPakistanRelation' ||
+        mapping.id.includes('grandparent')
+      ) {
+        document.querySelectorAll<HTMLInputElement>(
+          '#grandparent_flag1, #grandparent_flag2, input[name="appl.grandparent_flag"], input[name="grandparent_flag"]'
+        ).forEach((r) => radioElementsSet.add(r))
+      }
+
+      if (
+        mapping.targetField === 'prev_org' ||
+        mapping.sourceField === 'employment.hasMilitaryService' ||
+        mapping.id.includes('prev_org')
+      ) {
+        document.querySelectorAll<HTMLInputElement>(
+          '#prev_org1, #prev_org2, input[name="appl.prev_org"], input[name="prev_org"]'
+        ).forEach((r) => radioElementsSet.add(r))
+      }
+
+      if (element.id) {
+        const baseId = element.id.replace(/(?:_?flag)?[12]$|_yes$|_no$/i, '')
+        if (baseId) {
+          document.querySelectorAll<HTMLInputElement>(
+            `input[type="radio"][id^="${safeCssEscape(baseId)}"], input[type="radio"][id*="${safeCssEscape(baseId)}"]`
+          ).forEach((r) => radioElementsSet.add(r))
+        }
+      }
+
+      const radioGroup = Array.from(radioElementsSet)
       const isTrue = strValue.toLowerCase() === 'true' || strValue.toLowerCase() === 'yes' || strValue === '1' || strValue.toLowerCase() === 'y'
       const isFalse = strValue.toLowerCase() === 'false' || strValue.toLowerCase() === 'no' || strValue === '0' || strValue.toLowerCase() === 'n'
       const matchingRadios = radioGroup.filter((r) => {
-        const rVal = r.value.toLowerCase()
-        const rId = r.id.toLowerCase()
+        const rVal = (r.value || '').toLowerCase()
+        const rId = (r.id || '').toLowerCase()
         if (rVal === strValue.toLowerCase() || rId === strValue.toLowerCase()) return true
         if (isTrue) {
           if (rVal === 'y' || rVal === 'yes' || rVal === '1' || rVal === 'true') return true
@@ -231,11 +274,22 @@ export function fillField(
       if (matchingRadios.length === 0) {
         return { fieldId, status: 'failed', failureType: 'option-not-found', reason: `Radio option "${strValue}" not found` }
       }
+
+      let targetRadio: HTMLInputElement = matchingRadios[0]
       if (matchingRadios.length > 1) {
-        return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Multiple matching radio elements found' }
+        targetRadio = matchingRadios.find((r) => {
+          const rVal = (r.value || '').toLowerCase()
+          const rId = (r.id || '').toLowerCase()
+          if (isFalse) {
+            return rVal === 'n' || rVal === 'no' || rId.endsWith('2') || rId.includes('no')
+          }
+          if (isTrue) {
+            return rVal === 'y' || rVal === 'yes' || rId.endsWith('1') || rId.includes('yes')
+          }
+          return false
+        }) || matchingRadios[0]
       }
 
-      const targetRadio = matchingRadios[0]
       targetRadio.checked = true
       dispatchFieldEvents(targetRadio)
 
