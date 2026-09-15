@@ -603,6 +603,20 @@ export function extractFromOgdVisaApplication(
     if (parsedPerm.country) result.permanentAddress!.country = { value: parsedPerm.country, source, confidence: baseConfidence }
   }
 
+  // Fallback: If present address was absent on passport, populate it from permanent address
+  if (!result.presentAddress?.addressLine1 && result.permanentAddress?.addressLine1) {
+    result.presentAddress = {
+      ...result.presentAddress,
+      addressLine1: result.permanentAddress.addressLine1 ? { ...result.permanentAddress.addressLine1 } : undefined,
+      addressLine2: result.permanentAddress.addressLine2 ? { ...result.permanentAddress.addressLine2 } : undefined,
+      villageTownCity: result.permanentAddress.villageTownCity ? { ...result.permanentAddress.villageTownCity } : undefined,
+      district: result.permanentAddress.district ? { ...result.permanentAddress.district } : undefined,
+      stateProvince: result.permanentAddress.stateProvince ? { ...result.permanentAddress.stateProvince } : undefined,
+      postalCode: result.permanentAddress.postalCode ? { ...result.permanentAddress.postalCode } : undefined,
+      country: result.permanentAddress.country ? { ...result.permanentAddress.country } : { value: 'BANGLADESH', source },
+    }
+  }
+
   // Phone, Mobile, ISD Code, Email
   const parsedContacts = parseApplicantContact(text)
   if (parsedContacts.email) {
@@ -970,7 +984,27 @@ export function parseStructuredAddress(
       return true
     })
 
-  const segments = rawSegments.filter((s) => {
+  // Deduplicate consecutive identical segments
+  const dedupedSegments: string[] = []
+  for (let i = 0; i < rawSegments.length; i++) {
+    const curr = rawSegments[i]
+    if (dedupedSegments.length === 0 || dedupedSegments[dedupedSegments.length - 1].toUpperCase() !== curr.toUpperCase()) {
+      dedupedSegments.push(curr)
+    }
+  }
+
+  // Also check if array has repeated sequence, e.g. [A, B, A, B] -> [A, B]
+  let cleanRawSegments = dedupedSegments
+  if (dedupedSegments.length >= 4 && dedupedSegments.length % 2 === 0) {
+    const half = dedupedSegments.length / 2
+    const firstHalf = dedupedSegments.slice(0, half).map((s) => s.toUpperCase()).join('|')
+    const secondHalf = dedupedSegments.slice(half).map((s) => s.toUpperCase()).join('|')
+    if (firstHalf === secondHalf) {
+      cleanRawSegments = dedupedSegments.slice(0, half)
+    }
+  }
+
+  const segments = cleanRawSegments.filter((s) => {
     if (s.toUpperCase() === 'BANGLADESH' || s.toUpperCase() === 'INDIA' || s.toUpperCase() === 'USA') {
       if (!result.country) result.country = s.toUpperCase()
       return false
@@ -983,11 +1017,15 @@ export function parseStructuredAddress(
     return true
   })
 
-  // 5. Semantic Assignment based on reference structure:
-  // Address Line 1 = FIRST logical address component
-  // Address Line 2 = SECOND and subsequent local components before city/town
-  // City/Town = LAST component (City/Town)
-  // District = LAST component (if not explicitly set)
+  // 5. Semantic Assignment based on user-specified structure:
+  // - Address Line 1 (House No./Street): FIRST logical address component (before 1st comma)
+  // - Village / Town / City: Middle component(s)
+  //   - If total 3 segments: segment[1] -> Village/Town/City
+  //   - If total 4 segments: segment[1], segment[2] -> Village/Town/City (joined with ', ')
+  //   - If total >= 5 segments: segments.slice(1, -1).join(', ') -> Village/Town/City
+  //   - If total 2 segments: segment[1] -> Village/Town/City
+  //   - If total 1 segment: segment[0] -> Village/Town/City
+  // - District / State: LAST logical address component (e.g. THAKURGAON, DHAKA, CHITTAGONG)
   if (segments.length > 0) {
     if (!result.addressLine1) {
       result.addressLine1 = segments[0]
@@ -995,22 +1033,31 @@ export function parseStructuredAddress(
 
     if (segments.length === 1) {
       if (!result.villageTownCity) result.villageTownCity = segments[0]
+      if (!result.addressLine2) result.addressLine2 = segments[0]
       if (!result.district) result.district = segments[0]
+      if (!result.stateProvince) result.stateProvince = segments[0]
     } else if (segments.length === 2) {
       if (!result.villageTownCity) result.villageTownCity = segments[1]
-      if (!result.district) result.district = segments[1]
-    } else if (segments.length === 3) {
       if (!result.addressLine2) result.addressLine2 = segments[1]
-      if (!result.villageTownCity) result.villageTownCity = segments[2]
+      if (!result.district) result.district = segments[1]
+      if (!result.stateProvince) result.stateProvince = segments[1]
+    } else if (segments.length === 3) {
+      if (!result.villageTownCity) result.villageTownCity = segments[1]
+      if (!result.addressLine2) result.addressLine2 = segments[1]
       if (!result.district) result.district = segments[2]
+      if (!result.stateProvince) result.stateProvince = segments[2]
     } else if (segments.length === 4) {
-      if (!result.addressLine2) result.addressLine2 = `${segments[1]}, ${segments[2]}`
-      if (!result.villageTownCity) result.villageTownCity = segments[3]
+      const middleTwo = `${segments[1]}, ${segments[2]}`
+      if (!result.villageTownCity) result.villageTownCity = middleTwo
+      if (!result.addressLine2) result.addressLine2 = middleTwo
       if (!result.district) result.district = segments[3]
+      if (!result.stateProvince) result.stateProvince = segments[3]
     } else if (segments.length >= 5) {
-      if (!result.addressLine2) result.addressLine2 = segments.slice(1, -1).join(', ')
-      if (!result.villageTownCity) result.villageTownCity = segments[segments.length - 1]
+      const middleAll = segments.slice(1, -1).join(', ')
+      if (!result.villageTownCity) result.villageTownCity = middleAll
+      if (!result.addressLine2) result.addressLine2 = middleAll
       if (!result.district) result.district = segments[segments.length - 1]
+      if (!result.stateProvince) result.stateProvince = segments[segments.length - 1]
     }
   }
 
@@ -1023,11 +1070,27 @@ export function parseStructuredAddress(
     }
   }
 
+  // Sanitize district & stateProvince to ensure country code junk like "IN", "BD" is never treated as district/state
+  const invalidGeoTokens = new Set(['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'])
+  if (result.district && (invalidGeoTokens.has(result.district.toUpperCase()) || result.district.length <= 2)) {
+    result.district = undefined
+  }
+  if (result.stateProvince && (invalidGeoTokens.has(result.stateProvince.toUpperCase()) || result.stateProvince.length <= 2)) {
+    result.stateProvince = undefined
+  }
+  if (!result.district && result.stateProvince) {
+    result.district = result.stateProvince
+  }
+  if (!result.stateProvince && result.district) {
+    result.stateProvince = result.district
+  }
+
   // Clean trailing/leading spaces or punctuation from all parsed fields
   if (result.addressLine1) result.addressLine1 = result.addressLine1.replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '').trim()
   if (result.addressLine2) result.addressLine2 = result.addressLine2.replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '').trim()
   if (result.villageTownCity) result.villageTownCity = result.villageTownCity.replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '').trim()
   if (result.district) result.district = result.district.replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '').trim()
+  if (result.stateProvince) result.stateProvince = result.stateProvince.replace(/^[\s,;:\-—_~=]+|[\s,;:\-—_~=]+$/g, '').trim()
 
   return result
 }
@@ -1749,6 +1812,32 @@ export function extractFromRawText(
           country: parsedGeneric.country ? { value: parsedGeneric.country, source, confidence: baseConfidence } : undefined,
         }
       }
+    }
+  }
+
+  // Cross-synchronize present and permanent address if one is missing
+  if (!result.presentAddress?.addressLine1 && result.permanentAddress?.addressLine1) {
+    result.presentAddress = {
+      ...result.presentAddress,
+      addressLine1: result.permanentAddress.addressLine1 ? { ...result.permanentAddress.addressLine1 } : undefined,
+      addressLine2: result.permanentAddress.addressLine2 ? { ...result.permanentAddress.addressLine2 } : undefined,
+      villageTownCity: result.permanentAddress.villageTownCity ? { ...result.permanentAddress.villageTownCity } : undefined,
+      district: result.permanentAddress.district ? { ...result.permanentAddress.district } : undefined,
+      stateProvince: result.permanentAddress.stateProvince ? { ...result.permanentAddress.stateProvince } : undefined,
+      postalCode: result.permanentAddress.postalCode ? { ...result.permanentAddress.postalCode } : undefined,
+      country: result.permanentAddress.country ? { ...result.permanentAddress.country } : { value: 'BANGLADESH', source },
+    }
+  }
+  if (!result.permanentAddress?.addressLine1 && result.presentAddress?.addressLine1) {
+    result.permanentAddress = {
+      ...result.permanentAddress,
+      addressLine1: result.presentAddress.addressLine1 ? { ...result.presentAddress.addressLine1 } : undefined,
+      addressLine2: result.presentAddress.addressLine2 ? { ...result.presentAddress.addressLine2 } : undefined,
+      villageTownCity: result.presentAddress.villageTownCity ? { ...result.presentAddress.villageTownCity } : undefined,
+      district: result.presentAddress.district ? { ...result.presentAddress.district } : undefined,
+      stateProvince: result.presentAddress.stateProvince ? { ...result.presentAddress.stateProvince } : undefined,
+      postalCode: result.presentAddress.postalCode ? { ...result.presentAddress.postalCode } : undefined,
+      country: result.presentAddress.country ? { ...result.presentAddress.country } : { value: 'BANGLADESH', source },
     }
   }
 
