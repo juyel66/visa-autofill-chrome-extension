@@ -179,19 +179,14 @@ export function resolveApplicantValue(
     path === 'permanent_village_town_city'
   ) {
     const raw = (
-      applicant.permanentAddress?.addressLine2 ||
-      applicant.permanentAddress?.villageTownCity ||
-      applicant.presentAddress?.addressLine2 ||
       applicant.presentAddress?.villageTownCity ||
+      applicant.presentAddress?.addressLine2 ||
+      applicant.permanentAddress?.villageTownCity ||
+      applicant.permanentAddress?.addressLine2 ||
       ''
     ).trim()
     if (!raw) return undefined
-    const clean = raw.toUpperCase()
-    const pCode = (applicant.permanentAddress?.postalCode || applicant.presentAddress?.postalCode || '').trim()
-    if (pCode && !clean.endsWith(pCode)) {
-      return `${clean}-${pCode}`
-    }
-    return clean
+    return raw.toUpperCase()
   }
 
   // Village / Town / City (Present Address)
@@ -510,17 +505,12 @@ export function resolveApplicantValue(
     path === 'appl.perm_city'
   ) {
     const rawVal =
-      applicant.permanentAddress?.villageTownCity ||
-      applicant.permanentAddress?.addressLine2 ||
       applicant.presentAddress?.villageTownCity ||
-      applicant.presentAddress?.addressLine2
+      applicant.presentAddress?.addressLine2 ||
+      applicant.permanentAddress?.villageTownCity ||
+      applicant.permanentAddress?.addressLine2
     if (rawVal && rawVal.trim() !== '') {
-      const clean = rawVal.trim().toUpperCase()
-      const pCode = (applicant.permanentAddress?.postalCode || applicant.presentAddress?.postalCode || '').trim()
-      if (pCode && !clean.endsWith(pCode)) {
-        return `${clean}-${pCode}`
-      }
-      return clean
+      return rawVal.trim().toUpperCase()
     }
     return undefined
   }
