@@ -365,7 +365,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
-                  value={getVal('permanent_village_town_city') || getVal('perm_add2')}
+                  value={getVal('permanent_village_town_city') || getVal('perm_add2') || getVal('village_town_city') || getVal('pres_addr2')}
                   onChange={(e) => {
                     onFieldChange('permanent_village_town_city', e.target.value.toUpperCase())
                     onFieldChange('perm_add2', e.target.value.toUpperCase())
@@ -373,7 +373,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   placeholder="VILLAGE / TOWN / CITY"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
-                {renderSourceBadge(fields['permanent_village_town_city'] || fields['perm_add2'])}
+                {renderSourceBadge(fields['permanent_village_town_city'] || fields['perm_add2'] || fields['village_town_city'] || fields['pres_addr2'])}
                 {(fields['permanent_village_town_city']?.isUserEdited || fields['perm_add2']?.isUserEdited) && (
                   <button onClick={() => { onResetField('permanent_village_town_city'); onResetField('perm_add2'); }} className="text-slate-400 hover:text-blue-600 px-1">↺</button>
                 )}
