@@ -311,6 +311,55 @@ export function resolveApplicantValue(
     return undefined
   }
 
+  // Town / City of Birth (Place of Birth with District / Place of Issue Fallback)
+  if (
+    path === 'personalInfo.townCityOfBirth' ||
+    path === 'appl.placbrth' ||
+    path === 'placbrth' ||
+    path === 'birth_place'
+  ) {
+    if (applicant.personalInfo?.townCityOfBirth && applicant.personalInfo.townCityOfBirth.trim() !== '') {
+      return applicant.personalInfo.townCityOfBirth.trim().toUpperCase()
+    }
+    const districtFallback =
+      applicant.presentAddress?.district ||
+      applicant.permanentAddress?.district ||
+      applicant.passport?.placeOfIssue
+    if (districtFallback && districtFallback.trim() !== '') {
+      return districtFallback.trim().toUpperCase()
+    }
+    return undefined
+  }
+
+  // Passport Date of Issue (with deterministic 10-year validity derivation from Expiry Date)
+  if (
+    path === 'passport.issueDate' ||
+    path === 'appl.passport_issue_date' ||
+    path === 'passport_issue_date' ||
+    path === 'appl.issuedate' ||
+    path === 'issuedate'
+  ) {
+    if (applicant.passport?.issueDate && applicant.passport.issueDate.trim() !== '') {
+      return applicant.passport.issueDate.trim()
+    }
+    if (applicant.passport?.expiryDate && applicant.passport.expiryDate.trim() !== '') {
+      const exp = applicant.passport.expiryDate.trim()
+      const parts = exp.split(/[-/]/)
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // ISO YYYY-MM-DD
+          const year = parseInt(parts[0], 10) - 10
+          return `${year}-${parts[1]}-${parts[2]}`
+        } else if (parts[2].length === 4) {
+          // DD/MM/YYYY
+          const year = parseInt(parts[2], 10) - 10
+          return `${parts[0]}/${parts[1]}/${year}`
+        }
+      }
+    }
+    return undefined
+  }
+
   // Present Occupation
   if (
     path === 'employment.presentOccupation' ||
