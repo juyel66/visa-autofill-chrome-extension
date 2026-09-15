@@ -8,27 +8,27 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 describe('TASK 081: Dynamic Address Splitting & Extraction Tests', () => {
-  // Test 1: Supplied reference document structure
-  it('Test 1: Parses reference address structure (Address 1 = 1st component, Address 2 = secondary components, City = City, Postal = Postal)', () => {
+  // Test 1: Supplied reference document structure (4 parts total)
+  it('Test 1: Parses reference address structure (Address 1 = 1st component, Village/Town/City = 2 middle components, District = District, Postal = Postal)', () => {
     const raw = 'KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120, THAKURGAON'
     const res = parseStructuredAddress(raw)
 
     assert.strictEqual(res.addressLine1, 'KASHIPUR')
+    assert.strictEqual(res.villageTownCity, 'RANISANKAIL, MUZAHIDABAD COLONI')
     assert.strictEqual(res.addressLine2, 'RANISANKAIL, MUZAHIDABAD COLONI')
-    assert.strictEqual(res.villageTownCity, 'THAKURGAON')
     assert.strictEqual(res.district, 'THAKURGAON')
     assert.strictEqual(res.postalCode, '5120')
     assert.strictEqual(res.country, 'BANGLADESH')
   })
 
-  // Test 2: Completely different synthetic address
-  it('Test 2: Parses synthetic 4-component address with postal code', () => {
+  // Test 2: Synthetic 5-component address with postal code
+  it('Test 2: Parses synthetic 5-component address with postal code', () => {
     const raw = 'HOUSE 45, ROAD 7, SECTOR 3, UTTARA - 1230, DHAKA'
     const res = parseStructuredAddress(raw)
 
     assert.strictEqual(res.addressLine1, 'HOUSE 45')
+    assert.strictEqual(res.villageTownCity, 'ROAD 7, SECTOR 3, UTTARA')
     assert.strictEqual(res.addressLine2, 'ROAD 7, SECTOR 3, UTTARA')
-    assert.strictEqual(res.villageTownCity, 'DHAKA')
     assert.strictEqual(res.district, 'DHAKA')
     assert.strictEqual(res.postalCode, '1230')
   })
@@ -39,31 +39,31 @@ describe('TASK 081: Dynamic Address Splitting & Extraction Tests', () => {
     const res = parseStructuredAddress(raw)
 
     assert.strictEqual(res.addressLine1, 'VILLAGE CHARPARA')
-    assert.strictEqual(res.addressLine2, undefined)
     assert.strictEqual(res.villageTownCity, 'MUNSHIGANJ')
+    assert.strictEqual(res.addressLine2, 'MUNSHIGANJ')
     assert.strictEqual(res.district, 'MUNSHIGANJ')
   })
 
-  // Test 4: Address with 4+ components
+  // Test 4: Address with 5+ components
   it('Test 4: Parses 5+ component address', () => {
     const raw = 'FLAT 3A, HOLDING 89, WARD 4, KAZIPARA, MIRPUR - 1216, DHAKA'
     const res = parseStructuredAddress(raw)
 
     assert.strictEqual(res.addressLine1, 'FLAT 3A')
+    assert.strictEqual(res.villageTownCity, 'HOLDING 89, WARD 4, KAZIPARA, MIRPUR')
     assert.strictEqual(res.addressLine2, 'HOLDING 89, WARD 4, KAZIPARA, MIRPUR')
-    assert.strictEqual(res.villageTownCity, 'DHAKA')
     assert.strictEqual(res.district, 'DHAKA')
     assert.strictEqual(res.postalCode, '1216')
   })
 
-  // Test 5: Address without postal code
+  // Test 5: Address without postal code (4 components)
   it('Test 5: Parses address without postal code', () => {
     const raw = 'HOUSE 10, ROAD 5, DHANMONDI, DHAKA'
     const res = parseStructuredAddress(raw)
 
     assert.strictEqual(res.addressLine1, 'HOUSE 10')
+    assert.strictEqual(res.villageTownCity, 'ROAD 5, DHANMONDI')
     assert.strictEqual(res.addressLine2, 'ROAD 5, DHANMONDI')
-    assert.strictEqual(res.villageTownCity, 'DHAKA')
     assert.strictEqual(res.district, 'DHAKA')
     assert.strictEqual(res.postalCode, undefined)
   })
@@ -74,8 +74,8 @@ describe('TASK 081: Dynamic Address Splitting & Extraction Tests', () => {
     const res = parseStructuredAddress(raw)
 
     assert.strictEqual(res.addressLine1, 'CHITTAGONG')
-    assert.strictEqual(res.addressLine2, undefined)
     assert.strictEqual(res.villageTownCity, 'CHITTAGONG')
+    assert.strictEqual(res.addressLine2, 'CHITTAGONG')
     assert.strictEqual(res.district, 'CHITTAGONG')
   })
 
@@ -85,8 +85,8 @@ describe('TASK 081: Dynamic Address Splitting & Extraction Tests', () => {
     const res = parseStructuredAddress(raw)
 
     assert.strictEqual(res.addressLine1, 'KASHIPUR')
+    assert.strictEqual(res.villageTownCity, 'RANISANKAIL, MUZAHIDABAD COLONI')
     assert.strictEqual(res.addressLine2, 'RANISANKAIL, MUZAHIDABAD COLONI')
-    assert.strictEqual(res.villageTownCity, 'THAKURGAON')
     assert.strictEqual(res.district, 'THAKURGAON')
     assert.strictEqual(res.postalCode, '5120')
   })
@@ -97,8 +97,8 @@ describe('TASK 081: Dynamic Address Splitting & Extraction Tests', () => {
     const res = parseStructuredAddress(raw)
 
     assert.strictEqual(res.addressLine1, 'VILLAGE SHANTI')
+    assert.strictEqual(res.villageTownCity, 'POST UTTAR, RAILWAY COLONY')
     assert.strictEqual(res.addressLine2, 'POST UTTAR, RAILWAY COLONY')
-    assert.strictEqual(res.villageTownCity, 'CHITTAGONG')
     assert.strictEqual(res.district, 'CHITTAGONG')
     assert.strictEqual(res.postalCode, '4000')
   })
@@ -109,8 +109,8 @@ describe('TASK 081: Dynamic Address Splitting & Extraction Tests', () => {
     const res = parseStructuredAddress(raw)
 
     assert.strictEqual(res.addressLine1, '24 GREEN ROAD')
+    assert.strictEqual(res.villageTownCity, 'FLAT B2, KALABAGAN')
     assert.strictEqual(res.addressLine2, 'FLAT B2, KALABAGAN')
-    assert.strictEqual(res.villageTownCity, 'DHAKA')
     assert.strictEqual(res.district, 'DHAKA')
   })
 
@@ -391,21 +391,21 @@ export async function runTask081AddressSplittingTests(): Promise<{ passed: boole
         const raw = 'KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI - 5120, THAKURGAON'
         const res = parseStructuredAddress(raw)
         assert.strictEqual(res.addressLine1, 'KASHIPUR')
+        assert.strictEqual(res.villageTownCity, 'RANISANKAIL, MUZAHIDABAD COLONI')
         assert.strictEqual(res.addressLine2, 'RANISANKAIL, MUZAHIDABAD COLONI')
-        assert.strictEqual(res.villageTownCity, 'THAKURGAON')
         assert.strictEqual(res.district, 'THAKURGAON')
         assert.strictEqual(res.postalCode, '5120')
         assert.strictEqual(res.country, 'BANGLADESH')
       },
     },
     {
-      name: 'Test 2: Synthetic 4-component address with postal code',
+      name: 'Test 2: Synthetic 5-component address with postal code',
       fn: () => {
         const raw = 'HOUSE 45, ROAD 7, SECTOR 3, UTTARA - 1230, DHAKA'
         const res = parseStructuredAddress(raw)
         assert.strictEqual(res.addressLine1, 'HOUSE 45')
+        assert.strictEqual(res.villageTownCity, 'ROAD 7, SECTOR 3, UTTARA')
         assert.strictEqual(res.addressLine2, 'ROAD 7, SECTOR 3, UTTARA')
-        assert.strictEqual(res.villageTownCity, 'DHAKA')
         assert.strictEqual(res.district, 'DHAKA')
         assert.strictEqual(res.postalCode, '1230')
       },
@@ -416,8 +416,8 @@ export async function runTask081AddressSplittingTests(): Promise<{ passed: boole
         const raw = 'VILLAGE CHARPARA, MUNSHIGANJ'
         const res = parseStructuredAddress(raw)
         assert.strictEqual(res.addressLine1, 'VILLAGE CHARPARA')
-        assert.strictEqual(res.addressLine2, undefined)
         assert.strictEqual(res.villageTownCity, 'MUNSHIGANJ')
+        assert.strictEqual(res.addressLine2, 'MUNSHIGANJ')
         assert.strictEqual(res.district, 'MUNSHIGANJ')
       },
     },
@@ -427,20 +427,20 @@ export async function runTask081AddressSplittingTests(): Promise<{ passed: boole
         const raw = 'FLAT 3A, HOLDING 89, WARD 4, KAZIPARA, MIRPUR - 1216, DHAKA'
         const res = parseStructuredAddress(raw)
         assert.strictEqual(res.addressLine1, 'FLAT 3A')
+        assert.strictEqual(res.villageTownCity, 'HOLDING 89, WARD 4, KAZIPARA, MIRPUR')
         assert.strictEqual(res.addressLine2, 'HOLDING 89, WARD 4, KAZIPARA, MIRPUR')
-        assert.strictEqual(res.villageTownCity, 'DHAKA')
         assert.strictEqual(res.district, 'DHAKA')
         assert.strictEqual(res.postalCode, '1216')
       },
     },
     {
-      name: 'Test 5: Address without postal code',
+      name: 'Test 5: Address without postal code (4 components)',
       fn: () => {
         const raw = 'HOUSE 10, ROAD 5, DHANMONDI, DHAKA'
         const res = parseStructuredAddress(raw)
         assert.strictEqual(res.addressLine1, 'HOUSE 10')
+        assert.strictEqual(res.villageTownCity, 'ROAD 5, DHANMONDI')
         assert.strictEqual(res.addressLine2, 'ROAD 5, DHANMONDI')
-        assert.strictEqual(res.villageTownCity, 'DHAKA')
         assert.strictEqual(res.district, 'DHAKA')
         assert.strictEqual(res.postalCode, undefined)
       },
@@ -451,8 +451,8 @@ export async function runTask081AddressSplittingTests(): Promise<{ passed: boole
         const raw = 'CHITTAGONG'
         const res = parseStructuredAddress(raw)
         assert.strictEqual(res.addressLine1, 'CHITTAGONG')
-        assert.strictEqual(res.addressLine2, undefined)
         assert.strictEqual(res.villageTownCity, 'CHITTAGONG')
+        assert.strictEqual(res.addressLine2, 'CHITTAGONG')
         assert.strictEqual(res.district, 'CHITTAGONG')
       },
     },
@@ -462,8 +462,8 @@ export async function runTask081AddressSplittingTests(): Promise<{ passed: boole
         const raw = 'i. KASHIPUR, RANISANKAIL, MUZAHIDABAD COLON - 5120, ME, THAKURGAON —'
         const res = parseStructuredAddress(raw)
         assert.strictEqual(res.addressLine1, 'KASHIPUR')
+        assert.strictEqual(res.villageTownCity, 'RANISANKAIL, MUZAHIDABAD COLONI')
         assert.strictEqual(res.addressLine2, 'RANISANKAIL, MUZAHIDABAD COLONI')
-        assert.strictEqual(res.villageTownCity, 'THAKURGAON')
         assert.strictEqual(res.district, 'THAKURGAON')
         assert.strictEqual(res.postalCode, '5120')
       },
@@ -474,8 +474,8 @@ export async function runTask081AddressSplittingTests(): Promise<{ passed: boole
         const raw = 'VILLAGE SHANTI, POST UTTAR, RAILWAY COLONY - 4000, CHITTAGONG'
         const res = parseStructuredAddress(raw)
         assert.strictEqual(res.addressLine1, 'VILLAGE SHANTI')
+        assert.strictEqual(res.villageTownCity, 'POST UTTAR, RAILWAY COLONY')
         assert.strictEqual(res.addressLine2, 'POST UTTAR, RAILWAY COLONY')
-        assert.strictEqual(res.villageTownCity, 'CHITTAGONG')
         assert.strictEqual(res.district, 'CHITTAGONG')
         assert.strictEqual(res.postalCode, '4000')
       },
@@ -486,8 +486,8 @@ export async function runTask081AddressSplittingTests(): Promise<{ passed: boole
         const raw = '24 GREEN ROAD, FLAT B2, KALABAGAN, DHAKA'
         const res = parseStructuredAddress(raw)
         assert.strictEqual(res.addressLine1, '24 GREEN ROAD')
+        assert.strictEqual(res.villageTownCity, 'FLAT B2, KALABAGAN')
         assert.strictEqual(res.addressLine2, 'FLAT B2, KALABAGAN')
-        assert.strictEqual(res.villageTownCity, 'DHAKA')
         assert.strictEqual(res.district, 'DHAKA')
       },
     },
