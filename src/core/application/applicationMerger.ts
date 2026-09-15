@@ -92,6 +92,12 @@ export const PASSPORT_IDENTITY_KEYS = new Set([
   'perm_add3',
   'marital_status',
   'appl.marital_status',
+  'appl.oth_ppt',
+  'appl.oth_pptno',
+  'appl.oth_ppt_issue_date',
+  'appl.oth_ppt_issue_place',
+  'appl.prev_passport_country_issue',
+  'appl.other_ppt_nationality',
 ])
 
 // Application merger helper constants and functions
@@ -717,41 +723,49 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'pres_addr2' || key === 'appl.pres_add2') &&
         !resolvedValue &&
-        (activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.addressLine2)
+        (activeProfile.presentAddress?.addressLine2 || activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity)
       ) {
-        resolvedValue = activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.addressLine2
-        source = activeProfile.presentAddress?.addressLine2 ? activeSource : 'derived'
+        resolvedValue = activeProfile.presentAddress?.addressLine2 || activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity
+        source = activeProfile.presentAddress?.addressLine2 || activeProfile.presentAddress?.villageTownCity ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'village_town_city' || key === 'appl.pres_city') &&
         !resolvedValue &&
-        (activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity)
+        (activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2)
       ) {
-        resolvedValue = activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity
-        source = activeProfile.presentAddress?.villageTownCity ? activeSource : 'derived'
+        resolvedValue = activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2
+        source = activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2 ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'district' || key === 'appl.pres_district') &&
         !resolvedValue &&
-        (activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district)
+        (activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince)
       ) {
-        resolvedValue = activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district
-        source = activeProfile.presentAddress?.district ? activeSource : 'derived'
-        docId = activeDocId
+        const rawDist = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince
+        const cleanDist = rawDist && !['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'].includes(rawDist.trim().toUpperCase()) && rawDist.trim().length > 2 ? rawDist.trim() : (activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district)
+        if (cleanDist) {
+          resolvedValue = cleanDist
+          source = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince ? activeSource : 'derived'
+          docId = activeDocId
+        }
       } else if (
-        (key === 'state_province' || key === 'appl.pres_state' || key === 'pres_state' || key === 'state_name') &&
+        (key === 'state_province' || key === 'appl.pres_state' || key === 'pres_state' || key === 'state_name' || key === 'pres_add3') &&
         !resolvedValue &&
-        (activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.stateProvince)
+        (activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince)
       ) {
-        resolvedValue = activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.stateProvince
-        source = activeProfile.presentAddress?.stateProvince ? activeSource : 'derived'
-        docId = activeDocId
+        const rawDist = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince
+        const cleanDist = rawDist && !['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'].includes(rawDist.trim().toUpperCase()) && rawDist.trim().length > 2 ? rawDist.trim() : (activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district)
+        if (cleanDist) {
+          resolvedValue = cleanDist
+          source = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince ? activeSource : 'derived'
+          docId = activeDocId
+        }
       } else if (
-        (key === 'present_country' || key === 'appl.countryname') &&
+        (key === 'present_country' || key === 'appl.countryname' || key === 'pres_country') &&
         !resolvedValue &&
         (activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country)
       ) {
-        resolvedValue = activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country
+        resolvedValue = activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country || 'BANGLADESH'
         source = activeProfile.presentAddress?.country ? activeSource : 'derived'
         docId = activeDocId
       } else if (
@@ -773,41 +787,69 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'perm_add2' || key === 'appl.perm_add2') &&
         !resolvedValue &&
-        (activeProfile.permanentAddress?.addressLine2 || activeProfile.presentAddress?.addressLine2)
+        (activeProfile.permanentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2 || activeProfile.presentAddress?.villageTownCity)
       ) {
-        resolvedValue = activeProfile.permanentAddress?.addressLine2 || activeProfile.presentAddress?.addressLine2
-        source = activeProfile.permanentAddress?.addressLine2 ? activeSource : 'derived'
-        docId = activeDocId
+        const base = (
+          activeProfile.permanentAddress?.addressLine2 ||
+          activeProfile.permanentAddress?.villageTownCity ||
+          activeProfile.presentAddress?.addressLine2 ||
+          activeProfile.presentAddress?.villageTownCity ||
+          ''
+        ).trim()
+        const pCode = (activeProfile.permanentAddress?.postalCode || activeProfile.presentAddress?.postalCode || '').trim()
+        if (base) {
+          resolvedValue = pCode && !base.endsWith(pCode) ? `${base}-${pCode}` : base
+          source = activeProfile.permanentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity ? activeSource : 'derived'
+          docId = activeDocId
+        }
       } else if (
         (key === 'permanent_village_town_city' || key === 'appl.perm_city') &&
         !resolvedValue &&
-        (activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity)
+        (activeProfile.permanentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2 || activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2)
       ) {
-        resolvedValue = activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity
-        source = activeProfile.permanentAddress?.villageTownCity ? activeSource : 'derived'
-        docId = activeDocId
+        const base = (
+          activeProfile.permanentAddress?.villageTownCity ||
+          activeProfile.permanentAddress?.addressLine2 ||
+          activeProfile.presentAddress?.villageTownCity ||
+          activeProfile.presentAddress?.addressLine2 ||
+          ''
+        ).trim()
+        const pCode = (activeProfile.permanentAddress?.postalCode || activeProfile.presentAddress?.postalCode || '').trim()
+        if (base) {
+          resolvedValue = pCode && !base.endsWith(pCode) ? `${base}-${pCode}` : base
+          source = activeProfile.permanentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2 ? activeSource : 'derived'
+          docId = activeDocId
+        }
       } else if (
         (key === 'permanent_district' || key === 'appl.perm_district') &&
         !resolvedValue &&
-        (activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district)
+        (activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince)
       ) {
-        resolvedValue = activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district
-        source = activeProfile.permanentAddress?.district ? activeSource : 'derived'
-        docId = activeDocId
+        const rawDist = activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince
+        const cleanDist = rawDist && !['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'].includes(rawDist.trim().toUpperCase()) && rawDist.trim().length > 2 ? rawDist.trim() : (activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district)
+        if (cleanDist) {
+          resolvedValue = cleanDist
+          source = activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince ? activeSource : 'derived'
+          docId = activeDocId
+        }
       } else if (
         (key === 'permanent_state_province' || key === 'perm_add3' || key === 'appl.perm_state') &&
         !resolvedValue &&
-        (activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.stateProvince)
+        (activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince)
       ) {
-        resolvedValue = activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.stateProvince
-        source = activeProfile.permanentAddress?.stateProvince ? activeSource : 'derived'
-        docId = activeDocId
+        const rawDist = activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince || activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince
+        const cleanDist = rawDist && !['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'].includes(rawDist.trim().toUpperCase()) && rawDist.trim().length > 2 ? rawDist.trim() : (activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district)
+        if (cleanDist) {
+          resolvedValue = cleanDist
+          source = activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince ? activeSource : 'derived'
+          docId = activeDocId
+        }
       } else if (
         (key === 'permanent_country' || key === 'appl.perm_country') &&
         !resolvedValue &&
         (activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country)
       ) {
-        resolvedValue = activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country
+        resolvedValue = activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country || 'BANGLADESH'
         source = activeProfile.permanentAddress?.country ? activeSource : 'derived'
         docId = activeDocId
       } else if (
@@ -817,6 +859,90 @@ export function populateApplicationFromDocuments(options: {
       ) {
         resolvedValue = activeProfile.permanentAddress?.postalCode || activeProfile.presentAddress?.postalCode
         source = activeProfile.permanentAddress?.postalCode ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'occupation' || key === 'appl.occupation' || key === 'present_occupation') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.employment?.presentOccupation || 'WORKER'
+        source = activeProfile.employment?.presentOccupation ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'empname' || key === 'appl.empname' || key === 'employer_name') &&
+        !resolvedValue
+      ) {
+        const candidateFullName = [activeProfile.personalInfo?.givenNames, activeProfile.personalInfo?.surname]
+          .filter(Boolean)
+          .join(' ')
+          .trim()
+          .toUpperCase()
+        resolvedValue = activeProfile.employment?.employerName || candidateFullName || undefined
+        source = activeProfile.employment?.employerName ? activeSource : (candidateFullName ? 'derived' : 'missing')
+        docId = activeDocId
+      } else if (
+        (key === 'empdesignation' || key === 'appl.empdesignation' || key === 'designation') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.employment?.designationRank || 'WORKER'
+        source = activeProfile.employment?.designationRank ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'empaddress' || key === 'appl.empaddress' || key === 'employer_address') &&
+        !resolvedValue
+      ) {
+        const addr1 = activeProfile.presentAddress?.addressLine1 || activeProfile.permanentAddress?.addressLine1
+        const addr2 = activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2
+        const addrWithoutDist = [addr1, addr2].filter(Boolean).join(', ').trim().toUpperCase()
+        const rawEmpAddr = typeof activeProfile.employment?.employerAddress === 'string'
+          ? activeProfile.employment.employerAddress
+          : (activeProfile.employment?.employerAddress ? [activeProfile.employment.employerAddress.addressLine1, activeProfile.employment.employerAddress.villageTownCity || activeProfile.employment.employerAddress.addressLine2].filter(Boolean).join(', ') : '')
+        resolvedValue = rawEmpAddr || addrWithoutDist || undefined
+        source = rawEmpAddr ? activeSource : (addrWithoutDist ? 'derived' : 'missing')
+        docId = activeDocId
+      } else if (
+        (key === 'empphone' || key === 'appl.empphone' || key === 'employer_phone') &&
+        !resolvedValue
+      ) {
+        const rawP =
+          activeProfile.employment?.employerPhone ||
+          activeProfile.contact?.phone ||
+          activeProfile.presentAddress?.phone ||
+          activeProfile.contact?.mobile ||
+          activeProfile.presentAddress?.mobile
+        if (rawP) {
+          const cleanDigits = rawP.replace(/[^\d]/g, '')
+          if (rawP.startsWith('+880') || cleanDigits.startsWith('880')) {
+            resolvedValue = `+880${cleanDigits.replace(/^880/, '')}`
+          } else if (cleanDigits.startsWith('01') && cleanDigits.length === 11) {
+            resolvedValue = `+88${cleanDigits}`
+          } else if (cleanDigits.length === 10 && cleanDigits.startsWith('1')) {
+            resolvedValue = `+880${cleanDigits}`
+          } else {
+            resolvedValue = rawP.startsWith('+') ? rawP : `+88${rawP}`
+          }
+          source = activeProfile.employment?.employerPhone ? activeSource : 'derived'
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'previous_occupation' || key === 'appl.previous_occupation') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.employment?.pastOccupation || 'PRIVATE SERVICE'
+        source = activeProfile.employment?.pastOccupation ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'prev_org' || key === 'appl.prev_org') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.employment?.hasMilitaryService === true ? 'Yes' : 'No'
+        source = 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'grandparent_flag' || key === 'appl.grandparent_flag') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.family?.hasPakistanRelation === true ? 'Yes' : 'No'
+        source = 'derived'
         docId = activeDocId
       }
     }
@@ -1084,21 +1210,21 @@ export function convertSavedApplicationToApplicantProfile(
       holdsOtherPassport: getFieldBool('appl.oth_ppt'),
       otherPassportDetails: {
         passportNumber: getFieldStr('appl.oth_pptno'),
-        placeOfIssue: getFieldStr('appl.oth_ppt_issue_place'),
-        countryOfIssue: getFieldStr('appl.prev_passport_country_issue'),
-        nationalityInPassport: getFieldStr('appl.other_ppt_nationality'),
-        issueDate: getFieldDate('appl.oth_ppt_issue_date'),
+        placeOfIssue: getFieldStr('appl.oth_ppt_issue_place') || (getFieldBool('appl.oth_ppt') ? 'DHAKA' : undefined),
+        countryOfIssue: getFieldStr('appl.prev_passport_country_issue') || (getFieldBool('appl.oth_ppt') ? 'BANGLADESH' : undefined),
+        nationalityInPassport: getFieldStr('appl.other_ppt_nationality') || (getFieldBool('appl.oth_ppt') ? 'BANGLADESH' : undefined),
+        issueDate: getFieldDate('appl.oth_ppt_issue_date') || getFieldStr('appl.oth_ppt_issue_date'),
       },
     },
 
     presentAddress: {
       addressLine1: getFieldStr('pres_addr1'),
-      addressLine2: getFieldStr('pres_addr2'),
-      villageTownCity: getFieldStr('village_town_city'),
-      district: getFieldStr('district'),
-      stateProvince: getFieldStr('state_province'),
+      addressLine2: getFieldStr('pres_addr2') || getFieldStr('village_town_city'),
+      villageTownCity: getFieldStr('village_town_city') || getFieldStr('pres_addr2'),
+      district: getFieldStr('district') || getFieldStr('state_province'),
+      stateProvince: getFieldStr('state_province') || getFieldStr('district'),
       postalCode: getFieldStr('pincode'),
-      country: getFieldStr('present_country') || getFieldStr('appl.countryname'),
+      country: getFieldStr('present_country') || getFieldStr('appl.countryname') || 'BANGLADESH',
       phone: getFieldStr('pres_phone'),
       isdCode: getFieldStr('isd_code'),
       mobile: getFieldStr('mobile'),
@@ -1106,12 +1232,12 @@ export function convertSavedApplicationToApplicantProfile(
 
     permanentAddress: {
       addressLine1: getFieldStr('perm_add1'),
-      addressLine2: getFieldStr('perm_add2'),
-      villageTownCity: getFieldStr('permanent_village_town_city'),
-      district: getFieldStr('permanent_district'),
-      stateProvince: getFieldStr('permanent_state_province'),
-      country: getFieldStr('permanent_country'),
-      postalCode: getFieldStr('permanent_postal_code'),
+      addressLine2: getFieldStr('perm_add2') || getFieldStr('permanent_village_town_city'),
+      villageTownCity: getFieldStr('permanent_village_town_city') || getFieldStr('perm_add2'),
+      district: getFieldStr('permanent_district') || getFieldStr('permanent_state_province'),
+      stateProvince: getFieldStr('permanent_state_province') || getFieldStr('permanent_district'),
+      country: getFieldStr('permanent_country') || 'BANGLADESH',
+      postalCode: getFieldStr('permanent_postal_code') || getFieldStr('pincode'),
     },
 
     contact: {
