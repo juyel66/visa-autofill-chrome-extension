@@ -333,6 +333,12 @@ export const BANGLADESH_FAMILY_DETAILS_FIXTURE_HTML = `
     <input type="text" id="pres_add3" name="appl.state_name" value="" />
     <input type="text" id="pincode" name="appl.pincode" value="" />
     <input type="text" id="pres_phone" name="appl.pres_phone" value="" />
+    <select id="mobile_isd" name="appl.isd_code">
+      <option value="">ISD code</option>
+      <option value="93">93 - AFGHANISTAN</option>
+      <option value="880">880 - BANGLADESH</option>
+      <option value="375">375 - BELARUS</option>
+    </select>
     <input type="text" id="mobile" name="appl.mobile" value="" />
     <input type="checkbox" id="sameAddress_id" name="sameAddress" />
 
@@ -411,6 +417,7 @@ export const BANGLADESH_FAMILY_DETAILS_FIXTURE_HTML = `
       <option value="PRIVATE SERVICE">PRIVATE SERVICE</option>
       <option value="SELF EMPLOYED/ FREELANCER">SELF EMPLOYED/ FREELANCER</option>
       <option value="SERVICE">SERVICE</option>
+      <option value="WORKER">WORKER</option>
     </select>
     <input type="text" id="empname" name="appl.empname" value="" />
     <input type="text" id="empdesignation" name="appl.empdesignation" value="" />
