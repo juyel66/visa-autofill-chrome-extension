@@ -787,37 +787,39 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'perm_add2' || key === 'appl.perm_add2') &&
         !resolvedValue &&
-        (activeProfile.permanentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2 || activeProfile.presentAddress?.villageTownCity)
+        (activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2 || fields['village_town_city']?.value || fields['pres_addr2']?.value || activeProfile.permanentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity)
       ) {
         const base = (
+          activeProfile.presentAddress?.villageTownCity ||
+          activeProfile.presentAddress?.addressLine2 ||
+          fields['village_town_city']?.value ||
+          fields['pres_addr2']?.value ||
           activeProfile.permanentAddress?.addressLine2 ||
           activeProfile.permanentAddress?.villageTownCity ||
-          activeProfile.presentAddress?.addressLine2 ||
-          activeProfile.presentAddress?.villageTownCity ||
           ''
-        ).trim()
-        const pCode = (activeProfile.permanentAddress?.postalCode || activeProfile.presentAddress?.postalCode || '').trim()
+        ).toString().trim()
         if (base) {
-          resolvedValue = pCode && !base.endsWith(pCode) ? `${base}-${pCode}` : base
-          source = activeProfile.permanentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity ? activeSource : 'derived'
+          resolvedValue = base
+          source = (activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2) ? activeSource : 'derived'
           docId = activeDocId
         }
       } else if (
         (key === 'permanent_village_town_city' || key === 'appl.perm_city') &&
         !resolvedValue &&
-        (activeProfile.permanentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2 || activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2)
+        (activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2 || fields['village_town_city']?.value || fields['pres_addr2']?.value || activeProfile.permanentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2)
       ) {
         const base = (
-          activeProfile.permanentAddress?.villageTownCity ||
-          activeProfile.permanentAddress?.addressLine2 ||
           activeProfile.presentAddress?.villageTownCity ||
           activeProfile.presentAddress?.addressLine2 ||
+          fields['village_town_city']?.value ||
+          fields['pres_addr2']?.value ||
+          activeProfile.permanentAddress?.villageTownCity ||
+          activeProfile.permanentAddress?.addressLine2 ||
           ''
-        ).trim()
-        const pCode = (activeProfile.permanentAddress?.postalCode || activeProfile.presentAddress?.postalCode || '').trim()
+        ).toString().trim()
         if (base) {
-          resolvedValue = pCode && !base.endsWith(pCode) ? `${base}-${pCode}` : base
-          source = activeProfile.permanentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2 ? activeSource : 'derived'
+          resolvedValue = base
+          source = (activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2) ? activeSource : 'derived'
           docId = activeDocId
         }
       } else if (
@@ -1231,12 +1233,12 @@ export function convertSavedApplicationToApplicantProfile(
     },
 
     permanentAddress: {
-      addressLine1: getFieldStr('perm_add1'),
-      addressLine2: getFieldStr('perm_add2') || getFieldStr('permanent_village_town_city'),
-      villageTownCity: getFieldStr('permanent_village_town_city') || getFieldStr('perm_add2'),
-      district: getFieldStr('permanent_district') || getFieldStr('permanent_state_province'),
-      stateProvince: getFieldStr('permanent_state_province') || getFieldStr('permanent_district'),
-      country: getFieldStr('permanent_country') || 'BANGLADESH',
+      addressLine1: getFieldStr('perm_add1') || getFieldStr('pres_addr1'),
+      addressLine2: getFieldStr('permanent_village_town_city') || getFieldStr('perm_add2') || getFieldStr('village_town_city') || getFieldStr('pres_addr2'),
+      villageTownCity: getFieldStr('permanent_village_town_city') || getFieldStr('perm_add2') || getFieldStr('village_town_city') || getFieldStr('pres_addr2'),
+      district: getFieldStr('permanent_district') || getFieldStr('permanent_state_province') || getFieldStr('district'),
+      stateProvince: getFieldStr('permanent_state_province') || getFieldStr('permanent_district') || getFieldStr('state_province'),
+      country: getFieldStr('permanent_country') || getFieldStr('present_country') || 'BANGLADESH',
       postalCode: getFieldStr('permanent_postal_code') || getFieldStr('pincode'),
     },
 
