@@ -102,14 +102,151 @@ export function resolveApplicantValue(
   }
 
   // Country
-  if (path === 'presentAddress.country' || path === 'appl.countryname' || path === 'present_country') {
+  if (
+    path === 'presentAddress.country' ||
+    path === 'permanentAddress.country' ||
+    path === 'appl.countryname' ||
+    path === 'present_country' ||
+    path === 'perm_country' ||
+    path === 'appl.pres_country' ||
+    path === 'appl.perm_country' ||
+    path === 'country_name' ||
+    path === 'registration.applyingFromCountry'
+  ) {
     if (applicant.presentAddress?.country && applicant.presentAddress.country.trim() !== '') {
       return applicant.presentAddress.country.trim()
+    }
+    if (applicant.permanentAddress?.country && applicant.permanentAddress.country.trim() !== '') {
+      return applicant.permanentAddress.country.trim()
     }
     if (applicant.registration?.applyingFromCountry && applicant.registration.applyingFromCountry.trim() !== '') {
       return applicant.registration.applyingFromCountry.trim()
     }
-    return undefined
+    return 'BANGLADESH'
+  }
+
+  // ISD Code
+  if (
+    path === 'contact.isdCode' ||
+    path === 'presentAddress.isdCode' ||
+    path === 'appl.isd_code' ||
+    path === 'isd_code' ||
+    path === 'pres_phone_isd' ||
+    path === 'mobile_isd'
+  ) {
+    const isd = applicant.contact?.isdCode || applicant.presentAddress?.isdCode
+    if (isd && isd.trim() !== '') {
+      return isd.trim()
+    }
+    return '880'
+  }
+
+  // Helper to sanitize District & State names (filter out invalid tokens like "IN", "BD", country names)
+  const sanitizeDistrict = (val?: string): string | undefined => {
+    if (!val) return undefined
+    const clean = val.trim()
+    const upper = clean.toUpperCase()
+    if (['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'].includes(upper) || clean.length <= 2) {
+      return undefined
+    }
+    return clean
+  }
+
+  // Address Line 1
+  if (path === 'presentAddress.addressLine1' || path === 'appl.pres_add1' || path === 'pres_addr1' || path === 'pres_add1') {
+    return applicant.presentAddress?.addressLine1 || applicant.permanentAddress?.addressLine1
+  }
+  if (path === 'permanentAddress.addressLine1' || path === 'appl.perm_add1' || path === 'perm_addr1' || path === 'perm_add1') {
+    return applicant.permanentAddress?.addressLine1 || applicant.presentAddress?.addressLine1
+  }
+
+  // Address Line 2
+  if (path === 'presentAddress.addressLine2' || path === 'appl.pres_add2' || path === 'pres_addr2' || path === 'pres_add2') {
+    return (
+      applicant.presentAddress?.addressLine2 ||
+      applicant.presentAddress?.villageTownCity ||
+      applicant.permanentAddress?.addressLine2 ||
+      applicant.permanentAddress?.villageTownCity
+    )
+  }
+  if (
+    path === 'permanentAddress.addressLine2' ||
+    path === 'appl.perm_add2' ||
+    path === 'perm_addr2' ||
+    path === 'perm_add2' ||
+    path === 'permanentAddress.villageTownCity' ||
+    path === 'appl.perm_city' ||
+    path === 'permanent_village_town_city'
+  ) {
+    const raw = (
+      applicant.permanentAddress?.addressLine2 ||
+      applicant.permanentAddress?.villageTownCity ||
+      applicant.presentAddress?.addressLine2 ||
+      applicant.presentAddress?.villageTownCity ||
+      ''
+    ).trim()
+    if (!raw) return undefined
+    const clean = raw.toUpperCase()
+    const pCode = (applicant.permanentAddress?.postalCode || applicant.presentAddress?.postalCode || '').trim()
+    if (pCode && !clean.endsWith(pCode)) {
+      return `${clean}-${pCode}`
+    }
+    return clean
+  }
+
+  // Village / Town / City (Present Address)
+  if (path === 'presentAddress.villageTownCity' || path === 'appl.pres_city' || path === 'village_town_city') {
+    return (
+      applicant.presentAddress?.villageTownCity ||
+      applicant.presentAddress?.addressLine2 ||
+      applicant.permanentAddress?.villageTownCity ||
+      applicant.permanentAddress?.addressLine2
+    )
+  }
+
+  // State / Province / District
+  if (
+    path === 'presentAddress.stateProvince' ||
+    path === 'presentAddress.district' ||
+    path === 'presentAddress.state_name' ||
+    path === 'appl.state_name' ||
+    path === 'appl.pres_state' ||
+    path === 'pres_state' ||
+    path === 'state_name' ||
+    path === 'pres_city' ||
+    path === 'pres_add3'
+  ) {
+    const d =
+      sanitizeDistrict(applicant.presentAddress?.district) ||
+      sanitizeDistrict(applicant.presentAddress?.stateProvince) ||
+      sanitizeDistrict(applicant.permanentAddress?.district) ||
+      sanitizeDistrict(applicant.permanentAddress?.stateProvince)
+    if (d) return d
+  }
+  if (
+    path === 'permanentAddress.stateProvince' ||
+    path === 'permanentAddress.district' ||
+    path === 'appl.perm_state' ||
+    path === 'perm_state' ||
+    path === 'perm_city' ||
+    path === 'perm_add3' ||
+    path === 'permanent_district' ||
+    path === 'permanent_state_province'
+  ) {
+    const d =
+      sanitizeDistrict(applicant.permanentAddress?.district) ||
+      sanitizeDistrict(applicant.permanentAddress?.stateProvince) ||
+      sanitizeDistrict(applicant.presentAddress?.district) ||
+      sanitizeDistrict(applicant.presentAddress?.stateProvince)
+    if (d) return d
+  }
+
+  // Postal / Zip Code
+  if (path === 'presentAddress.postalCode' || path === 'appl.pincode' || path === 'pincode' || path === 'pres_postal_code') {
+    return applicant.presentAddress?.postalCode || applicant.permanentAddress?.postalCode
+  }
+  if (path === 'permanentAddress.postalCode' || path === 'appl.perm_pincode' || path === 'perm_pincode' || path === 'perm_postal_code' || path === 'permanent_postal_code') {
+    return applicant.permanentAddress?.postalCode || applicant.presentAddress?.postalCode
   }
 
   // Nationality: Priority 1: Explicit nationality -> Priority 2: Country of birth fallback
@@ -179,6 +316,147 @@ export function resolveApplicantValue(
     return undefined
   }
 
+  // Present Occupation
+  if (
+    path === 'employment.presentOccupation' ||
+    path === 'appl.occupation' ||
+    path === 'occupation' ||
+    path === 'present_occupation'
+  ) {
+    if (applicant.employment?.presentOccupation && applicant.employment.presentOccupation.trim() !== '') {
+      return applicant.employment.presentOccupation.trim()
+    }
+    return 'WORKER'
+  }
+
+  // Employer Name / Business (Defaults to candidate's full name: Given Name Surname)
+  if (
+    path === 'employment.employerName' ||
+    path === 'appl.empname' ||
+    path === 'empname' ||
+    path === 'employer_name'
+  ) {
+    if (applicant.employment?.employerName && applicant.employment.employerName.trim() !== '') {
+      return applicant.employment.employerName.trim().toUpperCase()
+    }
+    const fullName = [applicant.personalInfo?.givenNames, applicant.personalInfo?.surname]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+      .toUpperCase()
+    if (fullName) return fullName
+    return undefined
+  }
+
+  // Designation (Defaults to WORKER)
+  if (
+    path === 'employment.designationRank' ||
+    path === 'appl.empdesignation' ||
+    path === 'empdesignation' ||
+    path === 'designation'
+  ) {
+    if (applicant.employment?.designationRank && applicant.employment.designationRank.trim() !== '') {
+      return applicant.employment.designationRank.trim().toUpperCase()
+    }
+    return 'WORKER'
+  }
+
+  // Employer Address (Defaults to passport address excluding district)
+  if (
+    path === 'employment.employerAddress' ||
+    path === 'appl.empaddress' ||
+    path === 'empaddress' ||
+    path === 'employer_address'
+  ) {
+    if (typeof applicant.employment?.employerAddress === 'string' && applicant.employment.employerAddress.trim() !== '') {
+      return applicant.employment.employerAddress.trim().toUpperCase()
+    }
+    if (applicant.employment?.employerAddress && typeof applicant.employment.employerAddress === 'object') {
+      const parts = [applicant.employment.employerAddress.addressLine1, applicant.employment.employerAddress.villageTownCity || applicant.employment.employerAddress.addressLine2].filter(Boolean)
+      if (parts.length > 0) return parts.join(', ').trim().toUpperCase()
+    }
+    const addr1 = applicant.presentAddress?.addressLine1 || applicant.permanentAddress?.addressLine1
+    const addr2 = applicant.presentAddress?.villageTownCity || applicant.presentAddress?.addressLine2 || applicant.permanentAddress?.villageTownCity || applicant.permanentAddress?.addressLine2
+    const combinedWithoutDist = [addr1, addr2].filter(Boolean).join(', ').trim().toUpperCase()
+    if (combinedWithoutDist) return combinedWithoutDist
+    return undefined
+  }
+
+  // Employer Phone (Defaults to candidate's phone starting with +88)
+  if (
+    path === 'employment.employerPhone' ||
+    path === 'appl.empphone' ||
+    path === 'empphone' ||
+    path === 'employer_phone'
+  ) {
+    if (applicant.employment?.employerPhone && applicant.employment.employerPhone.trim() !== '') {
+      return applicant.employment.employerPhone.trim()
+    }
+    const raw =
+      applicant.contact?.phone ||
+      applicant.presentAddress?.phone ||
+      applicant.contact?.mobile ||
+      applicant.presentAddress?.mobile
+    if (raw) {
+      const cleanDigits = raw.replace(/[^\d]/g, '')
+      if (raw.startsWith('+880') || cleanDigits.startsWith('880')) {
+        return `+880${cleanDigits.replace(/^880/, '')}`
+      } else if (cleanDigits.startsWith('01') && cleanDigits.length === 11) {
+        return `+88${cleanDigits}`
+      } else if (cleanDigits.length === 10 && cleanDigits.startsWith('1')) {
+        return `+880${cleanDigits}`
+      }
+      return raw.startsWith('+') ? raw : `+88${raw}`
+    }
+    return undefined
+  }
+
+  // Past Occupation (Defaults to PRIVATE SERVICE)
+  if (
+    path === 'employment.pastOccupation' ||
+    path === 'appl.previous_occupation' ||
+    path === 'previous_occupation'
+  ) {
+    if (applicant.employment?.pastOccupation && applicant.employment.pastOccupation.trim() !== '') {
+      return applicant.employment.pastOccupation.trim()
+    }
+    return 'PRIVATE SERVICE'
+  }
+
+  // Grandparent / Pakistan Origin Relation Flag (Defaults strictly to 'No')
+  if (
+    path === 'family.hasPakistanRelation' ||
+    path === 'appl.grandparent_flag' ||
+    path === 'grandparent_flag'
+  ) {
+    if (
+      applicant.family?.hasPakistanRelation === true ||
+      (applicant.family?.hasPakistanRelation as unknown) === 'Yes' ||
+      (applicant.family?.hasPakistanRelation as unknown) === 'Y' ||
+      (applicant.family?.hasPakistanRelation as unknown) === 'true'
+    ) {
+      return 'Yes'
+    }
+    return 'No'
+  }
+
+  // Military / Police / Security Organization Service Flag (Defaults strictly to 'No')
+  if (
+    path === 'employment.hasMilitaryService' ||
+    path === 'appl.prev_org' ||
+    path === 'prev_org'
+  ) {
+    if (
+      applicant.employment?.hasMilitaryService === true ||
+      (applicant.employment?.hasMilitaryService as unknown) === 'Yes' ||
+      (applicant.employment?.hasMilitaryService as unknown) === 'Y' ||
+      (applicant.employment?.hasMilitaryService as unknown) === 'true'
+    ) {
+      return 'Yes'
+    }
+    return 'No'
+  }
+
   const parts = path.split('.')
   let current: unknown = applicant
 
@@ -206,6 +484,67 @@ export function resolveApplicantValue(
   }
   if ((path === 'contact.emailConfirm' || path === 'contact.email_re') && applicant.contact?.email) {
     return applicant.contact.email
+  }
+
+  // Cross-lookup fallback for address fields between presentAddress and permanentAddress
+  if (path === 'presentAddress.addressLine1' && applicant.permanentAddress?.addressLine1) {
+    return applicant.permanentAddress.addressLine1
+  }
+  if (path === 'permanentAddress.addressLine1' && applicant.presentAddress?.addressLine1) {
+    return applicant.presentAddress.addressLine1
+  }
+  if (path === 'presentAddress.addressLine2' || path === 'presentAddress.villageTownCity') {
+    return (
+      applicant.presentAddress?.villageTownCity ||
+      applicant.presentAddress?.addressLine2 ||
+      applicant.permanentAddress?.villageTownCity ||
+      applicant.permanentAddress?.addressLine2
+    )
+  }
+  if (
+    path === 'permanentAddress.addressLine2' ||
+    path === 'permanentAddress.villageTownCity' ||
+    path === 'appl.perm_add2' ||
+    path === 'perm_add2' ||
+    path === 'permanent_village_town_city' ||
+    path === 'appl.perm_city'
+  ) {
+    const rawVal =
+      applicant.permanentAddress?.villageTownCity ||
+      applicant.permanentAddress?.addressLine2 ||
+      applicant.presentAddress?.villageTownCity ||
+      applicant.presentAddress?.addressLine2
+    if (rawVal && rawVal.trim() !== '') {
+      const clean = rawVal.trim().toUpperCase()
+      const pCode = (applicant.permanentAddress?.postalCode || applicant.presentAddress?.postalCode || '').trim()
+      if (pCode && !clean.endsWith(pCode)) {
+        return `${clean}-${pCode}`
+      }
+      return clean
+    }
+    return undefined
+  }
+  if (path === 'presentAddress.stateProvince' || path === 'presentAddress.district' || path === 'presentAddress.state_name') {
+    return (
+      applicant.presentAddress?.district ||
+      applicant.presentAddress?.stateProvince ||
+      applicant.permanentAddress?.district ||
+      applicant.permanentAddress?.stateProvince
+    )
+  }
+  if (path === 'permanentAddress.stateProvince' || path === 'permanentAddress.district') {
+    return (
+      applicant.permanentAddress?.district ||
+      applicant.permanentAddress?.stateProvince ||
+      applicant.presentAddress?.district ||
+      applicant.presentAddress?.stateProvince
+    )
+  }
+  if (path === 'presentAddress.postalCode' && applicant.permanentAddress?.postalCode) {
+    return applicant.permanentAddress.postalCode
+  }
+  if (path === 'permanentAddress.postalCode' && applicant.presentAddress?.postalCode) {
+    return applicant.presentAddress.postalCode
   }
 
   // Cross-lookup fallback for phone, mobile, isdCode between contact and presentAddress
