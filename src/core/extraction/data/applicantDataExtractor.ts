@@ -603,6 +603,12 @@ export function extractFromOgdVisaApplication(
     if (parsedPerm.country) result.permanentAddress!.country = { value: parsedPerm.country, source, confidence: baseConfidence }
   }
 
+  // Ensure Permanent Address villageTownCity matches Present Address villageTownCity if present
+  if (result.presentAddress?.villageTownCity?.value) {
+    result.permanentAddress!.villageTownCity = { ...result.presentAddress.villageTownCity }
+    result.permanentAddress!.addressLine2 = { ...result.presentAddress.villageTownCity }
+  }
+
   // Fallback: If present address was absent on passport, populate it from permanent address
   if (!result.presentAddress?.addressLine1 && result.permanentAddress?.addressLine1) {
     result.presentAddress = {
@@ -1838,6 +1844,14 @@ export function extractFromRawText(
       stateProvince: result.presentAddress.stateProvince ? { ...result.presentAddress.stateProvince } : undefined,
       postalCode: result.presentAddress.postalCode ? { ...result.presentAddress.postalCode } : undefined,
       country: result.presentAddress.country ? { ...result.presentAddress.country } : { value: 'BANGLADESH', source },
+    }
+  }
+
+  if (result.presentAddress?.villageTownCity?.value) {
+    result.permanentAddress = {
+      ...result.permanentAddress,
+      villageTownCity: { ...result.presentAddress.villageTownCity },
+      addressLine2: { ...result.presentAddress.villageTownCity },
     }
   }
 
