@@ -72,22 +72,22 @@ describe('TASK 093: Permanent Address Postal Code Formatting & Grandparent / Mil
     },
   }
 
-  it('Test 1: populateApplicationFromDocuments appends postal code to perm_add2 with dash and defaults flags to No', () => {
+  it('Test 1: populateApplicationFromDocuments sets perm_add2 to present villageTownCity and defaults flags to No', () => {
     const app = populateApplicationFromDocuments({
       applicantId: 'aziz_2323',
       passportDoc: azizPassportDoc,
     })
 
-    // 1. Permanent Address Village/Town/City has -5110
+    // 1. Permanent Address Village/Town/City matches Present Address
     assert.strictEqual(
       app.fields['perm_add2']?.value,
-      'PIRGANJ, KARNAI-5110',
-      'Permanent address perm_add2 must append postal code with dash'
+      'PIRGANJ, KARNAI',
+      'Permanent address perm_add2 must match present villageTownCity'
     )
     assert.strictEqual(
       app.fields['permanent_village_town_city']?.value,
-      'PIRGANJ, KARNAI-5110',
-      'Permanent address permanent_village_town_city must append postal code with dash'
+      'PIRGANJ, KARNAI',
+      'Permanent address permanent_village_town_city must match present villageTownCity'
     )
 
     // 2. Grandparent and Military flags default to No
@@ -103,7 +103,7 @@ describe('TASK 093: Permanent Address Postal Code Formatting & Grandparent / Mil
     )
   })
 
-  it('Test 2: Executes portal autofill on /visa/FamilyDetails DOM fixture with default No flags and postal formatted address', async () => {
+  it('Test 2: Executes portal autofill on /visa/FamilyDetails DOM fixture with default No flags and villageTownCity', async () => {
     const app = populateApplicationFromDocuments({
       applicantId: 'aziz_2323',
       passportDoc: azizPassportDoc,
@@ -141,8 +141,8 @@ describe('TASK 093: Permanent Address Postal Code Formatting & Grandparent / Mil
     const permAdd2Input = doc.querySelector<HTMLInputElement>('#perm_address2')
     assert.strictEqual(
       permAdd2Input?.value,
-      'PIRGANJ, KARNAI-5110',
-      `Portal permanent address #perm_address2 should be PIRGANJ, KARNAI-5110 (got "${permAdd2Input?.value}")`
+      'PIRGANJ, KARNAI',
+      `Portal permanent address #perm_address2 should be PIRGANJ, KARNAI (got "${permAdd2Input?.value}")`
     )
 
     // Mobile ISD Code Select dropdown
@@ -273,8 +273,8 @@ describe('TASK 093: Permanent Address Postal Code Formatting & Grandparent / Mil
     })
     assert.strictEqual(
       appRahim.fields['perm_add2']?.value,
-      'SECTOR 4, UTTARA-1230',
-      'Rahim permanent address should be SECTOR 4, UTTARA-1230'
+      'SECTOR 4, UTTARA',
+      'Rahim permanent address should be SECTOR 4, UTTARA'
     )
   })
 })
