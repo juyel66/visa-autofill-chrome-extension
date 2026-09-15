@@ -12,7 +12,9 @@ Object.defineProperty(global, 'navigator', { value: window.navigator, configurab
 Object.defineProperty(global, 'HTMLElement', { value: window.HTMLElement, configurable: true, writable: true })
 Object.defineProperty(global, 'HTMLInputElement', { value: window.HTMLInputElement, configurable: true, writable: true })
 Object.defineProperty(global, 'HTMLSelectElement', { value: window.HTMLSelectElement, configurable: true, writable: true })
+Object.defineProperty(global, 'HTMLOptionElement', { value: window.HTMLOptionElement, configurable: true, writable: true })
 Object.defineProperty(global, 'HTMLTextAreaElement', { value: window.HTMLTextAreaElement, configurable: true, writable: true })
+Object.defineProperty(global, 'HTMLButtonElement', { value: window.HTMLButtonElement, configurable: true, writable: true })
 Object.defineProperty(global, 'Event', { value: window.Event, configurable: true, writable: true })
 Object.defineProperty(global, 'CustomEvent', { value: window.CustomEvent, configurable: true, writable: true })
 
