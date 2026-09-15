@@ -28,13 +28,29 @@ import { runRegistrationAutofillTests } from '../src/countries/india/__tests__/r
 import { runContentScriptInjectionTests } from '../src/core/messaging/__tests__/contentScriptInjection.test'
 import { runTask083PurposeOfVisitTests } from '../src/core/__tests__/task083PurposeOfVisit.test'
 import { runTask084PurposeDebugTests } from '../src/core/__tests__/task084PurposeDebug.test'
-import { runTask087RegistrationWorkspaceRedesignTests } from '../src/core/__tests__/task087RegistrationWorkspaceRedesign.test'
-import { runTask088FullWorkspacePortalRedesignTests } from '../src/core/__tests__/task088FullWorkspacePortalRedesign.test'
+import { runTask091AddressAutofillTests } from '../src/core/__tests__/task091AddressAutofill.test'
+import { runTask090OtherPassportAutofillTests } from '../src/core/__tests__/task090OtherPassportAutofill.test'
 import { runTask089ChangedNameAutofillTests } from '../src/core/__tests__/task089ChangedNameAutofill.test'
+import { runTask088FullWorkspacePortalRedesignTests } from '../src/core/__tests__/task088FullWorkspacePortalRedesign.test'
+import { runTask087RegistrationWorkspaceRedesignTests } from '../src/core/__tests__/task087RegistrationWorkspaceRedesign.test'
 import { runTask086FirstClickRegistrationDefinitiveTests } from '../src/core/__tests__/task086FirstClickRegistrationDefinitive.test'
 import { runTask085FirstClickRegistrationAutofillTests } from '../src/core/__tests__/task085FirstClickRegistrationAutofill.test'
 
 async function execute() {
+  console.log('--- RUNNING TASK 091: ADDRESS SPLITTING & FAMILY DETAILS AUTOFILL TESTS ---')
+  const task091Res = await runTask091AddressAutofillTests()
+  console.log(`Passed: ${task091Res.passed}, Count: ${task091Res.totalSubtests}`)
+  if (!task091Res.passed) {
+    console.error('Failures:', task091Res.failures)
+  }
+
+  console.log('--- RUNNING TASK 090: OTHER PASSPORT (IC) AUTOFILL & DATE FORMATTING TESTS ---')
+  const task090Res = await runTask090OtherPassportAutofillTests()
+  console.log(`Passed: ${task090Res.passed}, Count: ${task090Res.totalSubtests}`)
+  if (!task090Res.passed) {
+    console.error('Failures:', task090Res.failures)
+  }
+
   console.log('--- RUNNING TASK 089: CHANGED NAME CHECKBOX & PREVIOUS SURNAME/NAME AUTOFILL TESTS ---')
   const task089Res = await runTask089ChangedNameAutofillTests()
   console.log(`Passed: ${task089Res.passed}, Count: ${task089Res.totalSubtests}`)
@@ -267,6 +283,8 @@ async function execute() {
   }
 
   const results = {
+    task091: task091Res.passed,
+    task090: task090Res.passed,
     task089: task089Res.passed,
     task088: task088Res.passed,
     task087: task087Res.passed,
