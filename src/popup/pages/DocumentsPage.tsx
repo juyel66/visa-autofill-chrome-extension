@@ -75,7 +75,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null)
 
-  // PDF Text Extraction Result Modal State
+  // PDF Text Extraction Result Modal State.
   const [extractionModal, setExtractionModal] = useState<{
     doc: DocumentRecord
     result: PdfExtractionResult
