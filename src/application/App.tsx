@@ -1108,10 +1108,10 @@ export const App: React.FC = () => {
             <div className="bg-blue-950/40 border border-blue-800/40 rounded-xl p-3 text-xs text-blue-300 space-y-1">
               <div className="font-semibold flex items-center gap-1.5">
                 <span>⚡ Active Model:</span>
-                <span className="bg-blue-900 px-2 py-0.5 rounded text-[11px] text-blue-200 font-mono">gemini-2.0-flash</span>
+                <span className="bg-blue-900 px-2 py-0.5 rounded text-[11px] text-blue-200 font-mono">gemini-3.8-flash</span>
               </div>
               <p className="text-[11px] text-blue-300/80">
-                Ultra-fast 1-second response time. Automatic fallback to local MRZ and OCR if offline.
+                Primary multimodal PDF & document extractor with instant structured JSON. Automatic fallback to local MRZ and OCR if offline.
               </p>
             </div>
 

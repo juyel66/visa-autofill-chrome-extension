@@ -46,6 +46,7 @@ export async function saveGeminiApiKey(apiKey: string): Promise<void> {
 export interface GeminiExtractionOptions {
   apiKey?: string
   modelName?: string
+  mimeType?: string
 }
 
 const PASSPORT_EXTRACTION_PROMPT = `
@@ -190,28 +191,38 @@ Rules:
 /**
  * Extracts structured applicant data from passport image(s) using Gemini Vision API.
  */
+/**
+ * Extracts structured applicant data from passport PDF or image(s) using Gemini 3.8 Flash API.
+ */
 export async function extractApplicantDataWithGemini(
   imagesBase64: string[],
   options?: GeminiExtractionOptions
 ): Promise<ExtractedApplicantData | null> {
   if (!imagesBase64 || imagesBase64.length === 0) return null
 
+  const totalStart = Date.now()
   const apiKey = (options?.apiKey || (await getGeminiApiKey())).trim()
   if (!apiKey) {
     console.warn('⚠️ [GEMINI AI] No API key provided or found in .env / storage.')
     return null
   }
 
-  // Build inline_data parts for all pages/images
+  // 1. Preparation & Encoding
+  const prepStart = Date.now()
   const inlineParts = imagesBase64.map((raw) => {
     let cleanBase64 = raw
-    let mimeType = 'image/jpeg'
+    let mimeType = options?.mimeType || 'image/jpeg'
 
     const match = raw.match(/^data:([^;]+);base64,(.+)$/)
     if (match) {
       mimeType = match[1]
       cleanBase64 = match[2]
+    } else if (raw.startsWith('JVBERi')) {
+      mimeType = 'application/pdf'
     }
+
+    // Clean whitespace/newlines from base64 string
+    cleanBase64 = cleanBase64.replace(/\s+/g, '')
 
     return {
       inline_data: {
@@ -220,6 +231,7 @@ export async function extractApplicantDataWithGemini(
       },
     }
   })
+  const prepDuration = Date.now() - prepStart
 
   const requestBody = {
     contents: [
@@ -232,59 +244,157 @@ export async function extractApplicantDataWithGemini(
     ],
     generationConfig: {
       response_mime_type: 'application/json',
-      temperature: 0.1,
     },
   }
 
   const modelsToTry = [
-    options?.modelName || 'gemini-3.6-flash',
-    'gemini-3.5-flash',
-    'gemini-flash-latest',
+    options?.modelName || 'gemini-3.8-flash',
     'gemini-3.7-flash',
-    'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
+    'gemini-3.5-flash',
   ]
 
-  console.log(`🤖 [GEMINI AI] Calling Gemini Vision API with ${imagesBase64.length} image(s)...`)
+  console.log(`🤖 [GEMINI AI] Calling Gemini API (Primary: ${modelsToTry[0]}) with ${imagesBase64.length} payload(s)...`)
+
+  let response: Response | null = null
+  let activeModel = modelsToTry[0]
+  let reqDuration = 0
+  const reqStart = Date.now()
 
   for (const model of modelsToTry) {
+    activeModel = model
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
     try {
-      const response = await fetch(url, {
+      const fetchStart = Date.now()
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
       })
+      reqDuration += Date.now() - fetchStart
 
-      if (!response.ok) {
-        const errText = await response.text()
-        console.warn(`⚠️ [GEMINI AI] Model ${model} returned HTTP ${response.status}:`, errText)
+      if (res.ok) {
+        response = res
+        // STOP IMMEDIATELY ON SUCCESS (ONE request -> ONE response)
+        break
+      }
+
+      const errText = await res.text()
+      console.warn(`⚠️ [GEMINI AI] Model ${model} returned HTTP ${res.status}:`, errText)
+
+      // If temporary overload (503/429), try next fallback model
+      if (res.status === 503 || res.status === 429 || res.status === 404) {
+        response = res
         continue
       }
 
-      const data = await response.json()
-      const candidate = data.candidates?.[0]
-      const rawJson = candidate?.content?.parts?.[0]?.text
-      if (!rawJson) {
-        continue
-      }
-
-      const parsed = JSON.parse(rawJson)
-      const mappedData = mapGeminiOutputToApplicantData(parsed)
-
-      // Explicitly log as requested by user
-      console.log('gemini api key theke egula asche:', mappedData)
-      console.log('gemini extracted data:', mappedData)
-
-      return mappedData
-    } catch (err) {
-      console.warn(`⚠️ [GEMINI AI] Error calling model ${model}:`, err)
-      // Cascade to next model if error occurs
+      response = res
+      break
+    } catch (fetchErr) {
+      reqDuration += Date.now() - reqStart
+      console.warn(`⚠️ [GEMINI AI] Network error calling model ${model}:`, fetchErr)
+      continue
     }
   }
 
-  return null
+  if (!response || !response.ok) {
+    const totalDuration = Date.now() - totalStart
+    console.log(`[GEMINI PERF]
+PDF preparation: ${prepDuration}ms
+Gemini request: ${reqDuration}ms
+Gemini response: HTTP ${response?.status || 'network-error'}
+JSON parsing: 0ms
+Mapping: 0ms
+Total: ${totalDuration}ms
+
+Gemini model: ${activeModel}
+HTTP status: ${response?.status || 0}
+Success: false
+Duration: ${totalDuration}ms`)
+    return null
+  }
+
+  // 2. JSON Parsing
+  const parseStart = Date.now()
+  let parsed: Record<string, unknown> | null = null
+  try {
+    const data = await response.json()
+    const candidate = data.candidates?.[0]
+    const rawJson = candidate?.content?.parts?.[0]?.text
+    if (rawJson && typeof rawJson === 'string') {
+      parsed = JSON.parse(rawJson)
+    }
+  } catch (parseErr) {
+    console.warn(`⚠️ [GEMINI AI] Failed to parse JSON response from ${model}:`, parseErr)
+  }
+  const parseDuration = Date.now() - parseStart
+
+  if (!parsed || typeof parsed !== 'object') {
+    const totalDuration = Date.now() - totalStart
+    console.log(`[GEMINI PERF]
+PDF preparation: ${prepDuration}ms
+Gemini request: ${reqDuration}ms
+Gemini response: HTTP ${response.status}
+JSON parsing: ${parseDuration}ms
+Mapping: 0ms
+Total: ${totalDuration}ms
+
+Gemini model: ${activeModel}
+HTTP status: ${response.status}
+Success: false
+Duration: ${totalDuration}ms`)
+    return null
+  }
+
+  // 3. Mapping
+  const mapStart = Date.now()
+  const mappedData = mapGeminiOutputToApplicantData(parsed)
+  const mapDuration = Date.now() - mapStart
+  const totalDuration = Date.now() - totalStart
+
+  const isUsable = hasUsableFields(mappedData)
+
+  console.log(`[GEMINI PERF]
+PDF preparation: ${prepDuration}ms
+Gemini request: ${reqDuration}ms
+Gemini response: HTTP ${response.status}
+JSON parsing: ${parseDuration}ms
+Mapping: ${mapDuration}ms
+Total: ${totalDuration}ms
+
+Gemini model: ${activeModel}
+HTTP status: ${response.status}
+Success: ${isUsable}
+Duration: ${totalDuration}ms`)
+
+  if (!isUsable) {
+    console.warn(`⚠️ [GEMINI AI] Model ${activeModel} returned response but no usable applicant fields were extracted.`)
+    return null
+  }
+
+  return mappedData
+}
+
+function hasUsableFields(data?: ExtractedApplicantData | null): boolean {
+  if (!data) return false
+  return Boolean(
+    data.personal?.lastName?.value ||
+    data.personal?.firstName?.value ||
+    data.personal?.fullName?.value ||
+    data.personal?.dateOfBirth?.value ||
+    data.passport?.passportNumber?.value ||
+    data.passport?.expiryDate?.value ||
+    data.presentAddress?.addressLine1?.value ||
+    data.permanentAddress?.addressLine1?.value ||
+    data.family?.father?.name?.value ||
+    data.family?.mother?.name?.value ||
+    data.family?.spouse?.name?.value ||
+    data.contact?.phone?.value ||
+    data.contact?.mobile?.value ||
+    data.contact?.email?.value
+  )
 }
 
 /**
@@ -385,12 +495,12 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   // 4. Present Address
   const pres = (raw.presentAddress || {}) as Record<string, unknown>
   let presLine1 = pres.addressLine1 ? String(pres.addressLine1).trim() : undefined
-  let presCity = pres.villageTownCity ? String(pres.villageTownCity).trim() : (pres.addressLine2 ? String(pres.addressLine2).trim() : undefined)
-  let presLine2 = pres.addressLine2 ? String(pres.addressLine2).trim() : (pres.villageTownCity ? String(pres.villageTownCity).trim() : undefined)
-  let presDist = pres.district ? String(pres.district).trim().toUpperCase() : (pres.stateProvince ? String(pres.stateProvince).trim().toUpperCase() : undefined)
-  let presState = pres.stateProvince ? String(pres.stateProvince).trim().toUpperCase() : (pres.district ? String(pres.district).trim().toUpperCase() : undefined)
+  let presLine2 = pres.addressLine2 ? String(pres.addressLine2).trim() : undefined
+  let presCity = pres.villageTownCity ? String(pres.villageTownCity).trim() : undefined
+  let presDist = pres.district ? String(pres.district).trim().toUpperCase() : undefined
+  let presState = pres.stateProvince ? String(pres.stateProvince).trim().toUpperCase() : undefined
   let presPin = pres.postalCode ? String(pres.postalCode).trim() : undefined
-  let presCountry = pres.country ? String(pres.country).trim().toUpperCase() : 'BANGLADESH'
+  let presCountry = pres.country ? String(pres.country).trim().toUpperCase() : undefined
 
   const invalidTokens = new Set(['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'])
   if (presState && (invalidTokens.has(presState) || presState.length <= 2)) {
@@ -403,12 +513,12 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   if (!presState && presDist) presState = presDist
 
   const rawPresStr = (pres.rawAddress || pres.fullAddress || pres.address) ? String(pres.rawAddress || pres.fullAddress || pres.address).trim() : undefined
-  if (rawPresStr && (!presLine1 || !presDist)) {
+  if (rawPresStr && !presLine1 && !presDist) {
     const reParsed = parseStructuredAddress(rawPresStr, { nationality: p.nationality ? String(p.nationality) : undefined })
     if (reParsed.addressLine1) presLine1 = reParsed.addressLine1
     if (reParsed.villageTownCity) {
       presCity = reParsed.villageTownCity
-      presLine2 = reParsed.villageTownCity
+      if (!presLine2) presLine2 = reParsed.villageTownCity
     }
     if (reParsed.district) {
       presDist = reParsed.district
@@ -429,12 +539,12 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   // 5. Permanent Address
   const perm = (raw.permanentAddress || {}) as Record<string, unknown>
   let permLine1 = perm.addressLine1 ? String(perm.addressLine1).trim() : undefined
-  let permCity = presCity || (perm.villageTownCity ? String(perm.villageTownCity).trim() : (perm.addressLine2 ? String(perm.addressLine2).trim() : undefined))
-  let permLine2 = presCity || (perm.addressLine2 ? String(perm.addressLine2).trim() : (perm.villageTownCity ? String(perm.villageTownCity).trim() : undefined))
-  let permDist = perm.district ? String(perm.district).trim().toUpperCase() : (perm.stateProvince ? String(perm.stateProvince).trim().toUpperCase() : undefined)
-  let permState = perm.stateProvince ? String(perm.stateProvince).trim().toUpperCase() : (perm.district ? String(perm.district).trim().toUpperCase() : undefined)
+  let permLine2 = perm.addressLine2 ? String(perm.addressLine2).trim() : undefined
+  let permCity = perm.villageTownCity ? String(perm.villageTownCity).trim() : undefined
+  let permDist = perm.district ? String(perm.district).trim().toUpperCase() : undefined
+  let permState = perm.stateProvince ? String(perm.stateProvince).trim().toUpperCase() : undefined
   let permPin = perm.postalCode ? String(perm.postalCode).trim() : undefined
-  let permCountry = perm.country ? String(perm.country).trim().toUpperCase() : 'BANGLADESH'
+  let permCountry = perm.country ? String(perm.country).trim().toUpperCase() : undefined
 
   if (permState && (invalidTokens.has(permState) || permState.length <= 2)) {
     permState = undefined
@@ -446,12 +556,12 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   if (!permState && permDist) permState = permDist
 
   const rawPermStr = (perm.rawAddress || perm.fullAddress || perm.address) ? String(perm.rawAddress || perm.fullAddress || perm.address).trim() : undefined
-  if (rawPermStr && (!permLine1 || !permDist)) {
+  if (rawPermStr && !permLine1 && !permDist) {
     const reParsed = parseStructuredAddress(rawPermStr, { nationality: p.nationality ? String(p.nationality) : undefined })
     if (reParsed.addressLine1) permLine1 = reParsed.addressLine1
-    if (reParsed.villageTownCity && !presCity) {
+    if (reParsed.villageTownCity) {
       permCity = reParsed.villageTownCity
-      permLine2 = reParsed.villageTownCity
+      if (!permLine2) permLine2 = reParsed.villageTownCity
     }
     if (reParsed.district) {
       permDist = reParsed.district
@@ -469,38 +579,34 @@ export function mapGeminiOutputToApplicantData(raw: Record<string, unknown>): Ex
   if (permPin) result.permanentAddress!.postalCode = { value: permPin, source }
   if (permCountry) result.permanentAddress!.country = { value: permCountry, source }
 
-  // Sync: If present address is empty and permanent address is present, copy permanent to present
-  if (!result.presentAddress?.addressLine1 && result.permanentAddress?.addressLine1) {
-    result.presentAddress = {
-      ...result.presentAddress,
-      addressLine1: result.permanentAddress.addressLine1 ? { ...result.permanentAddress.addressLine1 } : undefined,
-      addressLine2: result.permanentAddress.addressLine2 ? { ...result.permanentAddress.addressLine2 } : undefined,
-      villageTownCity: result.permanentAddress.villageTownCity ? { ...result.permanentAddress.villageTownCity } : undefined,
-      district: result.permanentAddress.district ? { ...result.permanentAddress.district } : undefined,
-      stateProvince: result.permanentAddress.stateProvince ? { ...result.permanentAddress.stateProvince } : undefined,
-      postalCode: result.permanentAddress.postalCode ? { ...result.permanentAddress.postalCode } : undefined,
-      country: result.permanentAddress.country ? { ...result.permanentAddress.country } : { value: 'BANGLADESH', source },
-    }
-  }
+  // Fallback: If permanent address is completely absent from document and present is present, fallback
+  const hasExtractedPerm = Boolean(
+    permLine1 || permLine2 || permCity || permDist || permState || permPin || permCountry
+  )
+  const hasExtractedPres = Boolean(
+    presLine1 || presLine2 || presCity || presDist || presState || presPin || presCountry
+  )
 
-  // Sync: If permanent address is empty and present address is present, copy present to permanent
-  if (!result.permanentAddress?.addressLine1 && result.presentAddress?.addressLine1) {
+  if (!hasExtractedPerm && hasExtractedPres) {
     result.permanentAddress = {
-      ...result.permanentAddress,
-      addressLine1: result.presentAddress.addressLine1 ? { ...result.presentAddress.addressLine1 } : undefined,
-      addressLine2: result.presentAddress.addressLine2 ? { ...result.presentAddress.addressLine2 } : undefined,
-      villageTownCity: result.presentAddress.villageTownCity ? { ...result.presentAddress.villageTownCity } : undefined,
-      district: result.presentAddress.district ? { ...result.presentAddress.district } : undefined,
-      stateProvince: result.presentAddress.stateProvince ? { ...result.presentAddress.stateProvince } : undefined,
-      postalCode: result.presentAddress.postalCode ? { ...result.presentAddress.postalCode } : undefined,
-      country: result.presentAddress.country ? { ...result.presentAddress.country } : { value: 'BANGLADESH', source },
+      addressLine1: result.presentAddress!.addressLine1 ? { ...result.presentAddress!.addressLine1 } : undefined,
+      addressLine2: result.presentAddress!.addressLine2 ? { ...result.presentAddress!.addressLine2 } : undefined,
+      villageTownCity: result.presentAddress!.villageTownCity ? { ...result.presentAddress!.villageTownCity } : undefined,
+      district: result.presentAddress!.district ? { ...result.presentAddress!.district } : undefined,
+      stateProvince: result.presentAddress!.stateProvince ? { ...result.presentAddress!.stateProvince } : undefined,
+      postalCode: result.presentAddress!.postalCode ? { ...result.presentAddress!.postalCode } : undefined,
+      country: result.presentAddress!.country ? { ...result.presentAddress!.country } : undefined,
     }
-  }
-
-  // Ensure Permanent Address villageTownCity and line2 match Present Address villageTownCity
-  if (result.presentAddress?.villageTownCity?.value) {
-    result.permanentAddress!.villageTownCity = { ...result.presentAddress.villageTownCity }
-    result.permanentAddress!.addressLine2 = { ...result.presentAddress.villageTownCity }
+  } else if (!hasExtractedPres && hasExtractedPerm) {
+    result.presentAddress = {
+      addressLine1: result.permanentAddress!.addressLine1 ? { ...result.permanentAddress!.addressLine1 } : undefined,
+      addressLine2: result.permanentAddress!.addressLine2 ? { ...result.permanentAddress!.addressLine2 } : undefined,
+      villageTownCity: result.permanentAddress!.villageTownCity ? { ...result.permanentAddress!.villageTownCity } : undefined,
+      district: result.permanentAddress!.district ? { ...result.permanentAddress!.district } : undefined,
+      stateProvince: result.permanentAddress!.stateProvince ? { ...result.permanentAddress!.stateProvince } : undefined,
+      postalCode: result.permanentAddress!.postalCode ? { ...result.permanentAddress!.postalCode } : undefined,
+      country: result.permanentAddress!.country ? { ...result.permanentAddress!.country } : undefined,
+    }
   }
 
   // 6. Family

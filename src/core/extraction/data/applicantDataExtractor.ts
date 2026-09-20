@@ -2797,17 +2797,46 @@ export function extractApplicantDataFromDocuments(
   return mergeExtractedCandidateData(candidateList).merged
 }
 
-const SOURCE_PRIORITY: Record<ExtractionSource, number> = {
-  mrz: 1,
-  'pdf-text': 2,
-  ai: 3,
-  ocr: 4,
-  'manual-review': 5,
+/**
+ * Resolves source priority on a per-field basis:
+ * - Checksummed MRZ identity fields (passport number, DOB, expiry date, gender):
+ *   MRZ (1) > AI (2) > PDF Text (3) > OCR (4) > Manual Review (5)
+ * - All semantic and structured document fields (address, family, employment, travel, sponsors, contact, religion, etc.):
+ *   AI (1) > MRZ (2) > PDF Text (3) > OCR (4) > Manual Review (5)
+ */
+function getFieldSourcePriority(fieldKey: string, source: ExtractionSource): number {
+  const MRZ_CORE_FIELDS = new Set([
+    'passport.passportNumber',
+    'personal.dateOfBirth',
+    'passport.expiryDate',
+    'personal.gender',
+  ])
+
+  if (MRZ_CORE_FIELDS.has(fieldKey)) {
+    const mrzPriority: Record<ExtractionSource, number> = {
+      mrz: 1,
+      ai: 2,
+      'pdf-text': 3,
+      ocr: 4,
+      'manual-review': 5,
+    }
+    return mrzPriority[source] ?? 99
+  }
+
+  const aiPrimaryPriority: Record<ExtractionSource, number> = {
+    ai: 1,
+    mrz: 2,
+    'pdf-text': 3,
+    ocr: 4,
+    'manual-review': 5,
+  }
+  return aiPrimaryPriority[source] ?? 99
 }
 
 /**
- * Merges multiple candidate extraction sources using a deterministic source priority rule:
- * MRZ (1) > PDF Text (2) > OCR (3) > Manual Review (4)
+ * Merges multiple candidate extraction sources using field-specific source priority:
+ * - MRZ is authoritative for core passport identity (passport number, DOB, expiry, gender)
+ * - Gemini AI is primary for all semantic, family, address, employment, travel, and sponsor fields
  * Records conflicts if candidates from different sources return conflicting non-empty values.
  */
 export function mergeExtractedCandidateData(
@@ -2845,9 +2874,9 @@ export function mergeExtractedCandidateData(
 
     if (fields.length === 0) return
 
-    // Sort by source priority first, then descending confidence
+    // Sort by field-specific source priority first, then descending confidence
     fields.sort((a, b) => {
-      const sourceDiff = (SOURCE_PRIORITY[a.source] || 99) - (SOURCE_PRIORITY[b.source] || 99)
+      const sourceDiff = getFieldSourcePriority(fieldKey, a.source) - getFieldSourcePriority(fieldKey, b.source)
       if (sourceDiff !== 0) return sourceDiff
       return (b.confidence || 0) - (a.confidence || 0)
     })
