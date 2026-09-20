@@ -29,7 +29,8 @@
   ],
   "host_permissions": [
     "https://indianvisa-bangladesh.nic.in/*",
-    "https://indianvisaonline.gov.in/*"
+    "https://indianvisaonline.gov.in/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "permissions": [
     "activeTab",
