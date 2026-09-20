@@ -49,7 +49,7 @@ let observerCleanup: (() => void) | null = null
 let latestOperation: AutofillOperation | null = null
 
 /**
- * Production-safe storage reader for content script with error logging.
+ * Production-safe storage reader for content script with error  logging.
  */
 async function readExtensionStorage<T extends Record<string, unknown>>(keys: string[]): Promise<T> {
   return new Promise<T>((resolve) => {
