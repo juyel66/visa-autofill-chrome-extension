@@ -88,7 +88,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }, [])
 
-  // 2. Load Documents & SavedApplication for selected applicant
+  // 2. Load Documents & SavedApplication for selected applicant.
   const refreshApplicantData = useCallback(async () => {
     if (!selectedApplicant) {
       setApplicantDocs([])
