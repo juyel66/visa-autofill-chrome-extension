@@ -33,6 +33,9 @@ export async function getGeminiApiKey(): Promise<string> {
 /**
  * Saves a new Gemini API key to chrome.storage.local.
  */
+/**
+ * Saves a new Gemini API key to chrome.storage.local.
+ */
 export async function saveGeminiApiKey(apiKey: string): Promise<void> {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     return new Promise((resolve) => {
@@ -41,6 +44,99 @@ export async function saveGeminiApiKey(apiKey: string): Promise<void> {
       })
     })
   }
+}
+
+export const RECOMMENDED_GEMINI_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
+  'gemini-3-flash-preview',
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-flash-latest',
+  'gemini-3.1-pro-preview',
+]
+
+let cachedWorkingModel = 'gemini-3.5-flash'
+
+/**
+ * Retrieves the currently active / cached working model.
+ */
+export async function getActiveGeminiModel(): Promise<string> {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['visa_autofill_active_gemini_model'], (res) => {
+        const stored = res?.visa_autofill_active_gemini_model
+        if (typeof stored === 'string' && stored.trim()) {
+          resolve(stored.trim())
+        } else {
+          resolve(cachedWorkingModel)
+        }
+      })
+    })
+  }
+  return cachedWorkingModel
+}
+
+/**
+ * Persists the working Gemini model so future requests hit it immediately.
+ */
+export async function setActiveGeminiModel(modelName: string): Promise<void> {
+  cachedWorkingModel = modelName
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    return new Promise((resolve) => {
+      chrome.storage.local.set({ visa_autofill_active_gemini_model: modelName }, () => {
+        resolve()
+      })
+    })
+  }
+}
+
+/**
+ * Tests Gemini API connection and finds the fastest working model.
+ */
+export async function testGeminiConnection(
+  apiKey?: string,
+  modelName?: string
+): Promise<{ success: boolean; activeModel?: string; latencyMs?: number; error?: string }> {
+  const key = (apiKey || (await getGeminiApiKey())).trim()
+  if (!key) {
+    return { success: false, error: 'No API key provided.' }
+  }
+
+  const activeCached = await getActiveGeminiModel()
+  const candidateModels = Array.from(new Set([
+    modelName || activeCached || 'gemini-3.5-flash',
+    ...RECOMMENDED_GEMINI_MODELS
+  ]))
+
+  for (const m of candidateModels) {
+    const t0 = Date.now()
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 12000)
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Respond with valid JSON: {"status":"ok"}' }] }],
+          generationConfig: { response_mime_type: 'application/json' }
+        }),
+        signal: controller.signal
+      })
+      clearTimeout(timer)
+      if (res.ok) {
+        const latencyMs = Date.now() - t0
+        await setActiveGeminiModel(m).catch(() => {})
+        return { success: true, activeModel: m, latencyMs }
+      }
+    } catch {
+      clearTimeout(timer)
+      continue
+    }
+  }
+
+  return { success: false, error: 'All tested Gemini models failed to respond. Please check your API key and network connection.' }
 }
 
 export interface GeminiExtractionOptions {
@@ -185,7 +281,10 @@ Rules:
 4. If Previous Passport No is found, set holdsOtherPassport to true and populate otherPassportNumber.
 5. If phone is found (e.g. +8801700000000), set phone: "+8801700000000", isdCode: "880", mobile: "1700000000".
 6. If permanent address is found, populate permanentAddress.
-7. If a field is not visibly found in the document, return null. Do not invent or guess data.
+7. For Place of Issue in Bangladeshi passports, extract the issuing authority/office (e.g. 'DIP/DHAKA', 'DHAKA', 'DIP/CHITTAGONG', etc.).
+8. Extract Personal No / NID / NIC (e.g. 10 or 17 digit number) into personal.nationalIdNumber.
+9. For addresses in Bangladesh, district name must be extracted into district and stateProvince (never use 'IN' or country code).
+10. If a field is not visibly found in the document, return null. Do not invent or guess data.
 `
 
 /**
@@ -247,12 +346,20 @@ export async function extractApplicantDataWithGemini(
     },
   }
 
-  const modelsToTry = [
-    options?.modelName || 'gemini-3.8-flash',
+  const activeCached = await getActiveGeminiModel()
+  const preferredModel = options?.modelName || activeCached || 'gemini-3.5-flash'
+  const fallbackList = [
+    preferredModel,
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-3-flash-preview',
+    'gemini-3.8-flash',
     'gemini-3.7-flash',
     'gemini-flash-latest',
-    'gemini-3.5-flash',
+    'gemini-3.1-pro-preview',
   ]
+  const modelsToTry = Array.from(new Set(fallbackList))
 
   console.log(`🤖 [GEMINI AI] Calling Gemini API (Primary: ${modelsToTry[0]}) with ${imagesBase64.length} payload(s)...`)
 
@@ -264,6 +371,9 @@ export async function extractApplicantDataWithGemini(
   for (const model of modelsToTry) {
     activeModel = model
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 50000)
+
     try {
       const fetchStart = Date.now()
       const res = await fetch(url, {
@@ -272,20 +382,23 @@ export async function extractApplicantDataWithGemini(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+        signal: controller.signal,
       })
+      clearTimeout(timer)
       reqDuration += Date.now() - fetchStart
 
       if (res.ok) {
         response = res
-        // STOP IMMEDIATELY ON SUCCESS (ONE request -> ONE response)
+        // Save working model so future extractions immediately hit the active model
+        setActiveGeminiModel(model).catch(() => {})
         break
       }
 
       const errText = await res.text()
       console.warn(`⚠️ [GEMINI AI] Model ${model} returned HTTP ${res.status}:`, errText)
 
-      // If temporary overload (503/429), try next fallback model
-      if (res.status === 503 || res.status === 429 || res.status === 404) {
+      // If temporary overload (503/429), model not found (404), unsupported/bad request (400), or server error (500), try next fallback model
+      if (res.status === 503 || res.status === 429 || res.status === 404 || res.status === 500 || res.status === 400) {
         response = res
         continue
       }
@@ -293,6 +406,7 @@ export async function extractApplicantDataWithGemini(
       response = res
       break
     } catch (fetchErr) {
+      clearTimeout(timer)
       reqDuration += Date.now() - reqStart
       console.warn(`⚠️ [GEMINI AI] Network error calling model ${model}:`, fetchErr)
       continue
@@ -324,10 +438,14 @@ Duration: ${totalDuration}ms`)
     const candidate = data.candidates?.[0]
     const rawJson = candidate?.content?.parts?.[0]?.text
     if (rawJson && typeof rawJson === 'string') {
-      parsed = JSON.parse(rawJson)
+      let cleanJson = rawJson.trim()
+      if (cleanJson.startsWith('```')) {
+        cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+      }
+      parsed = JSON.parse(cleanJson)
     }
   } catch (parseErr) {
-    console.warn(`⚠️ [GEMINI AI] Failed to parse JSON response from ${model}:`, parseErr)
+    console.warn(`⚠️ [GEMINI AI] Failed to parse JSON response from ${activeModel}:`, parseErr)
   }
   const parseDuration = Date.now() - parseStart
 

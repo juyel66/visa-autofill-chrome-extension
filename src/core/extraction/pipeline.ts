@@ -142,11 +142,11 @@ export async function processUploadedDocumentPayload(
 
     let geminiSuccess = false
     if (apiKey && apiKey.trim().length > 0) {
-      onProgress?.({ percent: 30, text: 'Extracting document with Gemini 3.8 Flash...' })
+      onProgress?.({ percent: 30, text: 'Extracting document with Gemini AI (Vision Engine)...' })
       try {
         const aiCand = await extractApplicantDataWithGemini([fileDataUrl], {
           apiKey: apiKey.trim(),
-          modelName: options?.modelName || 'gemini-3.8-flash',
+          modelName: options?.modelName,
           mimeType: 'application/pdf',
         })
 
@@ -286,11 +286,11 @@ export async function processUploadedDocumentPayload(
 
     let geminiImgSuccess = false
     if (apiKey && apiKey.trim().length > 0) {
-      onProgress?.({ percent: 30, text: 'Running Gemini 3.8 Flash on document image...' })
+      onProgress?.({ percent: 30, text: 'Extracting document with Gemini AI (Vision Engine)...' })
       try {
         const aiCand = await extractApplicantDataWithGemini([fileDataUrl], {
           apiKey: apiKey.trim(),
-          modelName: options?.modelName || 'gemini-3.8-flash',
+          modelName: options?.modelName,
         })
         if (aiCand && hasAnyFields(aiCand)) {
           aiExecuted = true

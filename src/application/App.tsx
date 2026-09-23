@@ -24,6 +24,10 @@ import { populateApplicationFromDocuments } from '../core/application/applicatio
 import {
   getGeminiApiKey,
   saveGeminiApiKey,
+  getActiveGeminiModel,
+  setActiveGeminiModel,
+  testGeminiConnection,
+  RECOMMENDED_GEMINI_MODELS,
   DEFAULT_GEMINI_API_KEY,
 } from '../core/extraction/ai/geminiExtractor'
 import { RegistrationSection } from './components/RegistrationSection'
@@ -45,7 +49,10 @@ export const App: React.FC = () => {
   const [showAllFields, setShowAllFields] = useState<boolean>(false)
   const [showAiModal, setShowAiModal] = useState<boolean>(false)
   const [apiKeyInput, setApiKeyInput] = useState<string>(DEFAULT_GEMINI_API_KEY)
+  const [activeModel, setActiveModel] = useState<string>('gemini-3.5-flash')
   const [savingApiKey, setSavingApiKey] = useState<boolean>(false)
+  const [testingConnection, setTestingConnection] = useState<boolean>(false)
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const loadApplicationForApplicant = useCallback(
     async (targetId: string, appList: ApplicantProfile[], allDocs: DocumentRecord[]) => {
@@ -157,11 +164,41 @@ export const App: React.FC = () => {
     []
   )
 
+  const handleTestConnection = async () => {
+    if (!apiKeyInput.trim()) {
+      setTestResult({ success: false, message: 'Please enter a Gemini API Key first.' })
+      return
+    }
+    setTestingConnection(true)
+    setTestResult(null)
+    try {
+      const res = await testGeminiConnection(apiKeyInput, activeModel)
+      if (res.success) {
+        if (res.activeModel) setActiveModel(res.activeModel)
+        setTestResult({
+          success: true,
+          message: `✓ Connected to ${res.activeModel} (${res.latencyMs}ms)! Ready for extraction.`,
+        })
+      } else {
+        setTestResult({
+          success: false,
+          message: res.error || 'Connection failed. Please check key & internet.',
+        })
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setTestResult({ success: false, message: `Error: ${msg}` })
+    } finally {
+      setTestingConnection(false)
+    }
+  }
+
   const handleSaveApiKey = async () => {
     setSavingApiKey(true)
     try {
       await saveGeminiApiKey(apiKeyInput)
-      showToast('✓ Gemini API Key saved successfully!', 'success')
+      await setActiveGeminiModel(activeModel)
+      showToast('✓ Gemini API Key and Model saved successfully!', 'success')
       setShowAiModal(false)
     } catch {
       showToast('Failed to save API Key', 'error')
@@ -177,6 +214,9 @@ export const App: React.FC = () => {
       try {
         const storedKey = await getGeminiApiKey()
         if (storedKey) setApiKeyInput(storedKey)
+
+        const currentModel = await getActiveGeminiModel()
+        if (currentModel) setActiveModel(currentModel)
 
         const urlParams = new URLSearchParams(window.location.search)
         const urlApplicantId = urlParams.get('applicantId')
@@ -1093,25 +1133,83 @@ export const App: React.FC = () => {
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                 Gemini API Key
               </label>
-              <input
-                type="text"
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder="Enter Gemini API Key..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={apiKeyInput}
+                  onChange={(e) => {
+                    setApiKeyInput(e.target.value)
+                    setTestResult(null)
+                  }}
+                  placeholder="Enter Gemini API Key (e.g. AIzaSy...)..."
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleTestConnection}
+                  disabled={testingConnection || !apiKeyInput.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap shadow-sm"
+                >
+                  {testingConnection ? 'Testing...' : '⚡ Test Connection'}
+                </button>
+              </div>
               <p className="text-[11px] text-slate-400">
                 Key is stored securely in your browser's local extension storage.
               </p>
+              {apiKeyInput.trim().startsWith('AQ.') && (
+                <div className="bg-amber-950/40 border border-amber-700/60 rounded-lg p-2.5 text-[11px] text-amber-300 space-y-1">
+                  <div className="font-semibold flex items-center gap-1">
+                    <span>⚠️ Recommended: Use Standard Google AI Studio Key</span>
+                  </div>
+                  <p className="text-amber-200/80 leading-relaxed">
+                    Your key begins with <code className="bg-amber-900/60 px-1 rounded">AQ.</code> (Vertex AI credential). These often experience 503/429 limits. For 100% guaranteed free quota without limits, generate a standard key (starts with <code className="bg-amber-900/60 px-1 rounded">AIzaSy...</code>) at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline font-bold text-amber-200 hover:text-white">aistudio.google.com</a>.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {testResult && (
+              <div
+                className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                  testResult.success
+                    ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-300'
+                    : 'bg-rose-950/40 border-rose-700/60 text-rose-300'
+                }`}
+              >
+                <span>{testResult.message}</span>
+                {testResult.success && <span className="font-bold text-emerald-400">ONLINE</span>}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Active Gemini Vision Model
+              </label>
+              <select
+                value={activeModel}
+                onChange={(e) => {
+                  setActiveModel(e.target.value)
+                  setTestResult(null)
+                }}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+              >
+                {RECOMMENDED_GEMINI_MODELS.map((m) => (
+                  <option key={m} value={m}>
+                    {m} {m === 'gemini-3.5-flash' ? '(Recommended - Fastest & Stable)' : ''}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="bg-blue-950/40 border border-blue-800/40 rounded-xl p-3 text-xs text-blue-300 space-y-1">
               <div className="font-semibold flex items-center gap-1.5">
-                <span>⚡ Active Model:</span>
-                <span className="bg-blue-900 px-2 py-0.5 rounded text-[11px] text-blue-200 font-mono">gemini-3.8-flash</span>
+                <span>⚡ Selected Engine:</span>
+                <span className="bg-blue-900 px-2 py-0.5 rounded text-[11px] text-blue-200 font-mono">
+                  {activeModel}
+                </span>
               </div>
               <p className="text-[11px] text-blue-300/80">
-                Primary multimodal PDF & document extractor with instant structured JSON. Automatic fallback to local MRZ and OCR if offline.
+                Primary multimodal PDF & document extractor with instant structured JSON. Auto-fallback to local MRZ and OCR if offline.
               </p>
             </div>
 
@@ -1127,7 +1225,7 @@ export const App: React.FC = () => {
                 disabled={savingApiKey}
                 className="px-5 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center gap-1.5"
               >
-                {savingApiKey ? 'Saving...' : '✓ Save API Key'}
+                {savingApiKey ? 'Saving...' : '✓ Save Settings'}
               </button>
             </div>
           </div>

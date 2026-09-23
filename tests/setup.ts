@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import fs from 'fs'
 import path from 'path'
+import dns from 'dns'
 import { JSDOM } from 'jsdom'
+
+try {
+  dns.setDefaultResultOrder('ipv4first')
+} catch {}
 
 try {
   const envPath = path.resolve(process.cwd(), '.env')

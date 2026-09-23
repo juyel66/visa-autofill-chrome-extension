@@ -122,8 +122,10 @@ export async function renderPdfPageToImage(
     // 1. Try high-resolution DOM Canvas rendering first via pdfjsLib
     if (typeof document !== 'undefined' && document.createElement) {
       try {
+        const copy = new Uint8Array(bytes.length)
+        copy.set(bytes)
         const loadingTask = pdfjsLib.getDocument({
-          data: bytes.slice(),
+          data: copy,
           useSystemFonts: true,
         })
         const pdfDoc = await loadingTask.promise
@@ -171,8 +173,10 @@ export async function renderAllPdfPagesToImages(
     const bytes = await toUint8Array(input)
     if (typeof document !== 'undefined' && document.createElement) {
       try {
+        const copy = new Uint8Array(bytes.length)
+        copy.set(bytes)
         const loadingTask = pdfjsLib.getDocument({
-          data: bytes.slice(),
+          data: copy,
           useSystemFonts: true,
         })
         const pdfDoc = await loadingTask.promise
@@ -231,8 +235,10 @@ export async function extractPdfText(
       }
     }
 
+    const copy = new Uint8Array(bytes.length)
+    copy.set(bytes)
     const loadingTask = pdfjsLib.getDocument({
-      data: bytes,
+      data: copy,
       useSystemFonts: true,
     })
 
