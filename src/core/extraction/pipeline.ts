@@ -1,13 +1,9 @@
-import { extractPdfText, renderAllPdfPagesToImages, renderPdfPageToImage, toUint8Array } from './pdf/pdfTextExtractor'
-import { recognizeText } from './ocr/ocrEngine'
-import { parsePassportMrz } from './mrz/mrzParser'
+import { mergeExtractedCandidateData } from './data/applicantDataExtractor'
 import {
-  extractFromPdfText,
-  extractFromOcrText,
-  extractFromMrz,
-  mergeExtractedCandidateData,
-} from './data/applicantDataExtractor'
-import { extractApplicantDataWithGemini, getGeminiApiKey } from './ai/geminiExtractor'
+  extractApplicantDataWithGemini,
+  getGeminiApiKey,
+  GeminiExtractionError,
+} from './ai/geminiExtractor'
 import type { ExtractedApplicantData } from './data/types'
 
 export interface ProcessDocumentPipelineOptions {
@@ -26,6 +22,8 @@ export interface ProcessDocumentPipelineResult {
   hasExtractedFields: boolean
   pageCount: number
   sourceTypes: Array<'ai' | 'pdf-text' | 'ocr' | 'mrz'>
+  geminiError?: string
+  isQuotaExceeded?: boolean
   diagnostics: {
     pdfTextFound: boolean
     pdfTextChars: number
@@ -37,8 +35,7 @@ export interface ProcessDocumentPipelineResult {
 }
 
 /**
- * Evaluates whether current extracted candidate data is sufficiently complete
- * so that expensive canvas rendering, OCR, and AI vision calls can be safely skipped.
+ * Checks whether candidate data has core identity fields.
  */
 export function isExtractionSufficient(
   candidateList: ExtractedApplicantData[],
@@ -60,24 +57,9 @@ export function isExtractionSufficient(
     merged.passport?.issueDate?.value?.trim()
   )
 
-  // Primary passport identity criteria:
-  // Must have: Passport Number, Name, DOB, Expiry/Issue Date
   const hasCoreIdentity = hasPassportNo && hasName && hasDob && hasExpiryOrIssue
 
-  // If core identity is established from clean text (>= 80 chars) or valid MRZ:
-  if (hasCoreIdentity && (textChars >= 80 || merged.passport?.passportNumber?.source === 'mrz')) {
-    return true
-  }
-
-  // Check if it's an OGD Application with rich fields:
-  const isOgd = Boolean(
-    hasPassportNo &&
-    hasName &&
-    (merged.family?.father?.name?.value ||
-      merged.presentAddress?.addressLine1?.value ||
-      merged.employment?.presentOccupation?.value)
-  )
-  if (isOgd && textChars >= 100) {
+  if (hasCoreIdentity && (textChars >= 80 || merged.passport?.passportNumber?.source === 'ai')) {
     return true
   }
 
@@ -85,17 +67,13 @@ export function isExtractionSufficient(
 }
 
 /**
- * Authoritative end-to-end extraction pipeline for ANY uploaded passport or visa document.
+ * Authoritative end-to-end extraction pipeline using SOLELY Gemini Vision AI.
  * 
- * Optimized Architecture (Task 089):
- * 1. Fast Path (Local Engine): Digital PDF Text Extraction + MRZ Parsing + Deterministic Field Parsers.
- *    If clean and sufficiently complete, instantly returns in < 200ms without waiting for OCR or AI.
- * 2. Smart OCR Decision: Runs WebAssembly OCR only when text is missing (scanned PDFs), incomplete, or forced.
- * 3. Smart Gemini Decision: Invokes Gemini Flash Multimodal AI when fields are missing/ambiguous and
- *    a valid Gemini API key is available (or explicitly requested), with resilient error handling.
- * 4. Merging: Safely resolves all candidates with deterministic source precedence (Manual > MRZ > PDF-Text > AI > OCR).
- * 
- * ZERO hardcoded applicant data. Only dynamic extraction and generic derivations.
+ * Local text / OCR fallback extraction has been removed per requirement:
+ * "sudhu matro gemini er extraction ta rakhe local ta remove kore felo,
+ * ebong joidi gemini er quata ses ba gemni kono erro dey tokhn workspace e
+ * ekta message dekhiye diba error er r workspace ta open hoye jabe manually
+ * korar jnno r kono pblm na hoilo auto filup hobe gemini diye"
  */
 export async function processUploadedDocumentPayload(
   fileDataUrl: string,
@@ -107,241 +85,62 @@ export async function processUploadedDocumentPayload(
     mimeType === 'application/pdf' ||
     fileDataUrl.startsWith('data:application/pdf') ||
     fileName.toLowerCase().endsWith('.pdf')
-  const isImage =
-    mimeType.startsWith('image/') ||
-    fileDataUrl.startsWith('data:image/') ||
-    /\.(jpe?g|png|webp|bmp|tiff?)$/i.test(fileName)
 
   const candidateList: ExtractedApplicantData[] = []
   const sourceTypes = new Set<'ai' | 'pdf-text' | 'ocr' | 'mrz'>()
   const errors: string[] = []
 
-  let pdfTextFound = false
-  let pdfTextChars = 0
-  let ocrExecutedCount = 0
-  let mrzFound = false
   let aiExecuted = false
-  let pageCount = 1
+  let geminiError: string | undefined
+  let isQuotaExceeded = false
+  const pageCount = 1
 
   const onProgress = options?.onProgress
-  const maxPdfPages = options?.maxPdfPages || 5
-  const ocrScale = options?.ocrScale || 2.5
 
-  if (isPdf) {
-    // -------------------------------------------------------------
-    // PRIMARY PATH: GEMINI 3.8 FLASH DIRECT PDF EXTRACTION
-    // -------------------------------------------------------------
-    let apiKey = options?.apiKey
-    if (!apiKey) {
-      try {
-        apiKey = await getGeminiApiKey()
-      } catch (keyErr) {
-        console.warn('Gemini API key resolution warning:', keyErr)
-      }
+  // 1. Resolve Gemini API Key
+  let apiKey = options?.apiKey
+  if (!apiKey) {
+    try {
+      apiKey = await getGeminiApiKey()
+    } catch (keyErr) {
+      console.warn('Gemini API key resolution warning:', keyErr)
     }
+  }
 
-    let geminiSuccess = false
-    if (apiKey && apiKey.trim().length > 0) {
-      onProgress?.({ percent: 30, text: 'Extracting document with Gemini AI (Vision Engine)...' })
-      try {
-        const aiCand = await extractApplicantDataWithGemini([fileDataUrl], {
-          apiKey: apiKey.trim(),
-          modelName: options?.modelName,
-          mimeType: 'application/pdf',
-        })
+  if (!apiKey || apiKey.trim().length === 0) {
+    geminiError = 'Gemini API key is missing or not configured. Please configure your Gemini API key in Settings.'
+    errors.push(geminiError)
+    console.warn('⚠️ [VISA AUTOFILL] Gemini extraction skipped: No API key available.')
+  } else {
+    onProgress?.({ percent: 30, text: 'Extracting document with Gemini AI (Vision Engine)...' })
+    try {
+      const targetMime = isPdf ? 'application/pdf' : (mimeType || 'image/jpeg')
+      const aiCand = await extractApplicantDataWithGemini([fileDataUrl], {
+        apiKey: apiKey.trim(),
+        modelName: options?.modelName,
+        mimeType: targetMime,
+      })
 
-        if (aiCand && hasAnyFields(aiCand)) {
-          aiExecuted = true
-          sourceTypes.add('ai')
-          candidateList.push(aiCand)
-          geminiSuccess = true
-          console.log('⚡ [VISA AUTOFILL] Gemini PDF extraction succeeded as PRIMARY source!')
-        } else {
-          errors.push('Gemini PDF extraction returned no usable fields; falling back to local extraction')
-        }
-      } catch (aiErr) {
-        const msg = aiErr instanceof Error ? aiErr.message : String(aiErr)
-        errors.push(`Gemini AI extraction failure: ${msg}`)
-        console.warn('⚠️ [VISA AUTOFILL] Gemini PDF extraction error, falling back:', aiErr)
-      }
-    } else {
-      errors.push('No Gemini API key available; using local fallback extraction')
-    }
-
-    // -------------------------------------------------------------
-    // FALLBACK PATH: EXECUTED ONLY IF GEMINI WAS NOT USED OR FAILED
-    // -------------------------------------------------------------
-    if (!geminiSuccess) {
-      console.log('🔄 [VISA AUTOFILL] Executing local fallback extraction for PDF...')
-      onProgress?.({ percent: 50, text: 'Running local PDF text and MRZ extraction...' })
-      try {
-        const pdfExtract = await extractPdfText(fileDataUrl)
-        pageCount = pdfExtract.pageCount || 1
-
-        if (pdfExtract.fullText && pdfExtract.fullText.trim().length > 0) {
-          pdfTextFound = true
-          pdfTextChars = pdfExtract.fullText.length
-          sourceTypes.add('pdf-text')
-
-          const pdfCand = extractFromPdfText(pdfExtract.fullText)
-          if (hasAnyFields(pdfCand)) {
-            candidateList.push(pdfCand)
-          }
-
-          const mrzRes = parsePassportMrz(pdfExtract.fullText)
-          if (mrzRes.success && mrzRes.data) {
-            mrzFound = true
-            sourceTypes.add('mrz')
-            candidateList.push(extractFromMrz(mrzRes.data))
-          }
-        }
-      } catch (pdfErr) {
-        const msg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr)
-        errors.push(`PDF text extraction error: ${msg}`)
-        console.warn('PDF text extraction warning:', pdfErr)
-      }
-
-      // In fallback mode, check if digital text + MRZ is sufficient before running expensive OCR
-      const isFallbackSufficient = isExtractionSufficient(candidateList, pdfTextChars)
-
-      if (isFallbackSufficient && !options?.forceOcr) {
-        console.log('⚡ [VISA AUTOFILL] Fallback digital PDF text extraction is sufficient.')
+      if (aiCand && hasAnyFields(aiCand)) {
+        aiExecuted = true
+        sourceTypes.add('ai')
+        candidateList.push(aiCand)
+        console.log('⚡ [VISA AUTOFILL] Gemini extraction succeeded as sole extraction engine!')
       } else {
-        // Fallback OCR: Render pages and run Tesseract OCR
-        let pageImages: string[] = []
-        try {
-          const rawBytes = await toUint8Array(fileDataUrl)
-          pageImages = await renderAllPdfPagesToImages(rawBytes, maxPdfPages, ocrScale)
-
-          if (pageImages.length === 0) {
-            const single = await renderPdfPageToImage(rawBytes, 1, ocrScale)
-            if (single) pageImages = [single]
-          }
-        } catch (renderErr) {
-          const msg = renderErr instanceof Error ? renderErr.message : String(renderErr)
-          errors.push(`PDF rendering error: ${msg}`)
-          console.warn('PDF rendering error:', renderErr)
-        }
-
-        if (pageImages.length > 0) {
-          const totalRendered = Math.max(1, pageImages.length)
-          for (let i = 0; i < pageImages.length; i++) {
-            const pageImg = pageImages[i]
-            const pageNum = i + 1
-            onProgress?.({
-              percent: 60 + Math.round(((i + 0.5) / totalRendered) * 35),
-              text: `Scanning document page ${pageNum} of ${totalRendered}...`,
-            })
-
-            try {
-              const ocrRes = await recognizeText(pageImg, {
-                language: 'eng',
-                onProgress: (prog, statusText) => {
-                  const base = 60 + Math.round((i / totalRendered) * 35)
-                  const chunk = Math.round((prog * 35) / totalRendered)
-                  onProgress?.({
-                    percent: Math.min(95, base + chunk),
-                    text: `Page ${pageNum}: ${statusText || 'Recognizing text...'}`,
-                  })
-                },
-              })
-
-              if (ocrRes.text && ocrRes.text.trim().length > 0) {
-                ocrExecutedCount++
-                sourceTypes.add('ocr')
-
-                const ocrCand = extractFromOcrText(ocrRes)
-                if (hasAnyFields(ocrCand)) {
-                  candidateList.push(ocrCand)
-                }
-
-                const mrzRes = parsePassportMrz(ocrRes.text)
-                if (mrzRes.success && mrzRes.data) {
-                  mrzFound = true
-                  sourceTypes.add('mrz')
-                  candidateList.push(extractFromMrz(mrzRes.data))
-                }
-              }
-            } catch (pageOcrErr) {
-              const msg = pageOcrErr instanceof Error ? pageOcrErr.message : String(pageOcrErr)
-              errors.push(`OCR error on page ${pageNum}: ${msg}`)
-              console.warn(`OCR error on page ${pageNum}:`, pageOcrErr)
-            }
-          }
-        }
+        geminiError = 'Gemini AI returned response but no usable applicant fields were detected in this document.'
+        errors.push(geminiError)
       }
-    }
-  } else if (isImage) {
-    // -------------------------------------------------------------
-    // IMAGE DOCUMENT EXTRACTION: GEMINI FIRST -> OCR/MRZ FALLBACK
-    // -------------------------------------------------------------
-    let apiKey = options?.apiKey
-    if (!apiKey) {
-      try {
-        apiKey = await getGeminiApiKey()
-      } catch (keyErr) {
-        console.warn('Gemini API key resolution warning:', keyErr)
-      }
-    }
-
-    let geminiImgSuccess = false
-    if (apiKey && apiKey.trim().length > 0) {
-      onProgress?.({ percent: 30, text: 'Extracting document with Gemini AI (Vision Engine)...' })
-      try {
-        const aiCand = await extractApplicantDataWithGemini([fileDataUrl], {
-          apiKey: apiKey.trim(),
-          modelName: options?.modelName,
-        })
-        if (aiCand && hasAnyFields(aiCand)) {
-          aiExecuted = true
-          sourceTypes.add('ai')
-          candidateList.push(aiCand)
-          geminiImgSuccess = true
-          console.log('⚡ [VISA AUTOFILL] Gemini Image extraction succeeded as PRIMARY source!')
-        } else {
-          errors.push('Gemini Image extraction returned no usable fields; falling back to OCR')
-        }
-      } catch (aiErr) {
+    } catch (aiErr) {
+      if (aiErr instanceof GeminiExtractionError) {
+        geminiError = aiErr.message
+        isQuotaExceeded = aiErr.isQuotaExceeded
+      } else {
         const msg = aiErr instanceof Error ? aiErr.message : String(aiErr)
-        errors.push(`Gemini AI extraction failure: ${msg}`)
-        console.warn('⚠️ [VISA AUTOFILL] Gemini Image extraction error, falling back to OCR:', aiErr)
+        geminiError = msg
+        isQuotaExceeded = /quota|429|resource_exhausted|rate limit/i.test(msg)
       }
-    }
-
-    if (!geminiImgSuccess) {
-      onProgress?.({ percent: 50, text: 'Running OCR fallback on document image...' })
-      try {
-        const ocrRes = await recognizeText(fileDataUrl, {
-          language: 'eng',
-          onProgress: (prog, statusText) => {
-            onProgress?.({
-              percent: Math.min(90, 50 + Math.round(prog * 40)),
-              text: statusText || 'Recognizing text...',
-            })
-          },
-        })
-
-        if (ocrRes.text && ocrRes.text.trim().length > 0) {
-          ocrExecutedCount++
-          sourceTypes.add('ocr')
-
-          const ocrCand = extractFromOcrText(ocrRes)
-          if (hasAnyFields(ocrCand)) {
-            candidateList.push(ocrCand)
-          }
-
-          const mrzRes = parsePassportMrz(ocrRes.text)
-          if (mrzRes.success && mrzRes.data) {
-            mrzFound = true
-            sourceTypes.add('mrz')
-            candidateList.push(extractFromMrz(mrzRes.data))
-          }
-        }
-      } catch (imgOcrErr) {
-        const msg = imgOcrErr instanceof Error ? imgOcrErr.message : String(imgOcrErr)
-        errors.push(`Image OCR error: ${msg}`)
-        console.warn('Image OCR error:', imgOcrErr)
-      }
+      errors.push(`Gemini AI extraction failure: ${geminiError}`)
+      console.warn('⚠️ [VISA AUTOFILL] Gemini extraction error:', aiErr)
     }
   }
 
@@ -358,8 +157,9 @@ export async function processUploadedDocumentPayload(
   console.group('🎯 [VISA AUTOFILL] PIPELINE EXTRACTION COMPLETE')
   console.log('File Name:', fileName)
   console.log('MIME Type:', mimeType)
-  console.log('Page Count:', pageCount)
   console.log('Extracted Field Count (hasFields):', hasExtractedFields)
+  console.log('Gemini Error:', geminiError)
+  console.log('Quota Exceeded:', isQuotaExceeded)
   console.log('Source Types:', Array.from(sourceTypes))
   console.log('Merged Extracted Data:', finalMerged)
   console.groupEnd()
@@ -369,11 +169,13 @@ export async function processUploadedDocumentPayload(
     hasExtractedFields,
     pageCount,
     sourceTypes: Array.from(sourceTypes),
+    geminiError,
+    isQuotaExceeded,
     diagnostics: {
-      pdfTextFound,
-      pdfTextChars,
-      ocrExecutedCount,
-      mrzFound,
+      pdfTextFound: false,
+      pdfTextChars: 0,
+      ocrExecutedCount: 0,
+      mrzFound: false,
       aiExecuted,
       errors,
     },
