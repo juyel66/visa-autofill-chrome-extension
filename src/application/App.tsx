@@ -20,7 +20,10 @@ import {
   getSavedApplicationByApplicantId,
   saveApplication,
 } from '../core/application/applicationStorage'
-import { populateApplicationFromDocuments } from '../core/application/applicationMerger'
+import {
+  populateApplicationFromDocuments,
+  createBlankApplicationWithDefaults,
+} from '../core/application/applicationMerger'
 import {
   getGeminiApiKey,
   saveGeminiApiKey,
@@ -53,6 +56,23 @@ export const App: React.FC = () => {
   const [savingApiKey, setSavingApiKey] = useState<boolean>(false)
   const [testingConnection, setTestingConnection] = useState<boolean>(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  // Gemini Error & Quota Detection for Manual Workspace Entry
+  const [geminiError, setGeminiError] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      return urlParams.get('geminiError') || urlParams.get('error') || null
+    }
+    return null
+  })
+  const [isQuotaExceeded, setIsQuotaExceeded] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const err = urlParams.get('geminiError') || urlParams.get('error') || ''
+      return urlParams.get('quotaExceeded') === 'true' || /quota|resource_exhausted|429/i.test(err)
+    }
+    return false
+  })
 
   const loadApplicationForApplicant = useCallback(
     async (targetId: string, appList: ApplicantProfile[], allDocs: DocumentRecord[]) => {
@@ -580,9 +600,45 @@ export const App: React.FC = () => {
           await saveDocument(updatedDoc)
           setDocuments((prev) => prev.map((d) => (d.documentId === updatedDoc.documentId ? updatedDoc : d)))
           passportDoc = updatedDoc
+          setGeminiError(null)
+          setIsQuotaExceeded(false)
+        } else if (pipelineResult.geminiError) {
+          setGeminiError(pipelineResult.geminiError)
+          setIsQuotaExceeded(Boolean(pipelineResult.isQuotaExceeded))
+
+          // Requirement: "ager kono pdf er data existing e rakhba na blank ey rakhba r jegula common segula rakhe diba"
+          const blankApp = createBlankApplicationWithDefaults({
+            applicantId,
+            notes: activeProf?.notes,
+            existingAppId: application?.applicationId,
+          })
+          await saveApplication(blankApp)
+          setApplication(blankApp)
+
+          showToast(
+            pipelineResult.isQuotaExceeded
+              ? '⚠️ Gemini quota ses (Quota Exceeded)! Fields blank kora hoyeche manually korar jnno.'
+              : `⚠️ ${pipelineResult.geminiError}. Fields blank kora hoyeche manually korar jnno.`,
+            'error'
+          )
+          setLoading(false)
+          return
         }
       } catch (healErr) {
         console.warn('Re-sync auto-healing error:', healErr)
+        const msg = healErr instanceof Error ? healErr.message : String(healErr)
+        setGeminiError(msg)
+        setIsQuotaExceeded(/quota|429|resource_exhausted/i.test(msg))
+
+        const blankApp = createBlankApplicationWithDefaults({
+          applicantId,
+          notes: activeProf?.notes,
+          existingAppId: application?.applicationId,
+        })
+        await saveApplication(blankApp)
+        setApplication(blankApp)
+        setLoading(false)
+        return
       }
     }
 
@@ -885,6 +941,52 @@ export const App: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* Gemini Error / Quota / Manual Entry Alert Banner */}
+      {geminiError && (
+        <div className="bg-rose-950/95 border-b border-rose-600 text-rose-100 px-4 sm:px-6 py-3.5 shadow-lg relative z-20">
+          <div className="max-w-7xl mx-auto flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-rose-900 border border-rose-500/80 flex items-center justify-center text-base flex-shrink-0 mt-0.5">
+                ⚠️
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-sm text-rose-200">
+                    {isQuotaExceeded
+                      ? 'Gemini API Quota Exceeded (কোটা শেষ)'
+                      : 'Gemini Document Extraction Error'}
+                  </span>
+                  <span className="bg-rose-900 border border-rose-500 text-rose-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Manual Mode Active / ম্যানুয়ালি এন্ট্রি করুন
+                  </span>
+                </div>
+                <p className="text-xs text-rose-200/90 leading-relaxed font-mono bg-rose-900/40 px-2.5 py-1.5 rounded border border-rose-800/80">
+                  {geminiError}
+                </p>
+                <p className="text-xs text-rose-300 font-medium">
+                  Workspace has been opened for manual entry. Please review and fill in your application fields below manually, then click <strong>💾 Save Application</strong>.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => setShowAiModal(true)}
+                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                ⚙️ API Key
+              </button>
+              <button
+                onClick={() => setGeminiError(null)}
+                className="text-rose-300 hover:text-white text-xs bg-rose-900/60 hover:bg-rose-800 border border-rose-700/60 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Alert Banner */}
       {toast && (
