@@ -35,7 +35,7 @@ export async function ensureContentScriptReady(
     }
   }
 
-  // 2. Ping content script to test existing connection
+  // 2. Ping content script to test existing connection.
   try {
     const pingResponse = await sendMessageToTab<{ type: 'CONTENT_PONG'; message: string }>(tabId, {
       type: 'PING_CONTENT',
