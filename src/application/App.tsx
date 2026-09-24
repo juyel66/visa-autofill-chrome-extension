@@ -1,11 +1,8 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import type { ApplicantProfile } from '../core/applicant/types'
 import type { DocumentRecord } from '../core/document/types'
-import { getLatestDocument, saveDocument } from '../core/document'
-import {
-  applyExtractionToApplicant,
-  processUploadedDocumentPayload,
-} from '../core/extraction'
+import { getLatestDocument } from '../core/document'
+import { applyExtractionToApplicant } from '../core/extraction'
 import { saveApplicant } from '../core/storage'
 import {
   getAllSchemaFields,
@@ -22,7 +19,6 @@ import {
 } from '../core/application/applicationStorage'
 import {
   populateApplicationFromDocuments,
-  createBlankApplicationWithDefaults,
 } from '../core/application/applicationMerger'
 import {
   getGeminiApiKey,
@@ -65,7 +61,7 @@ export const App: React.FC = () => {
     }
     return null
   })
-  const [isQuotaExceeded, setIsQuotaExceeded] = useState<boolean>(() => {
+  const [isQuotaExceeded] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search)
       const err = urlParams.get('geminiError') || urlParams.get('error') || ''
@@ -81,85 +77,6 @@ export const App: React.FC = () => {
       let passportDoc = getLatestDocument(profileDocs, 'passport') || profileDocs.find((d) => d.extractedDataConfirmed && d.extractedData)
       const ogdDoc = getLatestDocument(profileDocs, 'ogd')
       const activeProf = appList.find((a) => a.applicantId === targetId)
-
-      // Auto-heal legacy passport document records that lack contact, address, place of issue, or family extraction in storage
-      if (
-        passportDoc &&
-        passportDoc.fileDataUrl &&
-        ((!passportDoc.extractedData?.contact?.phone && !passportDoc.extractedData?.presentAddress?.phone) ||
-          !passportDoc.extractedData?.passport?.passportNumber?.value ||
-          !passportDoc.extractedData?.permanentAddress?.addressLine1 ||
-          !passportDoc.extractedData?.passport?.placeOfIssue?.value ||
-          !passportDoc.extractedData?.family?.father?.name?.value)
-      ) {
-        try {
-          const pipelineResult = await processUploadedDocumentPayload(
-            passportDoc.fileDataUrl,
-            passportDoc.fileName,
-            passportDoc.mimeType
-          )
-
-          if (pipelineResult.hasExtractedFields) {
-            const reExtracted = pipelineResult.extractedData
-            const updatedDoc: DocumentRecord = {
-              ...passportDoc,
-              extractedData: {
-                ...passportDoc.extractedData,
-                ...reExtracted,
-                personal: {
-                  ...passportDoc.extractedData?.personal,
-                  ...reExtracted.personal,
-                },
-                passport: {
-                  ...passportDoc.extractedData?.passport,
-                  ...reExtracted.passport,
-                },
-                contact: {
-                  ...passportDoc.extractedData?.contact,
-                  ...reExtracted.contact,
-                },
-                presentAddress: {
-                  ...passportDoc.extractedData?.presentAddress,
-                  ...reExtracted.presentAddress,
-                },
-                permanentAddress: {
-                  ...passportDoc.extractedData?.permanentAddress,
-                  ...reExtracted.permanentAddress,
-                },
-                family: {
-                  ...passportDoc.extractedData?.family,
-                  ...reExtracted.family,
-                },
-                employment: {
-                  ...passportDoc.extractedData?.employment,
-                  ...reExtracted.employment,
-                },
-                travel: {
-                  ...passportDoc.extractedData?.travel,
-                  ...reExtracted.travel,
-                },
-                previousVisa: {
-                  ...passportDoc.extractedData?.previousVisa,
-                  ...reExtracted.previousVisa,
-                },
-                sponsorIndia: {
-                  ...passportDoc.extractedData?.sponsorIndia,
-                  ...reExtracted.sponsorIndia,
-                },
-                sponsorMission: {
-                  ...passportDoc.extractedData?.sponsorMission,
-                  ...reExtracted.sponsorMission,
-                },
-              },
-              extractedDataConfirmed: true,
-            }
-            await saveDocument(updatedDoc)
-            passportDoc = updatedDoc
-          }
-        } catch (healErr) {
-          console.warn('Auto-healing passport document contact info warning:', healErr)
-        }
-      }
 
       const mergedApp = populateApplicationFromDocuments({
         applicantId: targetId,
@@ -555,92 +472,9 @@ export const App: React.FC = () => {
     if (!applicantId) return
     setLoading(true)
     const profileDocs = documents.filter((d) => d.applicantId === applicantId)
-    let passportDoc = getLatestDocument(profileDocs, 'passport')
+    const passportDoc = getLatestDocument(profileDocs, 'passport')
     const ogdDoc = getLatestDocument(profileDocs, 'ogd')
     const activeProf = applicants.find((a) => a.applicantId === applicantId)
-
-    if (passportDoc && passportDoc.fileDataUrl) {
-      try {
-        const pipelineResult = await processUploadedDocumentPayload(
-          passportDoc.fileDataUrl,
-          passportDoc.fileName,
-          passportDoc.mimeType
-        )
-
-        if (pipelineResult.hasExtractedFields) {
-          const reExtracted = pipelineResult.extractedData
-          const updatedDoc: DocumentRecord = {
-            ...passportDoc,
-            extractedData: {
-              ...passportDoc.extractedData,
-              ...reExtracted,
-              passport: {
-                ...passportDoc.extractedData?.passport,
-                ...reExtracted.passport,
-              },
-              contact: {
-                ...passportDoc.extractedData?.contact,
-                ...reExtracted.contact,
-              },
-              presentAddress: {
-                ...passportDoc.extractedData?.presentAddress,
-                ...reExtracted.presentAddress,
-              },
-              permanentAddress: {
-                ...passportDoc.extractedData?.permanentAddress,
-                ...reExtracted.permanentAddress,
-              },
-              family: {
-                ...passportDoc.extractedData?.family,
-                ...reExtracted.family,
-              },
-            },
-            extractedDataConfirmed: true,
-          }
-          await saveDocument(updatedDoc)
-          setDocuments((prev) => prev.map((d) => (d.documentId === updatedDoc.documentId ? updatedDoc : d)))
-          passportDoc = updatedDoc
-          setGeminiError(null)
-          setIsQuotaExceeded(false)
-        } else if (pipelineResult.geminiError) {
-          setGeminiError(pipelineResult.geminiError)
-          setIsQuotaExceeded(Boolean(pipelineResult.isQuotaExceeded))
-
-          // Requirement: "ager kono pdf er data existing e rakhba na blank ey rakhba r jegula common segula rakhe diba"
-          const blankApp = createBlankApplicationWithDefaults({
-            applicantId,
-            notes: activeProf?.notes,
-            existingAppId: application?.applicationId,
-          })
-          await saveApplication(blankApp)
-          setApplication(blankApp)
-
-          showToast(
-            pipelineResult.isQuotaExceeded
-              ? '⚠️ Gemini quota ses (Quota Exceeded)! Fields blank kora hoyeche manually korar jnno.'
-              : `⚠️ ${pipelineResult.geminiError}. Fields blank kora hoyeche manually korar jnno.`,
-            'error'
-          )
-          setLoading(false)
-          return
-        }
-      } catch (healErr) {
-        console.warn('Re-sync auto-healing error:', healErr)
-        const msg = healErr instanceof Error ? healErr.message : String(healErr)
-        setGeminiError(msg)
-        setIsQuotaExceeded(/quota|429|resource_exhausted/i.test(msg))
-
-        const blankApp = createBlankApplicationWithDefaults({
-          applicantId,
-          notes: activeProf?.notes,
-          existingAppId: application?.applicationId,
-        })
-        await saveApplication(blankApp)
-        setApplication(blankApp)
-        setLoading(false)
-        return
-      }
-    }
 
     const refreshed = populateApplicationFromDocuments({
       applicantId,
@@ -754,6 +588,18 @@ export const App: React.FC = () => {
     } else {
       f = fieldKeyOrValue
     }
+
+    if (f?.hasConflict) {
+      return (
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-950/90 text-red-300 border border-red-700/80 cursor-help"
+          title={f.conflictDetails || 'Invalid data relationship - requires manual review'}
+        >
+          <span>⚠</span> Invalid / Review
+        </span>
+      )
+    }
+
     if (!f || f.value === '' || f.value === undefined || f.value === null || f.value === false) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800/80 text-amber-400/90 border border-slate-700">

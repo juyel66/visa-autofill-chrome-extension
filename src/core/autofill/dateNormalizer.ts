@@ -190,3 +190,73 @@ export function normalizeDateForControl(
   // Default for text inputs if no transform specified: format as DD/MM/YYYY
   return formatToDdMmYyyy(parsed)
 }
+
+export interface PassportDateValidationResult {
+  isValid: boolean
+  issueDate?: string
+  expiryDate?: string
+  error?: string
+  needsManualReview: boolean
+}
+
+/**
+ * Validates that current passport expiry date is strictly after issue date.
+ * If either date is missing, isValid is true, needsManualReview is false (not an impossible sequence, just partial).
+ * If expiryDate <= issueDate, isValid is false, error is populated, and needsManualReview is true.
+ */
+export function validatePassportDates(
+  issueDateStr?: string | null,
+  expiryDateStr?: string | null
+): PassportDateValidationResult {
+  if (!issueDateStr || !issueDateStr.trim() || !expiryDateStr || !expiryDateStr.trim()) {
+    return {
+      isValid: true,
+      issueDate: issueDateStr?.trim() || undefined,
+      expiryDate: expiryDateStr?.trim() || undefined,
+      needsManualReview: false,
+    }
+  }
+
+  const parsedIssue = parseDateString(issueDateStr)
+  const parsedExpiry = parseDateString(expiryDateStr)
+
+  if (!parsedIssue || !parsedExpiry) {
+    return {
+      isValid: true,
+      issueDate: issueDateStr.trim(),
+      expiryDate: expiryDateStr.trim(),
+      needsManualReview: false,
+    }
+  }
+
+  const issueTime = Date.UTC(parsedIssue.year, parsedIssue.month - 1, parsedIssue.day)
+  const expiryTime = Date.UTC(parsedExpiry.year, parsedExpiry.month - 1, parsedExpiry.day)
+
+  if (expiryTime < issueTime) {
+    return {
+      isValid: false,
+      issueDate: issueDateStr.trim(),
+      expiryDate: expiryDateStr.trim(),
+      error: `Invalid passport date relationship: Expiry date (${expiryDateStr.trim()}) is before Issue date (${issueDateStr.trim()}).`,
+      needsManualReview: true,
+    }
+  }
+
+  if (expiryTime === issueTime) {
+    return {
+      isValid: false,
+      issueDate: issueDateStr.trim(),
+      expiryDate: expiryDateStr.trim(),
+      error: `Invalid passport date relationship: Expiry date (${expiryDateStr.trim()}) cannot be identical to Issue date (${issueDateStr.trim()}).`,
+      needsManualReview: true,
+    }
+  }
+
+  return {
+    isValid: true,
+    issueDate: issueDateStr.trim(),
+    expiryDate: expiryDateStr.trim(),
+    needsManualReview: false,
+  }
+}
+

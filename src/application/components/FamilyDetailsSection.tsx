@@ -444,7 +444,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('father_nationality') || 'BANGLADESH'}
+                  value={getVal('father_nationality')}
                   onChange={(e) => onFieldChange('father_nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                 >
@@ -466,7 +466,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('father_prev_nationality') || 'BANGLADESH'}
+                  value={getVal('father_prev_nationality')}
                   onChange={(e) => onFieldChange('father_prev_nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                 >
@@ -489,7 +489,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
-                  value={getVal('father_place_of_birth') || getVal('appl.placbrth')}
+                  value={getVal('father_place_of_birth')}
                   onChange={(e) => onFieldChange('father_place_of_birth', e.target.value.toUpperCase())}
                   placeholder="PLACE OF BIRTH"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -505,7 +505,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('father_country_of_birth') || 'BANGLADESH'}
+                  value={getVal('father_country_of_birth')}
                   onChange={(e) => onFieldChange('father_country_of_birth', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                 >
@@ -549,7 +549,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('mother_nationality') || 'BANGLADESH'}
+                  value={getVal('mother_nationality')}
                   onChange={(e) => onFieldChange('mother_nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                 >
@@ -571,7 +571,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('mother_prev_nationality') || 'BANGLADESH'}
+                  value={getVal('mother_prev_nationality')}
                   onChange={(e) => onFieldChange('mother_prev_nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                 >
@@ -594,7 +594,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
-                  value={getVal('mother_place_of_birth') || getVal('appl.placbrth')}
+                  value={getVal('mother_place_of_birth')}
                   onChange={(e) => onFieldChange('mother_place_of_birth', e.target.value.toUpperCase())}
                   placeholder="PLACE OF BIRTH"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -610,7 +610,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('mother_country_of_birth') || 'BANGLADESH'}
+                  value={getVal('mother_country_of_birth')}
                   onChange={(e) => onFieldChange('mother_country_of_birth', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                 >
@@ -670,7 +670,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Nationality *</label>
                   <div className="sm:col-span-5">
                     <select
-                      value={getVal('spouse_nationality') || 'BANGLADESH'}
+                      value={getVal('spouse_nationality')}
                       onChange={(e) => onFieldChange('spouse_nationality', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                     >
@@ -687,7 +687,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <div className="sm:col-span-5">
                     <input
                       type="text"
-                      value={getVal('spouse_place_of_birth') || getVal('appl.placbrth')}
+                      value={getVal('spouse_place_of_birth')}
                       onChange={(e) => onFieldChange('spouse_place_of_birth', e.target.value.toUpperCase())}
                       placeholder="PLACE OF BIRTH"
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -699,7 +699,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Country of Birth</label>
                   <div className="sm:col-span-5">
                     <select
-                      value={getVal('spouse_country_of_birth') || 'BANGLADESH'}
+                      value={getVal('spouse_country_of_birth')}
                       onChange={(e) => onFieldChange('spouse_country_of_birth', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                     >

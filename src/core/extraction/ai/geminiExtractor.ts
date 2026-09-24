@@ -69,17 +69,12 @@ export async function saveGeminiApiKey(apiKey: string): Promise<void> {
 }
 
 export const RECOMMENDED_GEMINI_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
   'gemini-3.6-flash',
-  'gemini-3-flash-preview',
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
+  'gemini-3.5-flash-lite',
   'gemini-flash-latest',
-  'gemini-3.1-pro-preview',
 ]
 
-let cachedWorkingModel = 'gemini-3.5-flash'
+let cachedWorkingModel = 'gemini-3.6-flash'
 
 /**
  * Retrieves the currently active / cached working model.
@@ -128,18 +123,21 @@ export async function testGeminiConnection(
 
   const activeCached = await getActiveGeminiModel()
   const candidateModels = Array.from(new Set([
-    modelName || activeCached || 'gemini-3.5-flash',
+    modelName || activeCached || 'gemini-3.6-flash',
     ...RECOMMENDED_GEMINI_MODELS
   ]))
 
   for (const m of candidateModels) {
     const t0 = Date.now()
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 12000)
+    const timer = setTimeout(() => controller.abort(), 10000)
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key,
+        },
         body: JSON.stringify({
           contents: [{ parts: [{ text: 'Respond with valid JSON: {"status":"ok"}' }] }],
           generationConfig: { response_mime_type: 'application/json' }
@@ -372,17 +370,10 @@ export async function extractApplicantDataWithGemini(
   }
 
   const activeCached = await getActiveGeminiModel()
-  const preferredModel = options?.modelName || activeCached || 'gemini-3.5-flash'
+  const preferredModel = options?.modelName || activeCached || 'gemini-3.6-flash'
   const fallbackList = [
     preferredModel,
-    'gemini-3.5-flash',
-    'gemini-3.5-flash-lite',
-    'gemini-3.6-flash',
-    'gemini-3-flash-preview',
-    'gemini-3.8-flash',
-    'gemini-3.7-flash',
-    'gemini-flash-latest',
-    'gemini-3.1-pro-preview',
+    ...RECOMMENDED_GEMINI_MODELS,
   ]
   const modelsToTry = Array.from(new Set(fallbackList))
 
@@ -398,9 +389,9 @@ export async function extractApplicantDataWithGemini(
 
   for (const model of modelsToTry) {
     activeModel = model
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 50000)
+    const timer = setTimeout(() => controller.abort(), 15000)
 
     try {
       const fetchStart = Date.now()
@@ -408,6 +399,7 @@ export async function extractApplicantDataWithGemini(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,

@@ -2,7 +2,7 @@ import type { DocumentRecord } from '../document/types'
 import type { ApplicantProfile } from '../applicant/types'
 import { applyExtractionToApplicant } from '../extraction/data/extractionMapper'
 import { resolveApplicantValue } from '../autofill/valueResolver'
-import { parseDateString, formatToIsoDate } from '../autofill/dateNormalizer'
+import { parseDateString, formatToIsoDate, validatePassportDates } from '../autofill/dateNormalizer'
 import { getAllSchemaFields } from './fieldSchema'
 import { resolveApplicantReligion } from '../extraction/data/religionExtractor'
 import type { ApplicationFieldValue, SavedApplication } from './types'
@@ -319,18 +319,11 @@ export function populateApplicationFromDocuments(options: {
       isBangladeshiValue(activeProfile?.permanentAddress?.country) ||
       isBangladeshiValue(passportDoc?.extractedData?.personal?.nationality?.value) ||
       isBangladeshiValue(passportDoc?.extractedData?.passport?.issuingCountry?.value) ||
-      isBangladeshiValue(ogdProfile?.personalInfo?.nationality) ||
-      true
+      isBangladeshiValue(ogdProfile?.personalInfo?.nationality)
 
     const passportPob =
       activeProfile?.personalInfo?.townCityOfBirth ||
       passportDoc?.extractedData?.personal?.townCityOfBirth?.value ||
-      activeProfile?.presentAddress?.district ||
-      activeProfile?.permanentAddress?.district ||
-      passportDoc?.extractedData?.presentAddress?.district?.value ||
-      passportDoc?.extractedData?.permanentAddress?.district?.value ||
-      activeProfile?.passport?.placeOfIssue?.replace(/^DIP\s*\/\s*/i, '') ||
-      passportDoc?.extractedData?.passport?.placeOfIssue?.value?.replace(/^DIP\s*\/\s*/i, '') ||
       ''
 
     const hasSpouse = Boolean(
@@ -362,15 +355,22 @@ export function populateApplicationFromDocuments(options: {
           activeProfile.passport?.issuingCountry ||
           passportDoc?.extractedData?.personal?.nationality?.value ||
           passportDoc?.extractedData?.passport?.issuingCountry?.value
-        resolvedValue = isBangladeshiValue(rawNat) ? 'BANGLADESH' : (rawNat || 'BANGLADESH')
-        source = (activeProfile.personalInfo?.nationality || passportDoc?.extractedData?.personal?.nationality?.value) ? activeSource : 'derived'
-        docId = activeDocId
+        if (rawNat) {
+          resolvedValue = isBangladeshiValue(rawNat) ? 'BANGLADESH' : rawNat
+          source = (activeProfile.personalInfo?.nationality || passportDoc?.extractedData?.personal?.nationality?.value) ? activeSource : 'derived'
+          docId = activeDocId
+        }
       } else if (
         key === 'appl.country_of_birth'
       ) {
-        resolvedValue = 'BANGLADESH'
-        source = activeSource
-        docId = activeDocId
+        const rawCob =
+          activeProfile.personalInfo?.countryOfBirth ||
+          passportDoc?.extractedData?.personal?.countryOfBirth?.value
+        if (rawCob) {
+          resolvedValue = isBangladeshiValue(rawCob) ? 'BANGLADESH' : rawCob
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         key === 'appl.placbrth' || key === 'placbrth'
       ) {
@@ -447,33 +447,6 @@ export function populateApplicationFromDocuments(options: {
           resolvedValue = rawIssueDate
           source = activeSource
           docId = activeDocId
-        } else {
-          // Derive 10-year validity issue date from expiry date
-          const rawExpiry =
-            activeProfile.passport?.expiryDate ||
-            passportDoc?.extractedData?.passport?.expiryDate?.value
-          if (rawExpiry) {
-            const expParts = rawExpiry.split(/[-/]/)
-            if (expParts.length === 3) {
-              if (expParts[0].length === 4) {
-                // ISO YYYY-MM-DD
-                const expYear = parseInt(expParts[0], 10)
-                if (!isNaN(expYear)) {
-                  resolvedValue = `${expYear - 10}-${expParts[1]}-${expParts[2]}`
-                  source = 'derived'
-                  docId = activeDocId
-                }
-              } else if (expParts[2].length === 4) {
-                // DD/MM/YYYY
-                const expYear = parseInt(expParts[2], 10)
-                if (!isNaN(expYear)) {
-                  resolvedValue = `${expParts[0]}/${expParts[1]}/${expYear - 10}`
-                  source = 'derived'
-                  docId = activeDocId
-                }
-              }
-            }
-          }
         }
       } else if (key === 'pres_phone' || key === 'appl.pres_phone') {
         const rawPhone =
@@ -617,81 +590,97 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         key === 'father_nationality' || key === 'appl.father_nationality'
       ) {
-        resolvedValue = activeProfile.family?.father?.nationality || 'BANGLADESH'
-        source = activeProfile.family?.father?.nationality ? activeSource : 'derived'
-        docId = activeDocId
+        if (activeProfile.family?.father?.nationality) {
+          resolvedValue = activeProfile.family.father.nationality
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         key === 'father_place_of_birth' || key === 'appl.father_place_of_birth'
       ) {
-        resolvedValue = activeProfile.family?.father?.placeOfBirth || passportPob
-        source = activeProfile.family?.father?.placeOfBirth ? activeSource : (passportPob ? 'derived' : 'missing')
-        docId = activeDocId
+        if (activeProfile.family?.father?.placeOfBirth) {
+          resolvedValue = activeProfile.family.father.placeOfBirth
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         key === 'father_country_of_birth' || key === 'appl.father_country_of_birth'
       ) {
-        resolvedValue = activeProfile.family?.father?.countryOfBirth || 'BANGLADESH'
-        source = activeProfile.family?.father?.countryOfBirth ? activeSource : 'derived'
-        docId = activeDocId
+        if (activeProfile.family?.father?.countryOfBirth) {
+          resolvedValue = activeProfile.family.father.countryOfBirth
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         key === 'father_prev_nationality' || key === 'appl.father_prev_nationality'
       ) {
-        resolvedValue = activeProfile.family?.father?.previousNationality || 'BANGLADESH'
-        source = activeProfile.family?.father?.previousNationality ? activeSource : 'derived'
-        docId = activeDocId
+        if (activeProfile.family?.father?.previousNationality) {
+          resolvedValue = activeProfile.family.father.previousNationality
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         key === 'mother_nationality' || key === 'appl.mother_nationality'
       ) {
-        resolvedValue = activeProfile.family?.mother?.nationality || 'BANGLADESH'
-        source = activeProfile.family?.mother?.nationality ? activeSource : 'derived'
-        docId = activeDocId
+        if (activeProfile.family?.mother?.nationality) {
+          resolvedValue = activeProfile.family.mother.nationality
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         key === 'mother_place_of_birth' || key === 'appl.mother_place_of_birth'
       ) {
-        resolvedValue = activeProfile.family?.mother?.placeOfBirth || passportPob
-        source = activeProfile.family?.mother?.placeOfBirth ? activeSource : (passportPob ? 'derived' : 'missing')
-        docId = activeDocId
+        if (activeProfile.family?.mother?.placeOfBirth) {
+          resolvedValue = activeProfile.family.mother.placeOfBirth
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         key === 'mother_country_of_birth' || key === 'appl.mother_country_of_birth'
       ) {
-        resolvedValue = activeProfile.family?.mother?.countryOfBirth || 'BANGLADESH'
-        source = activeProfile.family?.mother?.countryOfBirth ? activeSource : 'derived'
-        docId = activeDocId
+        if (activeProfile.family?.mother?.countryOfBirth) {
+          resolvedValue = activeProfile.family.mother.countryOfBirth
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         key === 'mother_prev_nationality' || key === 'appl.mother_prev_nationality'
       ) {
-        resolvedValue = activeProfile.family?.mother?.previousNationality || 'BANGLADESH'
-        source = activeProfile.family?.mother?.previousNationality ? activeSource : 'derived'
-        docId = activeDocId
+        if (activeProfile.family?.mother?.previousNationality) {
+          resolvedValue = activeProfile.family.mother.previousNationality
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         key === 'spouse_nationality' || key === 'appl.spouse_nationality'
       ) {
-        if (hasSpouse) {
-          resolvedValue = activeProfile.family?.spouse?.nationality || 'BANGLADESH'
-          source = activeProfile.family?.spouse?.nationality ? activeSource : 'derived'
+        if (hasSpouse && activeProfile.family?.spouse?.nationality) {
+          resolvedValue = activeProfile.family.spouse.nationality
+          source = activeSource
           docId = activeDocId
         }
       } else if (
         key === 'spouse_place_of_birth' || key === 'appl.spouse_place_of_birth'
       ) {
-        if (hasSpouse) {
-          resolvedValue = activeProfile.family?.spouse?.placeOfBirth || passportPob
-          source = activeProfile.family?.spouse?.placeOfBirth ? activeSource : (passportPob ? 'derived' : 'missing')
+        if (hasSpouse && activeProfile.family?.spouse?.placeOfBirth) {
+          resolvedValue = activeProfile.family.spouse.placeOfBirth
+          source = activeSource
           docId = activeDocId
         }
       } else if (
         key === 'spouse_country_of_birth' || key === 'appl.spouse_country_of_birth'
       ) {
-        if (hasSpouse) {
-          resolvedValue = activeProfile.family?.spouse?.countryOfBirth || 'BANGLADESH'
-          source = activeProfile.family?.spouse?.countryOfBirth ? activeSource : 'derived'
+        if (hasSpouse && activeProfile.family?.spouse?.countryOfBirth) {
+          resolvedValue = activeProfile.family.spouse.countryOfBirth
+          source = activeSource
           docId = activeDocId
         }
       } else if (
         key === 'spouse_prev_nationality' || key === 'appl.spouse_prev_nationality'
       ) {
-        if (hasSpouse) {
-          resolvedValue = activeProfile.family?.spouse?.previousNationality || 'BANGLADESH'
-          source = activeProfile.family?.spouse?.previousNationality ? activeSource : 'derived'
+        if (hasSpouse && activeProfile.family?.spouse?.previousNationality) {
+          resolvedValue = activeProfile.family.spouse.previousNationality
+          source = activeSource
           docId = activeDocId
         }
       } else if (
@@ -810,11 +799,13 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'present_country' || key === 'appl.countryname' || key === 'pres_country') &&
         !resolvedValue &&
-        (activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country)
+        (activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country || isApplicantBangladeshi)
       ) {
-        resolvedValue = activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country || 'BANGLADESH'
-        source = activeProfile.presentAddress?.country ? activeSource : 'derived'
-        docId = activeDocId
+        resolvedValue = activeProfile.presentAddress?.country || activeProfile.permanentAddress?.country || (isApplicantBangladeshi ? 'BANGLADESH' : undefined)
+        if (resolvedValue) {
+          source = activeProfile.presentAddress?.country ? activeSource : 'derived'
+          docId = activeDocId
+        }
       } else if (
         (key === 'pincode' || key === 'appl.pres_pincode' || key === 'pres_pincode') &&
         !resolvedValue &&
@@ -896,11 +887,13 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'permanent_country' || key === 'appl.perm_country') &&
         !resolvedValue &&
-        (activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country)
+        (activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country || isApplicantBangladeshi)
       ) {
-        resolvedValue = activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country || 'BANGLADESH'
-        source = activeProfile.permanentAddress?.country ? activeSource : 'derived'
-        docId = activeDocId
+        resolvedValue = activeProfile.permanentAddress?.country || activeProfile.presentAddress?.country || (isApplicantBangladeshi ? 'BANGLADESH' : undefined)
+        if (resolvedValue) {
+          source = activeProfile.permanentAddress?.country ? activeSource : 'derived'
+          docId = activeDocId
+        }
       } else if (
         (key === 'permanent_postal_code' || key === 'appl.perm_pincode' || key === 'perm_pincode') &&
         !resolvedValue &&
@@ -1135,6 +1128,44 @@ export function populateApplicationFromDocuments(options: {
     }
   }
 
+  // Passport date integrity check: passport_expiry_date > passport_issue_date
+  const issueFieldKey = fields['appl.passport_issue_date'] ? 'appl.passport_issue_date' : 'passport_issue_date'
+  const expFieldKey = fields['appl.passport_expiry_date'] ? 'appl.passport_expiry_date' : 'passport_expiry_date'
+
+  const issueField = fields[issueFieldKey]
+  const expField = fields[expFieldKey]
+
+  const issueDateStr = issueField?.value ? String(issueField.value).trim() : ''
+  const expDateStr = expField?.value ? String(expField.value).trim() : ''
+
+  if (issueDateStr && expDateStr) {
+    const dateValidation = validatePassportDates(issueDateStr, expDateStr)
+    if (!dateValidation.isValid) {
+      if (issueField && !issueField.isUserEdited) {
+        fields[issueFieldKey] = {
+          ...issueField,
+          value: '',
+          source: 'missing',
+          confidence: 0,
+          hasConflict: true,
+          conflictDetails: dateValidation.error,
+          originalExtractedValue: issueField.originalExtractedValue || issueDateStr,
+        }
+      }
+      if (expField && !expField.isUserEdited) {
+        fields[expFieldKey] = {
+          ...expField,
+          value: '',
+          source: 'missing',
+          confidence: 0,
+          hasConflict: true,
+          conflictDetails: dateValidation.error,
+          originalExtractedValue: expField.originalExtractedValue || expDateStr,
+        }
+      }
+    }
+  }
+
   const now = new Date().toISOString()
   const religionField = fields['appl.religion']
   const religionMetadata = {
@@ -1204,8 +1235,7 @@ export function createBlankApplicationWithDefaults(options: {
       key === 'present_country' ||
       key === 'permanent_country' ||
       key === 'pres_country' ||
-      key === 'perm_country' ||
-      key === 'appl.country_of_birth'
+      key === 'perm_country'
     ) {
       val = 'BANGLADESH'
       isDerived = true
@@ -1220,28 +1250,6 @@ export function createBlankApplicationWithDefaults(options: {
       isDerived = true
     } else if (key === 'isd_code') {
       val = '880'
-      isDerived = true
-    } else if (
-      key === 'father_nationality' ||
-      key === 'appl.father_nationality' ||
-      key === 'father_country_of_birth' ||
-      key === 'appl.father_country_of_birth' ||
-      key === 'father_prev_nationality' ||
-      key === 'appl.father_prev_nationality' ||
-      key === 'mother_nationality' ||
-      key === 'appl.mother_nationality' ||
-      key === 'mother_country_of_birth' ||
-      key === 'appl.mother_country_of_birth' ||
-      key === 'mother_prev_nationality' ||
-      key === 'appl.mother_prev_nationality' ||
-      key === 'spouse_nationality' ||
-      key === 'appl.spouse_nationality' ||
-      key === 'spouse_country_of_birth' ||
-      key === 'appl.spouse_country_of_birth' ||
-      key === 'spouse_prev_nationality' ||
-      key === 'appl.spouse_prev_nationality'
-    ) {
-      val = 'BANGLADESH'
       isDerived = true
     } else if (
       key === 'appl.oth_ppt' ||
@@ -1398,7 +1406,7 @@ export function convertSavedApplicationToApplicantProfile(
       district: getFieldStr('district') || getFieldStr('state_province'),
       stateProvince: getFieldStr('state_province') || getFieldStr('district'),
       postalCode: getFieldStr('pincode'),
-      country: getFieldStr('present_country') || getFieldStr('appl.countryname') || 'BANGLADESH',
+      country: getFieldStr('present_country') || getFieldStr('appl.countryname') || (getFieldStr('appl.nationality') === 'BANGLADESH' ? 'BANGLADESH' : getFieldStr('appl.nationality') || undefined),
       phone: getFieldStr('pres_phone'),
       isdCode: getFieldStr('isd_code'),
       mobile: getFieldStr('mobile'),
@@ -1410,7 +1418,7 @@ export function convertSavedApplicationToApplicantProfile(
       villageTownCity: getFieldStr('permanent_village_town_city') || getFieldStr('perm_add2') || getFieldStr('village_town_city') || getFieldStr('pres_addr2'),
       district: getFieldStr('permanent_district') || getFieldStr('permanent_state_province') || getFieldStr('district'),
       stateProvince: getFieldStr('permanent_state_province') || getFieldStr('permanent_district') || getFieldStr('state_province'),
-      country: getFieldStr('permanent_country') || getFieldStr('present_country') || 'BANGLADESH',
+      country: getFieldStr('permanent_country') || getFieldStr('present_country') || (getFieldStr('appl.nationality') === 'BANGLADESH' ? 'BANGLADESH' : getFieldStr('appl.nationality') || undefined),
       postalCode: getFieldStr('permanent_postal_code') || getFieldStr('pincode'),
     },
 

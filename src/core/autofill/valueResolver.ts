@@ -122,7 +122,15 @@ export function resolveApplicantValue(
     if (applicant.registration?.applyingFromCountry && applicant.registration.applyingFromCountry.trim() !== '') {
       return applicant.registration.applyingFromCountry.trim()
     }
-    return 'BANGLADESH'
+    const nat = applicant.personalInfo?.nationality?.trim() || applicant.passport?.issuingCountry?.trim()
+    if (nat) {
+      const upper = nat.toUpperCase()
+      if (upper === 'BANGLADESH' || upper === 'BANGLADESHI' || upper === 'BGD') {
+        return 'BANGLADESH'
+      }
+      return nat
+    }
+    return undefined
   }
 
   // ISD Code
@@ -138,7 +146,15 @@ export function resolveApplicantValue(
     if (isd && isd.trim() !== '') {
       return isd.trim()
     }
-    return '880'
+    const nat = applicant.personalInfo?.nationality?.trim() || applicant.passport?.issuingCountry?.trim()
+    if (nat) {
+      const upper = nat.toUpperCase()
+      if (upper === 'BANGLADESH' || upper === 'BANGLADESHI' || upper === 'BGD') {
+        return '880'
+      }
+      return undefined
+    }
+    return undefined
   }
 
   // Helper to sanitize District & State names (filter out invalid tokens like "IN", "BD", country names)
@@ -311,7 +327,7 @@ export function resolveApplicantValue(
     return undefined
   }
 
-  // Town / City of Birth (Place of Birth with District / Place of Issue Fallback)
+  // Town / City of Birth (Place of Birth strictly from document or blank)
   if (
     path === 'personalInfo.townCityOfBirth' ||
     path === 'appl.placbrth' ||
@@ -321,17 +337,10 @@ export function resolveApplicantValue(
     if (applicant.personalInfo?.townCityOfBirth && applicant.personalInfo.townCityOfBirth.trim() !== '') {
       return applicant.personalInfo.townCityOfBirth.trim().toUpperCase()
     }
-    const districtFallback =
-      applicant.presentAddress?.district ||
-      applicant.permanentAddress?.district ||
-      applicant.passport?.placeOfIssue
-    if (districtFallback && districtFallback.trim() !== '') {
-      return districtFallback.trim().toUpperCase()
-    }
     return undefined
   }
 
-  // Passport Date of Issue (with deterministic 10-year validity derivation from Expiry Date)
+  // Passport Date of Issue
   if (
     path === 'passport.issueDate' ||
     path === 'appl.passport_issue_date' ||
@@ -341,21 +350,6 @@ export function resolveApplicantValue(
   ) {
     if (applicant.passport?.issueDate && applicant.passport.issueDate.trim() !== '') {
       return applicant.passport.issueDate.trim()
-    }
-    if (applicant.passport?.expiryDate && applicant.passport.expiryDate.trim() !== '') {
-      const exp = applicant.passport.expiryDate.trim()
-      const parts = exp.split(/[-/]/)
-      if (parts.length === 3) {
-        if (parts[0].length === 4) {
-          // ISO YYYY-MM-DD
-          const year = parseInt(parts[0], 10) - 10
-          return `${year}-${parts[1]}-${parts[2]}`
-        } else if (parts[2].length === 4) {
-          // DD/MM/YYYY
-          const year = parseInt(parts[2], 10) - 10
-          return `${parts[0]}/${parts[1]}/${year}`
-        }
-      }
     }
     return undefined
   }
