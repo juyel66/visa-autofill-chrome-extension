@@ -23,7 +23,10 @@ import {
   getSavedApplicationByApplicantId,
   saveApplication,
 } from '../../core/application/applicationStorage'
-import { populateApplicationFromDocuments } from '../../core/application/applicationMerger'
+import {
+  populateApplicationFromDocuments,
+  createBlankApplicationWithDefaults,
+} from '../../core/application/applicationMerger'
 import type { SavedApplication } from '../../core/application/types'
 
 export interface DashboardProps {
@@ -254,67 +257,64 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         await saveDocument(newDoc)
 
-        // If targetType is passport and has extracted fields, sync the active applicant profile
-        if (targetType === 'passport' && hasFields && extractedApplicant) {
-          try {
-            const updatedProfile = applyExtractionToApplicant(selectedApplicant, extractedApplicant)
-            await saveApplicant(updatedProfile)
-          } catch (syncErr) {
-            console.warn('Could not sync applicant profile with passport extraction:', syncErr)
+        if (hasFields && extractedApplicant) {
+          // =========================================================================
+          // SUCCESS PATH: Gemini extracted document fields -> Auto-fill application & profile
+          // =========================================================================
+          if (targetType === 'passport') {
+            try {
+              const updatedProfile = applyExtractionToApplicant(selectedApplicant, extractedApplicant)
+              await saveApplicant(updatedProfile)
+            } catch (syncErr) {
+              console.warn('Could not sync applicant profile with passport extraction:', syncErr)
+            }
           }
-        }
 
-        // Populate or update SavedApplication directly
-        const docs = await getDocumentsByApplicantId(selectedApplicant.applicantId)
-        const pDoc =
-          targetType === 'passport' && newDoc.extractedDataConfirmed
-            ? newDoc
-            : getLatestDocument(docs, 'passport') || (newDoc.extractedDataConfirmed && newDoc.extractedData ? newDoc : docs.find((d) => d.extractedDataConfirmed && d.extractedData))
-        const oDoc = targetType === 'ogd' && newDoc.extractedDataConfirmed ? newDoc : getLatestDocument(docs, 'ogd')
-        const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
-        const mergedApp = populateApplicationFromDocuments({
-          applicantId: selectedApplicant.applicantId,
-          passportDoc: pDoc,
-          ogdDoc: oDoc,
-          existingApp,
-          notes: selectedApplicant.notes,
-        })
+          const docs = await getDocumentsByApplicantId(selectedApplicant.applicantId)
+          const pDoc = targetType === 'passport' ? newDoc : getLatestDocument(docs, 'passport')
+          const oDoc = targetType === 'ogd' ? newDoc : getLatestDocument(docs, 'ogd')
+          const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
+          const mergedApp = populateApplicationFromDocuments({
+            applicantId: selectedApplicant.applicantId,
+            passportDoc: pDoc,
+            ogdDoc: oDoc,
+            existingApp,
+            notes: selectedApplicant.notes,
+          })
 
-        await saveApplication(mergedApp)
-        setSavedApplication(mergedApp)
-        await refreshApplicantData()
-        setIsExtracting(false)
+          await saveApplication(mergedApp)
+          setSavedApplication(mergedApp)
+          await refreshApplicantData()
+          setIsExtracting(false)
 
-        const savedCount = Object.keys(mergedApp.fields).filter(
-          (k) =>
-            mergedApp.fields[k] &&
-            typeof mergedApp.fields[k] === 'object' &&
-            typeof mergedApp.fields[k].value === 'string' &&
-            mergedApp.fields[k].value.trim() !== ''
-        ).length
+          const savedCount = Object.keys(mergedApp.fields).filter(
+            (k) =>
+              mergedApp.fields[k] &&
+              typeof mergedApp.fields[k] === 'object' &&
+              typeof mergedApp.fields[k].value === 'string' &&
+              mergedApp.fields[k].value.trim() !== ''
+          ).length
 
-        setDiagnostic({
-          fileName: file.name,
-          pdfTextStatus: diagPdfStatus,
-          imagePayloadStatus: diagImgStatus,
-          imageMime: diagImgMime,
-          imageBytes: diagImgBytes,
-          ocrStatus: diagOcrStatus,
-          ocrCharCount: diagOcrChars,
-          ocrError: diagOcrError,
-          workerUrl,
-          coreUrl,
-          langUrl,
-          workerInitialized: diagWorkerInit,
-          languageLoaded: diagLangLoaded,
-          ocrExecuted: diagOcrExecuted,
-          mrzStatus: diagMrzStatus,
-          extractedFieldsCount: hasFields ? 15 : 0,
-          savedAppFieldsCount: savedCount,
-        })
+          setDiagnostic({
+            fileName: file.name,
+            pdfTextStatus: diagPdfStatus,
+            imagePayloadStatus: diagImgStatus,
+            imageMime: diagImgMime,
+            imageBytes: diagImgBytes,
+            ocrStatus: diagOcrStatus,
+            ocrCharCount: diagOcrChars,
+            ocrError: diagOcrError,
+            workerUrl,
+            coreUrl,
+            langUrl,
+            workerInitialized: diagWorkerInit,
+            languageLoaded: diagLangLoaded,
+            ocrExecuted: diagOcrExecuted,
+            mrzStatus: diagMrzStatus,
+            extractedFieldsCount: 15,
+            savedAppFieldsCount: savedCount,
+          })
 
-        if (hasFields) {
-          // AUTOMATICALLY OPEN WORKSPACE IN A NEW TAB
           const workspaceUrl = chrome?.runtime?.getURL
             ? chrome.runtime.getURL(
                 `application.html?applicantId=${encodeURIComponent(
@@ -331,9 +331,103 @@ export const Dashboard: React.FC<DashboardProps> = ({
             window.open(workspaceUrl, '_blank')
           }
 
-          showToast(`✓ Document extracted (${savedCount} fields populated) & workspace opened.`)
+          showToast(`✓ Document auto-filled with Gemini (${savedCount} fields populated) & workspace opened.`)
         } else {
-          setErrorMessage('Extraction produced 0 structured fields from this document.')
+          // =========================================================================
+          // ERROR PATH: Gemini failed / Quota exceeded / API error
+          // Requirement: "ager kono pdf er data existing e rakhba na blank ey rakhba
+          // r jegula common segula rakhe diba , like nationality r ja ja thake segula"
+          // =========================================================================
+          const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
+          const blankApp = createBlankApplicationWithDefaults({
+            applicantId: selectedApplicant.applicantId,
+            notes: selectedApplicant.notes,
+            existingAppId: existingApp?.applicationId,
+          })
+
+          await saveApplication(blankApp)
+          setSavedApplication(blankApp)
+
+          // Reset applicant profile's personal / passport fields so old PDF data does not linger
+          const cleanedProfile: ApplicantProfile = {
+            applicantId: selectedApplicant.applicantId,
+            createdAt: selectedApplicant.createdAt,
+            updatedAt: new Date().toISOString(),
+            notes: selectedApplicant.notes,
+            registration: {
+              applyingFromCountry: 'BANGLADESH',
+              indianMission: selectedApplicant.registration?.indianMission || 'BANGLADESH-DHAKA',
+              nationality: 'BANGLADESH',
+            },
+            personalInfo: undefined,
+            passport: undefined,
+            presentAddress: undefined,
+            permanentAddress: undefined,
+            family: undefined,
+            employment: undefined,
+            travel: undefined,
+            previousVisa: undefined,
+          }
+          await saveApplicant(cleanedProfile)
+          await refreshApplicantData()
+          setIsExtracting(false)
+
+          const savedCount = Object.keys(blankApp.fields).filter(
+            (k) =>
+              blankApp.fields[k] &&
+              typeof blankApp.fields[k] === 'object' &&
+              typeof blankApp.fields[k].value === 'string' &&
+              blankApp.fields[k].value.trim() !== ''
+          ).length
+
+          setDiagnostic({
+            fileName: file.name,
+            pdfTextStatus: diagPdfStatus,
+            imagePayloadStatus: diagImgStatus,
+            imageMime: diagImgMime,
+            imageBytes: diagImgBytes,
+            ocrStatus: diagOcrStatus,
+            ocrCharCount: diagOcrChars,
+            ocrError: diagOcrError,
+            workerUrl,
+            coreUrl,
+            langUrl,
+            workerInitialized: diagWorkerInit,
+            languageLoaded: diagLangLoaded,
+            ocrExecuted: diagOcrExecuted,
+            mrzStatus: diagMrzStatus,
+            extractedFieldsCount: 0,
+            savedAppFieldsCount: savedCount,
+          })
+
+          const errDetail = pipelineResult.geminiError || 'Gemini extraction failed or quota exhausted.'
+          const isQuota = Boolean(pipelineResult.isQuotaExceeded)
+
+          const workspaceUrl = chrome?.runtime?.getURL
+            ? chrome.runtime.getURL(
+                `application.html?applicantId=${encodeURIComponent(
+                  selectedApplicant.applicantId
+                )}&documentType=${encodeURIComponent(targetType)}&geminiError=${encodeURIComponent(
+                  errDetail
+                )}${isQuota ? '&quotaExceeded=true' : ''}&manualMode=true`
+              )
+            : `application.html?applicantId=${encodeURIComponent(
+                selectedApplicant.applicantId
+              )}&documentType=${encodeURIComponent(targetType)}&geminiError=${encodeURIComponent(
+                errDetail
+              )}${isQuota ? '&quotaExceeded=true' : ''}&manualMode=true`
+
+          if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+            chrome.tabs.create({ url: workspaceUrl })
+          } else {
+            window.open(workspaceUrl, '_blank')
+          }
+
+          const userMsg = isQuota
+            ? '⚠️ Gemini Quota Exceeded (কোটা শেষ)! Workspace opened for manual entry.'
+            : `⚠️ Gemini error: ${errDetail}. Workspace opened for manual entry.`
+          setErrorMessage(userMsg)
+          showToast(userMsg)
         }
       }
 
