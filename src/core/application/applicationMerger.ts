@@ -1178,6 +1178,131 @@ export function populateApplicationFromDocuments(options: {
 }
 
 /**
+ * Creates a clean application where all applicant identity / document fields are BLANK,
+ * and only standard common default values (Nationality, Country, ISD code, etc.) are pre-filled.
+ * Used when Gemini extraction fails or quota is exhausted so no old applicant data lingers.
+ */
+export function createBlankApplicationWithDefaults(options: {
+  applicantId: string
+  notes?: string
+  existingAppId?: string
+}): SavedApplication {
+  const { applicantId, notes, existingAppId } = options
+  const allFields = getAllSchemaFields()
+  const fields: Record<string, ApplicationFieldValue> = {}
+
+  const missionFromNotes = notes?.match(/Indian\s*Mission:\s*([^\r\n]+)/i)?.[1]?.trim()
+  const defaultMission = missionFromNotes || 'BANGLADESH-DHAKA'
+
+  for (const fieldDef of allFields) {
+    const key = fieldDef.key
+    let val: string | boolean = fieldDef.inputType === 'checkbox' ? false : ''
+    let isDerived = false
+
+    if (
+      key === 'appl.countryname' ||
+      key === 'present_country' ||
+      key === 'permanent_country' ||
+      key === 'pres_country' ||
+      key === 'perm_country' ||
+      key === 'appl.country_of_birth'
+    ) {
+      val = 'BANGLADESH'
+      isDerived = true
+    } else if (key === 'appl.nationality' || key === 'nationality') {
+      val = 'BANGLADESH'
+      isDerived = true
+    } else if (key === 'appl.nationality_by' || key === 'nationality_by') {
+      val = 'Birth'
+      isDerived = true
+    } else if (key === 'appl.missioncode' || key === 'missioncode') {
+      val = defaultMission
+      isDerived = true
+    } else if (key === 'isd_code') {
+      val = '880'
+      isDerived = true
+    } else if (
+      key === 'father_nationality' ||
+      key === 'appl.father_nationality' ||
+      key === 'father_country_of_birth' ||
+      key === 'appl.father_country_of_birth' ||
+      key === 'father_prev_nationality' ||
+      key === 'appl.father_prev_nationality' ||
+      key === 'mother_nationality' ||
+      key === 'appl.mother_nationality' ||
+      key === 'mother_country_of_birth' ||
+      key === 'appl.mother_country_of_birth' ||
+      key === 'mother_prev_nationality' ||
+      key === 'appl.mother_prev_nationality' ||
+      key === 'spouse_nationality' ||
+      key === 'appl.spouse_nationality' ||
+      key === 'spouse_country_of_birth' ||
+      key === 'appl.spouse_country_of_birth' ||
+      key === 'spouse_prev_nationality' ||
+      key === 'appl.spouse_prev_nationality'
+    ) {
+      val = 'BANGLADESH'
+      isDerived = true
+    } else if (
+      key === 'appl.oth_ppt' ||
+      key === 'grandparent_flag' ||
+      key === 'appl.grandparent_flag' ||
+      key === 'prev_org' ||
+      key === 'appl.prev_org' ||
+      key === 'old_visa_flag' ||
+      key === 'appl.old_visa_flag'
+    ) {
+      val = 'No'
+      isDerived = true
+    } else if (key === 'appl.visual_mark' || key === 'visual_mark') {
+      val = 'NA'
+      isDerived = true
+    } else if (key === 'appl.edu_id' || key === 'edu_id') {
+      val = 'BELOW MATRICULATION'
+      isDerived = true
+    } else if (/^question_\d+_flag$/.test(key)) {
+      val = 'No'
+      isDerived = true
+    }
+
+    fields[key] = {
+      value: val,
+      source: isDerived ? 'derived' : 'missing',
+      isUserEdited: false,
+    }
+  }
+
+  // Ensure all 6 questions have flags set to 'No' and answers empty
+  for (let q = 1; q <= 6; q++) {
+    fields[`question_${q}_flag`] = {
+      value: 'No',
+      source: 'derived',
+      isUserEdited: false,
+    }
+    fields[`answer_${q}`] = {
+      value: '',
+      source: 'missing',
+      isUserEdited: false,
+    }
+  }
+
+  const now = new Date().toISOString()
+  return {
+    applicationId: existingAppId || `app_${applicantId}_${Date.now()}`,
+    applicantId,
+    createdAt: now,
+    updatedAt: now,
+    status: 'draft',
+    fields,
+    provenance: {
+      lastSavedAt: now,
+    },
+    sourceDocuments: {},
+    manualEdits: {},
+  }
+}
+
+/**
  * Converts a SavedApplication back to an ApplicantProfile for the autofill engine.
  * Ensures that all edited or confirmed values in SavedApplication directly feed
  * into the standard verified field mappings.
