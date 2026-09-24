@@ -1,6 +1,28 @@
 import type { ExtractedApplicantData } from '../data/types'
 import { parseStandardIsoDate, parseStructuredAddress } from '../data/applicantDataExtractor'
 
+export class GeminiExtractionError extends Error {
+  public code?: number
+  public status?: string
+  public isQuotaExceeded: boolean
+
+  constructor(
+    message: string,
+    options?: { code?: number; status?: string; isQuotaExceeded?: boolean }
+  ) {
+    super(message)
+    this.name = 'GeminiExtractionError'
+    this.code = options?.code
+    this.status = options?.status
+    this.isQuotaExceeded = Boolean(
+      options?.isQuotaExceeded ||
+      options?.code === 429 ||
+      options?.status === 'RESOURCE_EXHAUSTED' ||
+      /quota|resource_exhausted|rate limit|too many requests/i.test(message)
+    )
+  }
+}
+
 export const DEFAULT_GEMINI_API_KEY =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) ||
   (typeof process !== 'undefined' && process.env?.VITE_GEMINI_API_KEY) ||
@@ -303,7 +325,10 @@ export async function extractApplicantDataWithGemini(
   const apiKey = (options?.apiKey || (await getGeminiApiKey())).trim()
   if (!apiKey) {
     console.warn('⚠️ [GEMINI AI] No API key provided or found in .env / storage.')
-    return null
+    throw new GeminiExtractionError(
+      'Gemini API key is not configured or missing. Please configure your API key in Settings.',
+      { isQuotaExceeded: false }
+    )
   }
 
   // 1. Preparation & Encoding
@@ -367,6 +392,9 @@ export async function extractApplicantDataWithGemini(
   let activeModel = modelsToTry[0]
   let reqDuration = 0
   const reqStart = Date.now()
+  let lastStatus: number | undefined
+  let lastErrorText = ''
+  let lastQuotaExceeded = false
 
   for (const model of modelsToTry) {
     activeModel = model
@@ -386,6 +414,7 @@ export async function extractApplicantDataWithGemini(
       })
       clearTimeout(timer)
       reqDuration += Date.now() - fetchStart
+      lastStatus = res.status
 
       if (res.ok) {
         response = res
@@ -395,7 +424,25 @@ export async function extractApplicantDataWithGemini(
       }
 
       const errText = await res.text()
+      lastErrorText = errText
       console.warn(`⚠️ [GEMINI AI] Model ${model} returned HTTP ${res.status}:`, errText)
+
+      let parsedErr: { error?: { message?: string; status?: string } } | null = null
+      try {
+        parsedErr = JSON.parse(errText)
+      } catch {
+        // Ignore JSON parse errors for non-JSON responses
+      }
+      const errMsg = parsedErr?.error?.message || errText
+      const errStatus = parsedErr?.error?.status || ''
+
+      if (
+        res.status === 429 ||
+        errStatus === 'RESOURCE_EXHAUSTED' ||
+        /quota|resource_exhausted|rate limit/i.test(errMsg)
+      ) {
+        lastQuotaExceeded = true
+      }
 
       // If temporary overload (503/429), model not found (404), unsupported/bad request (400), or server error (500), try next fallback model
       if (res.status === 503 || res.status === 429 || res.status === 404 || res.status === 500 || res.status === 400) {
@@ -418,16 +465,41 @@ export async function extractApplicantDataWithGemini(
     console.log(`[GEMINI PERF]
 PDF preparation: ${prepDuration}ms
 Gemini request: ${reqDuration}ms
-Gemini response: HTTP ${response?.status || 'network-error'}
+Gemini response: HTTP ${lastStatus || 'network-error'}
 JSON parsing: 0ms
 Mapping: 0ms
 Total: ${totalDuration}ms
 
 Gemini model: ${activeModel}
-HTTP status: ${response?.status || 0}
+HTTP status: ${lastStatus || 0}
 Success: false
 Duration: ${totalDuration}ms`)
-    return null
+
+    if (lastQuotaExceeded || lastStatus === 429) {
+      throw new GeminiExtractionError(
+        'Gemini API Quota Exceeded (429): Quota limit has been reached for your API key (কোটা শেষ হয়ে গেছে). Please check your Google AI Studio plan or use another key.',
+        { code: 429, status: 'RESOURCE_EXHAUSTED', isQuotaExceeded: true }
+      )
+    }
+
+    if (lastStatus === 400 || lastStatus === 403) {
+      throw new GeminiExtractionError(
+        `Gemini API Error (${lastStatus}): Invalid API Key or request parameters. Please verify your Gemini API key in Settings.`,
+        { code: lastStatus, isQuotaExceeded: false }
+      )
+    }
+
+    if (!response) {
+      throw new GeminiExtractionError(
+        'Gemini API Network Error: Unable to reach Google Gemini API. Please check your internet connection.',
+        { isQuotaExceeded: false }
+      )
+    }
+
+    throw new GeminiExtractionError(
+      `Gemini API Error (HTTP ${lastStatus}): ${lastErrorText.slice(0, 160) || 'Extraction request failed.'}`,
+      { code: lastStatus, isQuotaExceeded: false }
+    )
   }
 
   // 2. JSON Parsing
@@ -435,6 +507,12 @@ Duration: ${totalDuration}ms`)
   let parsed: Record<string, unknown> | null = null
   try {
     const data = await response.json()
+    if (data.promptFeedback?.blockReason) {
+      throw new GeminiExtractionError(
+        `Gemini blocked document extraction: ${data.promptFeedback.blockReason}`,
+        { isQuotaExceeded: false }
+      )
+    }
     const candidate = data.candidates?.[0]
     const rawJson = candidate?.content?.parts?.[0]?.text
     if (rawJson && typeof rawJson === 'string') {
@@ -445,6 +523,7 @@ Duration: ${totalDuration}ms`)
       parsed = JSON.parse(cleanJson)
     }
   } catch (parseErr) {
+    if (parseErr instanceof GeminiExtractionError) throw parseErr
     console.warn(`⚠️ [GEMINI AI] Failed to parse JSON response from ${activeModel}:`, parseErr)
   }
   const parseDuration = Date.now() - parseStart
@@ -463,7 +542,10 @@ Gemini model: ${activeModel}
 HTTP status: ${response.status}
 Success: false
 Duration: ${totalDuration}ms`)
-    return null
+    throw new GeminiExtractionError(
+      'Gemini responded but did not return valid structured JSON data.',
+      { isQuotaExceeded: false }
+    )
   }
 
   // 3. Mapping
@@ -489,7 +571,10 @@ Duration: ${totalDuration}ms`)
 
   if (!isUsable) {
     console.warn(`⚠️ [GEMINI AI] Model ${activeModel} returned response but no usable applicant fields were extracted.`)
-    return null
+    throw new GeminiExtractionError(
+      'Gemini could not identify or extract any usable passport/visa applicant fields from this document.',
+      { isQuotaExceeded: false }
+    )
   }
 
   return mappedData
