@@ -451,6 +451,197 @@ export async function runPythonExtractorClientTests(): Promise<{ passed: boolean
     assert(extracted.passport?.placeOfIssue?.value === 'DIP/DHAKA', 'issue place: DIP/DHAKA')
   })
 
+  // 14. TASK 118: Given Name Extraction, Name Spacing, and Garbage Rejection (Cases A-E)
+  test('14. TASK 118: Given name shapes, spacing, and G70E/garbage rejection', () => {
+    // Case A: Clean visual name
+    const resA = normalizeExtractedGivenName('SHREE JOTIMOY')
+    assert(resA === 'SHREE JOTIMOY', `Case A failed: got "${resA}"`)
+
+    // Case B: MRZ tokens with filler chevrons
+    const resB = normalizeExtractedGivenName('', ['P<BGDRAY<<SHREE<JOTIMOY<<<<<<<<<<<<<<<<<<<'])
+    assert(resB === 'SHREE JOTIMOY', `Case B failed: got "${resB}"`)
+
+    // Case C: Visual contains OCR garbage token G70E, MRZ provides clean tokens
+    const resC1 = normalizeExtractedGivenName('SHREE G70E JOTIMOY', ['P<BGDRAY<<SHREE<JOTIMOY<<<<<<<<<<<<<<<<<<<'])
+    assert(resC1 === 'SHREE JOTIMOY', `Case C1 failed: got "${resC1}"`)
+
+    // Case C2: Visual contains garbage without MRZ: garbage token with digits is rejected
+    const resC2 = normalizeExtractedGivenName('SHREE G70E JOTIMOY')
+    assert(resC2 === 'SHREE JOTIMOY', `Case C2 failed: got "${resC2}"`)
+
+    // Case D: Single given name
+    const resD = normalizeExtractedGivenName('JOTIMOY')
+    assert(resD === 'JOTIMOY', `Case D failed: got "${resD}"`)
+
+    // Case E: Multiple given names
+    const resE = normalizeExtractedGivenName('MOHAMMAD TARIQUL ISLAM')
+    assert(resE === 'MOHAMMAD TARIQUL ISLAM', `Case E failed: got "${resE}"`)
+
+    // Full name synthesis: fullName = givenName + " " + surname with single separator
+    const mockApplicant = mapPythonResultToExtractedApplicant({
+      personal: { surname: 'RAY', givenName: 'SHREE JOTIMOY', dateOfBirth: '1993-09-18', gender: 'male', nationality: 'BGD', placeOfBirth: '', countryOfBirth: '', nid: '' },
+      passport: { number: 'A21496961', issueDate: '2026-01-20', expiryDate: '2031-01-19', issuePlace: 'DHAKA', issuingCountry: 'BGD' },
+      address: { line1: '', line2: '', city: '', district: '', postalCode: '', country: '', phone: '' },
+      mrz: { detected: false, valid: false, rawLines: [], confidence: 0 },
+      fieldSources: {},
+    })
+    assert(mockApplicant.personal?.fullName?.value === 'SHREE JOTIMOY RAY', 'Full name is exactly "SHREE JOTIMOY RAY"')
+  })
+
+  // 15. TASK 118: Phone Number Variations & Normalization
+  test('15. TASK 118: Phone number variations and normalization', () => {
+    // Phone with +880
+    const m1 = mapPythonResultToExtractedApplicant({
+      personal: { surname: 'TEST', givenName: 'USER', dateOfBirth: '1990-01-01', gender: 'male', nationality: 'BGD', placeOfBirth: '', countryOfBirth: '', nid: '' },
+      passport: { number: 'A12345678', issueDate: '2020-01-01', expiryDate: '2030-01-01', issuePlace: 'DHAKA', issuingCountry: 'BGD' },
+      address: { line1: '', line2: '', city: '', district: '', postalCode: '', country: '', phone: '+8801744777846' },
+      mrz: { detected: false, valid: false, rawLines: [], confidence: 0 },
+      fieldSources: {},
+    })
+    assert(m1.contact?.phone?.value === '+8801744777846', 'Phone with +880 mapped')
+    assert(m1.contact?.isdCode?.value === '880', 'ISD code 880 extracted')
+
+    // Phone with spaces
+    const m2 = mapPythonResultToExtractedApplicant({
+      personal: { surname: 'TEST', givenName: 'USER', dateOfBirth: '1990-01-01', gender: 'male', nationality: 'BGD', placeOfBirth: '', countryOfBirth: '', nid: '' },
+      passport: { number: 'A12345678', issueDate: '2020-01-01', expiryDate: '2030-01-01', issuePlace: 'DHAKA', issuingCountry: 'BGD' },
+      address: { line1: '', line2: '', city: '', district: '', postalCode: '', country: '', phone: '+880 1744 777846' },
+      mrz: { detected: false, valid: false, rawLines: [], confidence: 0 },
+      fieldSources: {},
+    })
+    assert(m2.contact?.phone?.value === '+880 1744 777846' || m2.contact?.phone?.value === '+8801744777846', 'Phone with spaces mapped')
+
+    // Phone with hyphens
+    const m3 = mapPythonResultToExtractedApplicant({
+      personal: { surname: 'TEST', givenName: 'USER', dateOfBirth: '1990-01-01', gender: 'male', nationality: 'BGD', placeOfBirth: '', countryOfBirth: '', nid: '' },
+      passport: { number: 'A12345678', issueDate: '2020-01-01', expiryDate: '2030-01-01', issuePlace: 'DHAKA', issuingCountry: 'BGD' },
+      address: { line1: '', line2: '', city: '', district: '', postalCode: '', country: '', phone: '+880-1744-777846' },
+      mrz: { detected: false, valid: false, rawLines: [], confidence: 0 },
+      fieldSources: {},
+    })
+    assert(m3.contact?.phone?.value?.includes('1744'), 'Phone with hyphens mapped')
+
+    // Phone without country code
+    const m4 = mapPythonResultToExtractedApplicant({
+      personal: { surname: 'TEST', givenName: 'USER', dateOfBirth: '1990-01-01', gender: 'male', nationality: 'BGD', placeOfBirth: '', countryOfBirth: '', nid: '' },
+      passport: { number: 'A12345678', issueDate: '2020-01-01', expiryDate: '2030-01-01', issuePlace: 'DHAKA', issuingCountry: 'BGD' },
+      address: { line1: '', line2: '', city: '', district: '', postalCode: '', country: '', phone: '01744777846' },
+      mrz: { detected: false, valid: false, rawLines: [], confidence: 0 },
+      fieldSources: {},
+    })
+    assert(m4.contact?.phone?.value === '01744777846' || m4.contact?.phone?.value === '+8801744777846', 'Domestic phone without country code mapped')
+
+    // Missing phone: should NOT invent phone
+    const m5 = mapPythonResultToExtractedApplicant({
+      personal: { surname: 'TEST', givenName: 'USER', dateOfBirth: '1990-01-01', gender: 'male', nationality: 'BGD', placeOfBirth: '', countryOfBirth: '', nid: '' },
+      passport: { number: 'A12345678', issueDate: '2020-01-01', expiryDate: '2030-01-01', issuePlace: 'DHAKA', issuingCountry: 'BGD' },
+      address: { line1: '', line2: '', city: '', district: '', postalCode: '', country: '', phone: '' },
+      mrz: { detected: false, valid: false, rawLines: [], confidence: 0 },
+      fieldSources: {},
+    })
+    assert(m5.contact === undefined || m5.contact.phone === undefined, 'No fabricated phone when absent')
+  })
+
+  // 16. TASK 118: Passport Dates & Expiry Validation
+  test('16. TASK 118: Passport issue and expiry dates validation', () => {
+    const res = mapPythonResultToExtractedApplicant({
+      personal: { surname: 'RAY', givenName: 'SHREE JOTIMOY', dateOfBirth: '1993-09-18', gender: 'male', nationality: 'BGD', placeOfBirth: '', countryOfBirth: '', nid: '' },
+      passport: { number: 'A21496961', issueDate: '2026-01-20', expiryDate: '2031-01-19', issuePlace: 'DIP/DHAKA', issuingCountry: 'BGD' },
+      address: { line1: '', line2: '', city: '', district: '', postalCode: '', country: '' },
+      mrz: { detected: false, valid: false, rawLines: [], confidence: 0 },
+      fieldSources: {},
+    })
+    assert(res.passport?.issueDate?.value === '2026-01-20', 'Issue date is 2026-01-20')
+    assert(res.passport?.expiryDate?.value === '2031-01-19', 'Expiry date is 2031-01-19')
+    assert(res.passport?.expiryDate?.value! > res.passport?.issueDate?.value!, 'Expiry date is strictly later than issue date')
+  })
+
+  // 17. TASK 118: Bangladesh Nationality Defaults & Foreign Nationality Preservation
+  test('17. TASK 118: Bangladesh nationality defaults and foreign nationality preservation', () => {
+    // Bangladeshi applicant: Father, Mother, Spouse nationality default to BANGLADESH (derived)
+    const bdDoc: DocumentRecord = {
+      documentId: 'doc_bd_applicant',
+      applicantId: 'appl_bd',
+      documentType: 'passport',
+      fileName: 'bd_passport.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 1024,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'processed',
+      source: 'user-upload',
+      extractedData: {
+        personal: {
+          lastName: { value: 'RAY', source: 'ocr' },
+          firstName: { value: 'SHREE JOTIMOY', source: 'ocr' },
+          nationality: { value: 'BANGLADESH', source: 'ocr' },
+        },
+        passport: {
+          passportNumber: { value: 'A21496961', source: 'ocr' },
+          issueDate: { value: '2026-01-20', source: 'ocr' },
+          expiryDate: { value: '2031-01-19', source: 'ocr' },
+        },
+        family: {
+          father: { name: { value: 'SHREE KHIDAR MOHAN', source: 'ocr' } },
+          mother: { name: { value: 'PANCHAMI RANI', source: 'ocr' } },
+          spouse: { name: { value: 'JASHODA RANI', source: 'ocr' } },
+        },
+      },
+      extractedDataConfirmed: true,
+    }
+
+    const bdApp = populateApplicationFromDocuments({
+      applicantId: 'appl_bd',
+      passportDoc: bdDoc,
+    })
+
+    assert(bdApp.fields['appl.nationality']?.value === 'BANGLADESH', 'Applicant nationality is BANGLADESH')
+    assert(bdApp.fields['father_nationality']?.value === 'BANGLADESH', 'Father nationality default is BANGLADESH')
+    assert(bdApp.fields['father_nationality']?.source === 'derived', 'Father nationality source is derived')
+    assert(bdApp.fields['mother_nationality']?.value === 'BANGLADESH', 'Mother nationality default is BANGLADESH')
+    assert(bdApp.fields['mother_nationality']?.source === 'derived', 'Mother nationality source is derived')
+    assert(bdApp.fields['spouse_nationality']?.value === 'BANGLADESH', 'Spouse nationality default is BANGLADESH')
+    assert(bdApp.fields['spouse_nationality']?.source === 'derived', 'Spouse nationality source is derived')
+
+    // Foreign applicant: Indian applicant with Indian father -> preserve INDIA, never force Bangladesh
+    const indDoc: DocumentRecord = {
+      documentId: 'doc_ind_applicant',
+      applicantId: 'appl_ind',
+      documentType: 'passport',
+      fileName: 'ind_passport.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 1024,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'processed',
+      source: 'user-upload',
+      extractedData: {
+        personal: {
+          lastName: { value: 'SHARMA', source: 'ocr' },
+          firstName: { value: 'ROHIT', source: 'ocr' },
+          nationality: { value: 'INDIA', source: 'ocr' },
+        },
+        passport: {
+          passportNumber: { value: 'Z1234567', source: 'ocr' },
+          issueDate: { value: '2020-01-01', source: 'ocr' },
+          expiryDate: { value: '2030-01-01', source: 'ocr' },
+        },
+        family: {
+          father: { name: { value: 'GURUNATH SHARMA', source: 'ocr' }, nationality: { value: 'INDIAN', source: 'ocr' } },
+        },
+      },
+      extractedDataConfirmed: true,
+    }
+
+    const indApp = populateApplicationFromDocuments({
+      applicantId: 'appl_ind',
+      passportDoc: indDoc,
+    })
+
+    assert(indApp.fields['appl.nationality']?.value === 'INDIA', 'Indian applicant preserves INDIA nationality')
+    assert(indApp.fields['father_nationality']?.value === 'INDIA', 'Indian father preserves INDIA, not forced to BANGLADESH')
+  })
+
   console.log(`\n==================================================`)
   console.log(`TASK 115 TESTS RESULT: ${failures.length === 0 ? '✅ ALL PASSED' : '❌ SOME FAILED'}`)
   console.log(`Total tests: ${count}`)
