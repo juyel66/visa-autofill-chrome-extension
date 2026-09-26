@@ -8,6 +8,8 @@ import { resolveApplicantReligion } from '../extraction/data/religionExtractor'
 import type { ApplicationFieldValue, SavedApplication } from './types'
 import {
   isBangladeshiValue,
+  normalizeNationality,
+  normalizeCountry,
   resolveApprovedProductDefault,
 } from './defaultResolution'
 
@@ -310,6 +312,42 @@ export function populateApplicationFromDocuments(options: {
       }
     }
 
+    // Canonical nationality normalization for explicit document extractions (e.g. INDIAN -> INDIA, BANGLADESHI -> BANGLADESH)
+    if (
+      resolvedValue &&
+      (key === 'appl.nationality' ||
+        key === 'nationality' ||
+        key === 'father_nationality' ||
+        key === 'appl.father_nationality' ||
+        key === 'father_prev_nationality' ||
+        key === 'appl.father_prev_nationality' ||
+        key === 'mother_nationality' ||
+        key === 'appl.mother_nationality' ||
+        key === 'mother_prev_nationality' ||
+        key === 'appl.mother_prev_nationality' ||
+        key === 'spouse_nationality' ||
+        key === 'appl.spouse_nationality' ||
+        key === 'spouse_prev_nationality' ||
+        key === 'appl.spouse_prev_nationality')
+    ) {
+      resolvedValue = normalizeNationality(resolvedValue)
+    }
+
+    // Canonical country normalization for explicit document extractions (e.g. BGD -> BANGLADESH)
+    if (
+      resolvedValue &&
+      (key === 'appl.country_of_birth' ||
+        key === 'country_of_birth' ||
+        key === 'father_country_of_birth' ||
+        key === 'appl.father_country_of_birth' ||
+        key === 'mother_country_of_birth' ||
+        key === 'appl.mother_country_of_birth' ||
+        key === 'spouse_country_of_birth' ||
+        key === 'appl.spouse_country_of_birth')
+    ) {
+      resolvedValue = normalizeCountry(resolvedValue)
+    }
+
     const isApplicantBangladeshi =
       isBangladeshiValue(activeProfile?.personalInfo?.nationality) ||
       isBangladeshiValue(activeProfile?.passport?.issuingCountry) ||
@@ -327,6 +365,16 @@ export function populateApplicationFromDocuments(options: {
     const hasSpouse = Boolean(
       activeProfile?.family?.spouse?.name?.trim() ||
       passportDoc?.extractedData?.family?.spouse?.name?.value?.trim()
+    )
+
+    const hasFather = Boolean(
+      activeProfile?.family?.father?.name?.trim() ||
+      passportDoc?.extractedData?.family?.father?.name?.value?.trim()
+    )
+
+    const hasMother = Boolean(
+      activeProfile?.family?.mother?.name?.trim() ||
+      passportDoc?.extractedData?.family?.mother?.name?.value?.trim()
     )
 
     // Derivation pass for fields deterministically tied to confirmed documents
@@ -359,13 +407,13 @@ export function populateApplicationFromDocuments(options: {
           docId = activeDocId
         }
       } else if (
-        key === 'appl.country_of_birth'
+        key === 'appl.country_of_birth' || key === 'country_of_birth'
       ) {
         const rawCob =
           activeProfile.personalInfo?.countryOfBirth ||
           passportDoc?.extractedData?.personal?.countryOfBirth?.value
         if (rawCob) {
-          resolvedValue = isBangladeshiValue(rawCob) ? 'BANGLADESH' : rawCob
+          resolvedValue = isBangladeshiValue(rawCob) ? 'BANGLADESH' : normalizeCountry(rawCob)
           source = activeSource
           docId = activeDocId
         }
@@ -577,6 +625,18 @@ export function populateApplicationFromDocuments(options: {
             }
           }
         }
+      } else if (key === 'pres_phone' || key === 'phone_no' || key === 'phone') {
+        const rawPhone =
+          activeProfile.presentAddress?.phone ||
+          activeProfile.contact?.phone ||
+          activeProfile.permanentAddress?.phone ||
+          passportDoc?.extractedData?.presentAddress?.phone?.value ||
+          passportDoc?.extractedData?.contact?.phone?.value
+        if (rawPhone) {
+          resolvedValue = rawPhone
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (key === 'appl.journeydate' && activeProfile.travel?.intendedArrivalDate) {
         resolvedValue = activeProfile.travel.intendedArrivalDate
         source = activeSource
@@ -687,12 +747,30 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         key === 'marital_status' || key === 'appl.marital_status'
       ) {
-        if (hasSpouse) {
+        const rawStatus = activeProfile.personalInfo?.maritalStatus || passportDoc?.extractedData?.personal?.maritalStatus?.value
+        if (rawStatus) {
+          const upperStatus = rawStatus.toUpperCase().trim()
+          if (upperStatus === 'MARRIED' || upperStatus === '0') {
+            resolvedValue = 'Married'
+          } else if (upperStatus === 'SINGLE' || upperStatus === 'UNMARRIED' || upperStatus === '1') {
+            resolvedValue = 'Single'
+          } else if (upperStatus === 'DIVORCED') {
+            resolvedValue = 'Divorced'
+          } else if (upperStatus === 'WIDOW' || upperStatus === 'WIDOWER' || upperStatus === 'WIDOW/WIDOWER') {
+            resolvedValue = 'Widow/Widower'
+          } else {
+            resolvedValue = rawStatus
+          }
+          source = activeSource
+          docId = activeDocId
+        } else if (hasSpouse) {
           resolvedValue = 'Married'
           source = 'derived'
           docId = activeDocId
         } else {
-          resolvedValue = undefined
+          resolvedValue = 'Single'
+          source = 'derived'
+          docId = activeDocId
         }
       } else if (
         (key === 'appl.oth_ppt_issue_date' || key === 'oth_ppt_issue_date') &&
@@ -1000,8 +1078,12 @@ export function populateApplicationFromDocuments(options: {
         hasMilitaryService: activeProfile.employment?.hasMilitaryService ?? ogdProfile?.employment?.hasMilitaryService,
         hasPreviousVisa: activeProfile.previousVisa?.hasPreviousVisa ?? ogdProfile?.previousVisa?.hasPreviousVisa,
         holdsOtherPassport: activeProfile.passport?.holdsOtherPassport,
-        hasFather: Boolean(activeProfile.family?.father?.name || passportDoc?.extractedData?.family?.father?.name?.value),
-        hasMother: Boolean(activeProfile.family?.mother?.name || passportDoc?.extractedData?.family?.mother?.name?.value),
+        hasFather,
+        hasMother,
+        applicantPlaceOfBirth:
+          passportPob ||
+          activeProfile.personalInfo?.townCityOfBirth ||
+          passportDoc?.extractedData?.personal?.townCityOfBirth?.value,
       })
 
       if (approvedDefault) {

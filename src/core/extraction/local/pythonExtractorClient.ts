@@ -175,16 +175,30 @@ export function normalizeExtractedDate(dateStr?: string): string {
  * Does NOT invent arbitrary spaces.
  */
 export function normalizeExtractedGivenName(givenName?: string, mrzRawLines?: string[]): string {
-  if (!givenName) return ''
-  const trimmed = givenName.trim()
-  if (!trimmed) return ''
+  const trimmed = (givenName || '').trim()
+
+  if (!trimmed) {
+    // If explicit Given Name is unavailable, use valid MRZ name tokens
+    if (mrzRawLines && mrzRawLines.length > 0) {
+      const l1 = (mrzRawLines[0] || '').trim().replace(/<+$/, '')
+      const parts = l1.includes('<<') ? l1.split('<<') : []
+      const afterSurname = parts.length > 1 ? parts[1] : ''
+      if (afterSurname) {
+        const tokens = afterSurname.split('<').filter((t) => t.length > 0 && /^[A-Z]+$/.test(t))
+        if (tokens.length > 0) {
+          return tokens.map((t) => normalizeNameString(t) || t).join(' ')
+        }
+      }
+    }
+    return ''
+  }
 
   // 1. Check if MRZ line 1 contains '<' separator for this given name
   if (mrzRawLines && mrzRawLines.length > 0) {
-    const l1 = mrzRawLines[0] || ''
-    // TD3 Line 1 format: P<CCC<SURNAME<<GIVEN<NAMES<<<<
-    const parts = l1.includes('<<') ? l1.split('<<') : [l1]
-    const afterSurname = parts.length > 1 ? parts[1] : parts[0]
+    const l1 = (mrzRawLines[0] || '').trim().replace(/<+$/, '')
+    // TD3 Line 1 format: P<CCC<SURNAME<<GIVEN<NAMES
+    const parts = l1.includes('<<') ? l1.split('<<') : []
+    const afterSurname = parts.length > 1 ? parts[1] : ''
     if (afterSurname) {
       const tokens = afterSurname.split('<').filter((t) => t.length > 0 && /^[A-Z]+$/.test(t))
       if (tokens.length >= 2) {
@@ -200,7 +214,7 @@ export function normalizeExtractedGivenName(givenName?: string, mrzRawLines?: st
   // 2. Filter out obvious OCR garbage tokens (e.g. tokens with digits like G70E, 410G7A, 70E, O7E)
   const rawTokens = trimmed.replace(/[/<]/g, ' ').split(/\s+/).filter(Boolean)
   const validTokens = rawTokens.filter((tok) => {
-    const cleanTok = tok.replace(/^[.,:;-_/\\<>()[\]{}"'!?#*~]+|[.,:;-_/\\<>()[\]{}"'!?#*~]+$/g, '')
+    const cleanTok = tok.replace(/^[-.,:;_\\/<>()[\]{}"'!?#*~]+|[-.,:;_\\/<>()[\]{}"'!?#*~]+$/g, '')
     if (!cleanTok || /\d/.test(cleanTok)) return false
     return /^[A-Za-z]+(?:['-][A-Za-z]+)*$/.test(cleanTok)
   })
@@ -208,9 +222,9 @@ export function normalizeExtractedGivenName(givenName?: string, mrzRawLines?: st
   if (validTokens.length === 0) {
     // If visual only contained noise tokens, fallback to MRZ tokens if present
     if (mrzRawLines && mrzRawLines.length > 0) {
-      const l1 = mrzRawLines[0] || ''
-      const parts = l1.includes('<<') ? l1.split('<<') : [l1]
-      const afterSurname = parts.length > 1 ? parts[1] : parts[0]
+      const l1 = (mrzRawLines[0] || '').trim().replace(/<+$/, '')
+      const parts = l1.includes('<<') ? l1.split('<<') : []
+      const afterSurname = parts.length > 1 ? parts[1] : ''
       if (afterSurname) {
         const tokens = afterSurname.split('<').filter((t) => t.length > 0 && /^[A-Z]+$/.test(t))
         if (tokens.length > 0) {
@@ -518,8 +532,6 @@ export function mapPythonResultToExtractedApplicant(
     const rawP = addr.phone.trim()
     result.presentAddress!.phone = createExtractedField(rawP, addrSource, addrConf, 'ocr')
     result.presentAddress!.mobile = createExtractedField(rawP, addrSource, addrConf, 'ocr')
-    result.permanentAddress!.phone = createExtractedField(rawP, addrSource, addrConf, 'ocr')
-    result.permanentAddress!.mobile = createExtractedField(rawP, addrSource, addrConf, 'ocr')
     result.contact = result.contact || {}
     result.contact.phone = createExtractedField(rawP, addrSource, addrConf, 'ocr')
     result.contact.mobile = createExtractedField(rawP, addrSource, addrConf, 'ocr')

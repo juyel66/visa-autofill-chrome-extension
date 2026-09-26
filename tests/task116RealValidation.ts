@@ -167,10 +167,13 @@ async function runTask116Validation() {
   console.log(`    - city: "${city}" (expected: "THAKURGAON")`)
   console.log(`    - district: "${district}" (expected: "THAKURGAON")`)
   console.log(`    - postal code: "${postalCode}" (expected: "5120")`)
+  const phone = extractedData.contact?.phone?.value || extractedData.presentAddress?.phone?.value
   console.log(`    - country: "${country}" (expected: "BANGLADESH")`)
+  console.log(`    - phone: "${phone}" (expected: "+8801744777846")`)
 
   assert.strictEqual(surname, 'RAY', 'surname matches RAY')
   assert.strictEqual(givenName, 'SHREE JOTIMOY', 'givenName matches SHREE JOTIMOY')
+  assert.strictEqual(phone, '+8801744777846', 'phone matches +8801744777846')
   assert.strictEqual(dob, '1993-09-18', 'DOB matches 1993-09-18')
   assert.strictEqual(gender, 'male', 'gender matches male')
   assert.strictEqual(nationality, 'BANGLADESH', 'nationality matches BANGLADESH')
@@ -326,6 +329,7 @@ async function runTask116Validation() {
   assert.strictEqual(savedApp.fields['village_town_city']?.value, 'THAKURGAON', 'SavedApp village_town_city is THAKURGAON')
   assert.strictEqual(savedApp.fields['district']?.value, 'THAKURGAON', 'SavedApp district is THAKURGAON')
   assert.strictEqual(savedApp.fields['pincode']?.value, '5120', 'SavedApp pincode is 5120')
+  assert.strictEqual(savedApp.fields['pres_phone']?.value, '+8801744777846', 'SavedApp pres_phone is +8801744777846')
   // Verify family fields in SavedApplication
   assert.strictEqual(savedApp.fields['fthrname']?.value, 'SHREE KHIDAR MOHAN', 'SavedApp father name is SHREE KHIDAR MOHAN')
   assert.strictEqual(savedApp.fields['mother_name']?.value, 'PANCHAMI RANI', 'SavedApp mother name is PANCHAMI RANI')
@@ -334,6 +338,21 @@ async function runTask116Validation() {
   assert.strictEqual(savedApp.fields['father_nationality']?.value, 'BANGLADESH', 'SavedApp father nationality default is BANGLADESH')
   assert.strictEqual(savedApp.fields['mother_nationality']?.value, 'BANGLADESH', 'SavedApp mother nationality default is BANGLADESH')
   assert.strictEqual(savedApp.fields['spouse_nationality']?.value, 'BANGLADESH', 'SavedApp spouse nationality default is BANGLADESH')
+  // Task 119 additions
+  assert.strictEqual(savedApp.fields['appl.country_of_birth']?.value, 'BANGLADESH', 'SavedApp country of birth default is BANGLADESH')
+  assert.strictEqual(savedApp.fields['appl.country_of_birth']?.source, 'derived', 'SavedApp country of birth source is derived')
+  assert.strictEqual(savedApp.fields['father_prev_nationality']?.value, 'BANGLADESH', 'SavedApp father prev nationality is BANGLADESH')
+  assert.strictEqual(savedApp.fields['father_prev_nationality']?.source, 'derived', 'SavedApp father prev nationality source is derived')
+  assert.strictEqual(savedApp.fields['mother_prev_nationality']?.value, 'BANGLADESH', 'SavedApp mother prev nationality is BANGLADESH')
+  assert.strictEqual(savedApp.fields['mother_prev_nationality']?.source, 'derived', 'SavedApp mother prev nationality source is derived')
+  assert.strictEqual(savedApp.fields['father_place_of_birth']?.value, 'THAKURGAON', 'SavedApp father birthplace copied from applicant birthplace')
+  assert.strictEqual(savedApp.fields['father_place_of_birth']?.source, 'derived', 'SavedApp father birthplace source is derived')
+  assert.strictEqual(savedApp.fields['mother_place_of_birth']?.value, 'THAKURGAON', 'SavedApp mother birthplace copied from applicant birthplace')
+  assert.strictEqual(savedApp.fields['mother_place_of_birth']?.source, 'derived', 'SavedApp mother birthplace source is derived')
+  assert.strictEqual(savedApp.fields['spouse_place_of_birth']?.value, 'BANGLADESH', 'SavedApp spouse birthplace default is BANGLADESH')
+  assert.strictEqual(savedApp.fields['spouse_place_of_birth']?.source, 'derived', 'SavedApp spouse birthplace source is derived')
+  assert.strictEqual(savedApp.fields['spouse_prev_nationality']?.value, 'BANGLADESH', 'SavedApp spouse prev nationality default is BANGLADESH')
+  assert.strictEqual(savedApp.fields['spouse_country_of_birth']?.value, 'BANGLADESH', 'SavedApp spouse country of birth default is BANGLADESH')
 
   // Verify previous passport in SavedApplication
   assert.strictEqual(savedApp.fields['appl.oth_pptno']?.value, 'BK0965579', 'SavedApp other passport number is BK0965579')

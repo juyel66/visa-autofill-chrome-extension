@@ -27,6 +27,7 @@ export interface DefaultResolutionContext {
   holdsOtherPassport?: boolean
   hasFather?: boolean
   hasMother?: boolean
+  applicantPlaceOfBirth?: string
 }
 
 export interface ResolvedDefault {
@@ -60,6 +61,9 @@ export function normalizeNationality(val?: string | null): string {
   if (upper === 'NEPALESE' || upper === 'NPL' || upper === 'NEPAL') {
     return 'NEPAL'
   }
+  if (upper === 'PAKISTANI' || upper === 'PAK' || upper === 'PAKISTAN') {
+    return 'PAKISTAN'
+  }
   return trimmed
 }
 
@@ -79,6 +83,9 @@ export function normalizeCountry(val?: string | null): string {
   if (upper === 'NEPALESE' || upper === 'NPL' || upper === 'NEPAL') {
     return 'NEPAL'
   }
+  if (upper === 'PAKISTANI' || upper === 'PAK' || upper === 'PAKISTAN') {
+    return 'PAKISTAN'
+  }
   return trimmed
 }
 
@@ -97,6 +104,17 @@ export function resolveApprovedProductDefault(
         value: 'BANGLADESH',
         source: 'derived',
         reason: 'Approved product default: BANGLADESH nationality for applicant',
+      }
+    }
+  }
+
+  // 1b. Applicant Country/Region of Birth Default (Task 119)
+  if (key === 'appl.country_of_birth' || key === 'country_of_birth') {
+    if (context.isApplicantBangladeshi || !context.hasDocumentNationality) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: BANGLADESH country of birth for applicant',
       }
     }
   }
@@ -180,7 +198,7 @@ export function resolveApprovedProductDefault(
     }
   }
 
-  // 9. Marital Status
+  // 9. Marital Status (Task 119: deterministic spouse presence -> Married, no spouse -> Single)
   if (key === 'marital_status' || key === 'appl.marital_status') {
     if (context.hasSpouse) {
       return {
@@ -188,43 +206,150 @@ export function resolveApprovedProductDefault(
         source: 'derived',
         reason: 'Derived: Married status confirmed by spouse record in document',
       }
+    } else {
+      return {
+        value: 'Single',
+        source: 'derived',
+        reason: 'Derived: Single status default when no spouse record is present in document',
+      }
     }
   }
 
-  // 10. Family Nationalities (when family member exists and nationality is unextracted)
-  if (
-    (key === 'father_nationality' || key === 'appl.father_nationality') &&
-    context.hasFather &&
-    context.isApplicantBangladeshi
-  ) {
-    return {
-      value: 'BANGLADESH',
-      source: 'derived',
-      reason: 'Approved product default: Father nationality matches Bangladeshi family descent',
+  // 10. Father Defaults (Task 119: only when father exists)
+  if (context.hasFather) {
+    if (
+      (key === 'father_nationality' || key === 'appl.father_nationality') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Father nationality matches Bangladeshi family descent',
+      }
+    }
+
+    if (
+      (key === 'father_prev_nationality' || key === 'appl.father_prev_nationality') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Father previous nationality matches Bangladeshi family descent',
+      }
+    }
+
+    if (
+      (key === 'father_place_of_birth' || key === 'appl.father_place_of_birth') &&
+      context.applicantPlaceOfBirth
+    ) {
+      return {
+        value: context.applicantPlaceOfBirth.toUpperCase(),
+        source: 'derived',
+        reason: "Derived: Father place of birth defaults to applicant's extracted place of birth",
+      }
+    }
+
+    if (
+      (key === 'father_country_of_birth' || key === 'appl.father_country_of_birth') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Father country of birth matches Bangladeshi family descent',
+      }
     }
   }
 
-  if (
-    (key === 'mother_nationality' || key === 'appl.mother_nationality') &&
-    context.hasMother &&
-    context.isApplicantBangladeshi
-  ) {
-    return {
-      value: 'BANGLADESH',
-      source: 'derived',
-      reason: 'Approved product default: Mother nationality matches Bangladeshi family descent',
+  // 11. Mother Defaults (Task 119: only when mother exists)
+  if (context.hasMother) {
+    if (
+      (key === 'mother_nationality' || key === 'appl.mother_nationality') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Mother nationality matches Bangladeshi family descent',
+      }
+    }
+
+    if (
+      (key === 'mother_prev_nationality' || key === 'appl.mother_prev_nationality') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Mother previous nationality matches Bangladeshi family descent',
+      }
+    }
+
+    if (
+      (key === 'mother_place_of_birth' || key === 'appl.mother_place_of_birth') &&
+      context.applicantPlaceOfBirth
+    ) {
+      return {
+        value: context.applicantPlaceOfBirth.toUpperCase(),
+        source: 'derived',
+        reason: "Derived: Mother place of birth defaults to applicant's extracted place of birth",
+      }
+    }
+
+    if (
+      (key === 'mother_country_of_birth' || key === 'appl.mother_country_of_birth') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Mother country of birth matches Bangladeshi family descent',
+      }
     }
   }
 
-  if (
-    (key === 'spouse_nationality' || key === 'appl.spouse_nationality') &&
-    context.hasSpouse &&
-    context.isApplicantBangladeshi
-  ) {
-    return {
-      value: 'BANGLADESH',
-      source: 'derived',
-      reason: 'Approved product default: Spouse nationality matches Bangladeshi family descent',
+  // 12. Spouse Defaults (Task 119: only when spouse exists)
+  if (context.hasSpouse) {
+    if (
+      (key === 'spouse_nationality' || key === 'appl.spouse_nationality') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Spouse nationality matches Bangladeshi family descent',
+      }
+    }
+
+    if (
+      (key === 'spouse_prev_nationality' || key === 'appl.spouse_prev_nationality') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Spouse previous nationality matches Bangladeshi family descent',
+      }
+    }
+
+    if (key === 'spouse_place_of_birth' || key === 'appl.spouse_place_of_birth') {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: BANGLADESH place of birth for spouse when unavailable',
+      }
+    }
+
+    if (
+      (key === 'spouse_country_of_birth' || key === 'appl.spouse_country_of_birth') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: BANGLADESH country of birth for spouse',
+      }
     }
   }
 
