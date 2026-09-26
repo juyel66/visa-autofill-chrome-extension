@@ -230,7 +230,7 @@ export async function runTask113Tests(): Promise<TestSuiteResult> {
       'C.1: Extracted country_of_birth has source "passport"'
     )
 
-    // C.2: Missing country of birth stays blank (no fake source="passport")
+    // C.2: Missing country of birth defaults to BANGLADESH (source: 'derived', Task 119)
     const docWithoutCob = createTestDoc('doc_cob_2', {
       personal: {
         firstName: ef('TARIQ'),
@@ -241,12 +241,12 @@ export async function runTask113Tests(): Promise<TestSuiteResult> {
       passportDoc: docWithoutCob,
     })
     assert(
-      appCob2.fields['appl.country_of_birth']?.value === '',
-      'C.2: Missing country_of_birth stays blank'
+      appCob2.fields['appl.country_of_birth']?.value === 'BANGLADESH',
+      'C.2: Missing country_of_birth defaults to BANGLADESH (Task 119)'
     )
     assert(
-      appCob2.fields['appl.country_of_birth']?.source === 'missing',
-      'C.2: Missing country_of_birth has source "missing"'
+      appCob2.fields['appl.country_of_birth']?.source === 'derived',
+      'C.2: Missing country_of_birth has source "derived"'
     )
     assert(
       appCob2.fields['appl.country_of_birth']?.source !== 'passport',
