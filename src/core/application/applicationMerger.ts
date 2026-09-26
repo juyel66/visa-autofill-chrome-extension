@@ -589,7 +589,8 @@ export function populateApplicationFromDocuments(options: {
         key === 'father_nationality' || key === 'appl.father_nationality'
       ) {
         if (activeProfile.family?.father?.nationality) {
-          resolvedValue = activeProfile.family.father.nationality
+          const rawFn = activeProfile.family.father.nationality
+          resolvedValue = isBangladeshiValue(rawFn) ? 'BANGLADESH' : normalizeNationality(rawFn)
           source = activeSource
           docId = activeDocId
         }
@@ -621,7 +622,8 @@ export function populateApplicationFromDocuments(options: {
         key === 'mother_nationality' || key === 'appl.mother_nationality'
       ) {
         if (activeProfile.family?.mother?.nationality) {
-          resolvedValue = activeProfile.family.mother.nationality
+          const rawMn = activeProfile.family.mother.nationality
+          resolvedValue = isBangladeshiValue(rawMn) ? 'BANGLADESH' : normalizeNationality(rawMn)
           source = activeSource
           docId = activeDocId
         }
@@ -653,7 +655,8 @@ export function populateApplicationFromDocuments(options: {
         key === 'spouse_nationality' || key === 'appl.spouse_nationality'
       ) {
         if (hasSpouse && activeProfile.family?.spouse?.nationality) {
-          resolvedValue = activeProfile.family.spouse.nationality
+          const rawSn = activeProfile.family.spouse.nationality
+          resolvedValue = isBangladeshiValue(rawSn) ? 'BANGLADESH' : normalizeNationality(rawSn)
           source = activeSource
           docId = activeDocId
         }
