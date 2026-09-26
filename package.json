@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && node build.js",
+    "test": "npx tsx -r ./tests/setup.ts src/core/application/__tests__/task119WorkspaceFields.test.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
