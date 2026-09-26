@@ -655,7 +655,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                 <div className="font-bold text-[#4a154b] text-[11px] uppercase">Spouse Details</div>
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Name *</label>
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
                       type="text"
                       value={getVal('spouse_name')}
@@ -663,12 +663,14 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                       placeholder="SPOUSE NAME"
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                     />
+                    {renderSourceBadge(fields['spouse_name'])}
                   </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Spouse Full Name</div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Nationality *</label>
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
                     <select
                       value={getVal('spouse_nationality')}
                       onChange={(e) => onFieldChange('spouse_nationality', e.target.value)}
@@ -679,12 +681,32 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                         <option key={n.value} value={n.value}>{n.label}</option>
                       ))}
                     </select>
+                    {renderSourceBadge(fields['spouse_nationality'])}
                   </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Nationality of Spouse</div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Previous Nationality</label>
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
+                    <select
+                      value={getVal('spouse_prev_nationality')}
+                      onChange={(e) => onFieldChange('spouse_prev_nationality', e.target.value)}
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    >
+                      <option value="">Select Nationality</option>
+                      {PORTAL_NATIONALITY_OPTIONS.map((n) => (
+                        <option key={n.value} value={n.value}>{n.label}</option>
+                      ))}
+                    </select>
+                    {renderSourceBadge(fields['spouse_prev_nationality'])}
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Previous Nationality of Spouse</div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Place of Birth</label>
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
                       type="text"
                       value={getVal('spouse_place_of_birth')}
@@ -692,12 +714,14 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                       placeholder="PLACE OF BIRTH"
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                     />
+                    {renderSourceBadge(fields['spouse_place_of_birth'])}
                   </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Place of birth</div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Country of Birth</label>
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-5 flex items-center gap-1.5">
                     <select
                       value={getVal('spouse_country_of_birth')}
                       onChange={(e) => onFieldChange('spouse_country_of_birth', e.target.value)}
@@ -708,7 +732,9 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                         <option key={c.value} value={c.value}>{c.label}</option>
                       ))}
                     </select>
+                    {renderSourceBadge(fields['spouse_country_of_birth'])}
                   </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Country/Region of birth</div>
                 </div>
               </div>
             )}
