@@ -6,6 +6,10 @@ import { parseDateString, formatToIsoDate, validatePassportDates } from '../auto
 import { getAllSchemaFields } from './fieldSchema'
 import { resolveApplicantReligion } from '../extraction/data/religionExtractor'
 import type { ApplicationFieldValue, SavedApplication } from './types'
+import {
+  isBangladeshiValue,
+  resolveApprovedProductDefault,
+} from './defaultResolution'
 
 const HISTORICAL_FIELD_KEYS = new Set([
   'old_visa_flag',
@@ -267,7 +271,7 @@ export function populateApplicationFromDocuments(options: {
 
     // Priority 2: Passport Document (Primary authoritative source for identity, passport, address)
     if (passportProfile && fieldDef.sourceApplicantPath) {
-      const pVal = resolveApplicantValue(passportProfile, fieldDef.sourceApplicantPath, { disableTemporaryEmail: true })
+      const pVal = resolveApplicantValue(passportProfile, fieldDef.sourceApplicantPath, { disableTemporaryEmail: true, disableEmploymentDefaults: true })
       if (pVal !== undefined && pVal !== '') {
         resolvedValue = pVal
         const isPresentAddressField =
@@ -295,7 +299,7 @@ export function populateApplicationFromDocuments(options: {
       // (a) It's a historical field, OR
       // (b) Passport document did not provide a value for this field AND OGD is not a different applicant
       if (isHistorical || (!resolvedValue && (!isPassportIdentityField || !ogdIsDifferentApplicant))) {
-        const ogdVal = resolveApplicantValue(ogdProfile, fieldDef.sourceApplicantPath, { disableTemporaryEmail: true })
+        const ogdVal = resolveApplicantValue(ogdProfile, fieldDef.sourceApplicantPath, { disableTemporaryEmail: true, disableEmploymentDefaults: true })
         if (ogdVal !== undefined && ogdVal !== '') {
           if (!resolvedValue || isHistorical) {
             resolvedValue = ogdVal
@@ -304,12 +308,6 @@ export function populateApplicationFromDocuments(options: {
           }
         }
       }
-    }
-
-    function isBangladeshiValue(val?: string | null): boolean {
-      if (!val) return false
-      const s = val.trim().toUpperCase()
-      return s === 'BANGLADESH' || s === 'BANGLADESHI' || s === 'BGD'
     }
 
     const isApplicantBangladeshi =
@@ -906,41 +904,38 @@ export function populateApplicationFromDocuments(options: {
         (key === 'occupation' || key === 'appl.occupation' || key === 'present_occupation') &&
         !resolvedValue
       ) {
-        resolvedValue = activeProfile.employment?.presentOccupation || 'WORKER'
-        source = activeProfile.employment?.presentOccupation ? activeSource : 'derived'
-        docId = activeDocId
+        if (activeProfile.employment?.presentOccupation) {
+          resolvedValue = activeProfile.employment.presentOccupation
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         (key === 'empname' || key === 'appl.empname' || key === 'employer_name') &&
         !resolvedValue
       ) {
-        const candidateFullName = [activeProfile.personalInfo?.givenNames, activeProfile.personalInfo?.surname]
-          .filter(Boolean)
-          .join(' ')
-          .trim()
-          .toUpperCase()
-        resolvedValue = activeProfile.employment?.employerName || candidateFullName || undefined
-        source = activeProfile.employment?.employerName ? activeSource : (candidateFullName ? 'derived' : 'missing')
-        docId = activeDocId
+        if (activeProfile.employment?.employerName) {
+          resolvedValue = activeProfile.employment.employerName
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         (key === 'empdesignation' || key === 'appl.empdesignation' || key === 'designation') &&
         !resolvedValue
       ) {
-        resolvedValue = activeProfile.employment?.designationRank || 'WORKER'
-        source = activeProfile.employment?.designationRank ? activeSource : 'derived'
-        docId = activeDocId
+        if (activeProfile.employment?.designationRank) {
+          resolvedValue = activeProfile.employment.designationRank
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         (key === 'empaddress' || key === 'appl.empaddress' || key === 'employer_address') &&
         !resolvedValue
       ) {
-        const addr1 = activeProfile.presentAddress?.addressLine1 || activeProfile.permanentAddress?.addressLine1
-        const addr2 = activeProfile.presentAddress?.villageTownCity || activeProfile.presentAddress?.addressLine2 || activeProfile.permanentAddress?.villageTownCity || activeProfile.permanentAddress?.addressLine2
-        const addrWithoutDist = [addr1, addr2].filter(Boolean).join(', ').trim().toUpperCase()
-        const rawEmpAddr = typeof activeProfile.employment?.employerAddress === 'string'
-          ? activeProfile.employment.employerAddress
-          : (activeProfile.employment?.employerAddress ? [activeProfile.employment.employerAddress.addressLine1, activeProfile.employment.employerAddress.villageTownCity || activeProfile.employment.employerAddress.addressLine2].filter(Boolean).join(', ') : '')
-        resolvedValue = rawEmpAddr || addrWithoutDist || undefined
-        source = rawEmpAddr ? activeSource : (addrWithoutDist ? 'derived' : 'missing')
-        docId = activeDocId
+        if (typeof activeProfile.employment?.employerAddress === 'string' && activeProfile.employment.employerAddress.trim()) {
+          resolvedValue = activeProfile.employment.employerAddress.trim().toUpperCase()
+          source = activeSource
+          docId = activeDocId
+        }
       } else if (
         (key === 'empphone' || key === 'appl.empphone' || key === 'employer_phone') &&
         !resolvedValue
@@ -984,6 +979,30 @@ export function populateApplicationFromDocuments(options: {
         !resolvedValue
       ) {
         resolvedValue = activeProfile.family?.hasPakistanRelation === true ? 'Yes' : 'No'
+        source = 'derived'
+        docId = activeDocId
+      }
+    }
+
+    // Centralized Approved Product Defaults & Deterministic Rules Pass
+    if ((resolvedValue === undefined || resolvedValue === '') && activeProfile) {
+      const approvedDefault = resolveApprovedProductDefault(key, {
+        isApplicantBangladeshi,
+        hasSpouse,
+        hasDocumentNationality: Boolean(
+          activeProfile.personalInfo?.nationality ||
+          passportDoc?.extractedData?.personal?.nationality?.value
+        ),
+        hasPakistanRelation: activeProfile.family?.hasPakistanRelation ?? ogdProfile?.family?.hasPakistanRelation,
+        hasMilitaryService: activeProfile.employment?.hasMilitaryService ?? ogdProfile?.employment?.hasMilitaryService,
+        hasPreviousVisa: activeProfile.previousVisa?.hasPreviousVisa ?? ogdProfile?.previousVisa?.hasPreviousVisa,
+        holdsOtherPassport: activeProfile.passport?.holdsOtherPassport,
+        hasFather: Boolean(activeProfile.family?.father?.name || passportDoc?.extractedData?.family?.father?.name?.value),
+        hasMother: Boolean(activeProfile.family?.mother?.name || passportDoc?.extractedData?.family?.mother?.name?.value),
+      })
+
+      if (approvedDefault) {
+        resolvedValue = typeof approvedDefault.value === 'boolean' ? (approvedDefault.value ? 'Yes' : 'No') : approvedDefault.value
         source = 'derived'
         docId = activeDocId
       }
