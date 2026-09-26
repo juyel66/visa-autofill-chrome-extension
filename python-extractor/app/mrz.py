@@ -189,8 +189,10 @@ def parse_td3_mrz(
     name_section = l1[5:44]
     parts = name_section.split("<<")
     if len(parts) >= 2 and any(c.isalpha() for c in parts[1]):
-        result.surname = " ".join([p for p in parts[0].split("<") if p]).strip()
-        result.given_names = " ".join([p for p in parts[1].split("<") if p]).strip()
+        s_tokens = [p for p in parts[0].split("<") if p and p.isalpha()]
+        g_tokens = [p for p in parts[1].split("<") if p and p.isalpha()]
+        result.surname = " ".join(s_tokens).strip()
+        result.given_names = " ".join(g_tokens).strip()
     else:
         # The << was trailing filler or omitted by OCR
         content = parts[0]
@@ -198,13 +200,15 @@ def parse_td3_mrz(
             clean_hint = surname_hint.upper().strip()
             rem = content[len(clean_hint):].lstrip("<")
             result.surname = clean_hint
-            result.given_names = " ".join([p for p in rem.split("<") if p]).strip()
+            g_tokens = [p for p in rem.split("<") if p and p.isalpha()]
+            result.given_names = " ".join(g_tokens).strip()
         elif "<" in content:
-            sub_tokens = [p for p in content.split("<") if p]
-            result.surname = sub_tokens[0].strip()
-            result.given_names = " ".join(sub_tokens[1:]).strip()
+            sub_tokens = [p for p in content.split("<") if p and p.isalpha()]
+            result.surname = sub_tokens[0].strip() if sub_tokens else ""
+            result.given_names = " ".join(sub_tokens[1:]).strip() if len(sub_tokens) > 1 else ""
         else:
-            result.surname = content.replace("<", "").strip()
+            clean_tok = content.replace("<", "").strip()
+            result.surname = clean_tok if clean_tok.isalpha() else ""
             result.given_names = ""
 
     # 2. Normalize and Parse Line 2
