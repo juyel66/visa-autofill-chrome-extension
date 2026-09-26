@@ -76,6 +76,97 @@ def normalize_gender(raw: str) -> str:
     return ""
 
 
+DISALLOWED_NAME_TOKENS = {
+    "GIVEN", "NAME", "NAMES", "SURNAME", "PASSPORT", "PRENOM", "PRENOMS",
+    "NATIONALITY", "BGD", "TYPE", "COUNTRY", "CODE", "SEX", "AUTHORITY",
+    "DATE", "BIRTH", "ISSUE", "EXPIRY", "DIP", "DHAKA", "HOLDER", "SIGNATURE",
+    "EMERGENCY", "CONTACT", "ADDRESS", "FATHER", "MOTHER", "GUARDIAN",
+    "LEGAL", "SPOUSE", "RELATIONSHIP", "TELEPHONE", "PHONE", "MOBILE",
+    "PERMANENT", "PRESENT", "PEOPLE", "REPUBLIC", "OF", "BANGLADESH"
+}
+
+
+def is_valid_name_token(token: str) -> bool:
+    """
+    Check if a token is a legitimate person name word.
+    Rejects OCR noise tokens such as G70E, 410G7A, 70E, O7E, tokens containing digits,
+    and passport keywords.
+    """
+    if not token:
+        return False
+    t = token.strip(".,:;-_/\\<>[]{}()\"'!?#*~")
+    if not t:
+        return False
+    # Person name tokens must never contain digits (e.g. G70E, 70E, 410G7A)
+    if re.search(r"\d", t):
+        return False
+    # Disallow passport metadata or labels
+    if t.upper() in DISALLOWED_NAME_TOKENS:
+        return False
+    # Must consist of letters, with optional internal hyphen or apostrophe
+    if not re.match(r"^[A-Za-z]+(?:['-][A-Za-z]+)*$", t):
+        return False
+    return True
+
+
+def clean_person_name(cand: str) -> str:
+    """
+    Clean person name: remove OCR artifacts (e.g. G70E, 70E, random alphanumeric fragments),
+    disallowed keywords, and normalize multi-token spaces.
+    """
+    if not cand:
+        return ""
+    cand_norm = cand.replace("<", " ").replace("/", " ")
+    raw_tokens = cand_norm.split()
+    valid_tokens = []
+    for tok in raw_tokens:
+        clean_tok = tok.strip(".,:;-_/\\<>[]{}()\"'!?#*~")
+        if is_valid_name_token(clean_tok):
+            valid_tokens.append(clean_tok.upper())
+    if not valid_tokens:
+        return ""
+    return " ".join(valid_tokens)
+
+
+def normalize_phone_number(raw: str) -> str:
+    """
+    Normalize phone number: preserve country code (+880, 880, 01), safely handle whitespace and hyphens,
+    and avoid confusing NID, passport numbers, dates, or postal codes.
+    """
+    if not raw:
+        return ""
+    clean = raw.strip()
+    clean = re.sub(
+        r"^(?:[ET]ELEPHONE|PHONE|MOBILE|CONTACT|TEL)(?:\s*(?:NO|NUMBER))?[\s.:=-]*",
+        "",
+        clean,
+        flags=re.IGNORECASE
+    ).strip()
+
+    has_plus = clean.startswith("+")
+    m = re.search(r"(\+?[\d\s-]{7,20})", clean)
+    if not m:
+        return ""
+
+    candidate = m.group(1).strip()
+    digits = re.sub(r"\D", "", candidate)
+
+    # Phone numbers must have between 7 and 15 digits
+    if len(digits) < 7 or len(digits) > 15:
+        return ""
+
+    # Avoid confusing 10-digit NIDs that do not match mobile patterns
+    if len(digits) == 10 and not has_plus and not digits.startswith("1") and not digits.startswith("0"):
+        return ""
+
+    if has_plus:
+        return "+" + digits
+    elif digits.startswith("880") and len(digits) in (13, 14):
+        return "+" + digits
+    else:
+        return digits
+
+
 def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float]]:
     """
     Extract passport fields from label-value positioning in OCR boxes.
@@ -92,45 +183,52 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float
 
         # 1. Surname (labels like "Surname", "sroct/Suname", etc.)
         if re.search(r"S[U|UR]NAME", upper) and not any(kw in upper for kw in ["PASSPORT", "FATHER", "MOTHER", "GUARDIAN"]):
-            for k in range(i + 1, min(i + 4, num_boxes)):
-                cand = lines[k].strip()
-                if cand and cand.isalpha() and not any(kw in cand.upper() for kw in ["GIVEN", "PASSPORT", "NAME", "NATIONALITY"]):
-                    results["surname"] = (cand, confs[k])
-                    break
+            after_label = re.sub(r"^.*?S[U|UR]NAME\s*[:/.-]*\s*", "", text, flags=re.IGNORECASE).strip()
+            clean_inline = clean_person_name(after_label)
+            if clean_inline:
+                results["surname"] = (clean_inline, confs[i])
+            else:
+                for k in range(i + 1, min(i + 4, num_boxes)):
+                    cand = clean_person_name(lines[k].strip())
+                    if cand:
+                        results["surname"] = (cand, confs[k])
+                        break
 
         # 2. Given Name
-        if re.search(r"GIVEN\s*NAME", upper):
-            for k in range(i + 1, min(i + 4, num_boxes)):
-                cand = lines[k].strip()
-                if cand and not any(kw in cand.upper() for kw in ["NATIONALITY", "SURNAME", "NAME", "PASSPORT"]):
-                    results["givenName"] = (cand, confs[k])
-                    break
+        if re.search(r"(?:GIVEN\s*NAMES?|PR[EÉ]NOM[S]?)", upper):
+            after_label = re.sub(r"^.*?(?:GIVEN\s*NAMES?|PR[EÉ]NOM[S]?)\s*[:/.-]*\s*", "", text, flags=re.IGNORECASE).strip()
+            clean_inline = clean_person_name(after_label)
+            if clean_inline:
+                results["givenName"] = (clean_inline, confs[i])
+            else:
+                for k in range(i + 1, min(i + 5, num_boxes)):
+                    cand = lines[k].strip()
+                    clean_c = clean_person_name(cand)
+                    if clean_c:
+                        results["givenName"] = (clean_c, confs[k])
+                        break
 
-        # 3. Full Name (from personal data page header)
         # 3. Full Name (from personal data page header)
         if upper in ["NAME:", "NAME"] and "fullName" not in results:
             for k in range(i + 1, min(i + 3, num_boxes)):
-                cand = lines[k].strip()
-                cand_clean = re.sub(r"^[.\s:]+|[.\s:]+$", "", cand)
-                if cand_clean and not any(kw in cand_clean.upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "PASSPORT", "ADDRESS", "EMERGENCY"]):
+                cand_clean = clean_person_name(lines[k].strip())
+                if cand_clean and not any(kw in cand_clean for kw in ["FATHER", "MOTHER", "GUARDIAN", "PASSPORT", "ADDRESS", "EMERGENCY"]):
                     results["fullName"] = (cand_clean, confs[k])
                     break
 
         # 4. Father's Name
         if re.search(r"FATHER['’]?S?\s*NAME", upper):
             for k in range(i + 1, min(i + 4, num_boxes)):
-                cand = lines[k].strip()
-                cand_clean = re.sub(r"^[.\s:]+|[.\s:]+$", "", cand)
-                if cand_clean and not any(kw in cand_clean.upper() for kw in ["MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME:"]):
+                cand_clean = clean_person_name(lines[k].strip())
+                if cand_clean and not any(kw in cand_clean for kw in ["MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME"]):
                     results["fatherName"] = (cand_clean, confs[k])
                     break
 
         # 5. Mother's Name
         if re.search(r"MOTHER['’]?S?\s*NAME", upper):
             for k in range(i + 1, min(i + 4, num_boxes)):
-                cand = lines[k].strip()
-                cand_clean = re.sub(r"^[.\s:]+|[.\s:]+$", "", cand)
-                if cand_clean and not any(kw in cand_clean.upper() for kw in ["FATHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "LEGAL"]):
+                cand_clean = clean_person_name(lines[k].strip())
+                if cand_clean and not any(kw in cand_clean for kw in ["FATHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "LEGAL"]):
                     results["motherName"] = (cand_clean, confs[k])
                     break
 
@@ -150,22 +248,25 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float
                             break
                 elif box_upper in ["NAME:", "NAME"] and not contact_name:
                     if k + 1 < num_boxes:
-                        contact_name = lines[k + 1].strip()
+                        contact_name = clean_person_name(lines[k + 1].strip())
                         contact_conf = confs[k + 1]
-                elif re.search(r"[ET]ELEPHONE\s*NO|PHONE\s*NO|MOBILE", box_upper):
-                    for pk in range(k + 1, min(k + 3, num_boxes)):
-                        phone_cand = lines[pk].strip()
-                        if re.search(r"[\d+]{7,15}", phone_cand):
-                            results["phone"] = (phone_cand, confs[pk])
-                            break
+                elif re.search(r"(?:\b[ET]ELEPHONE|\bPHONE|\bMOBILE|\bCONTACT|\bTEL)(?:\s*(?:NO|NUMBER))?", box_upper):
+                    cand_phone = normalize_phone_number(box_text)
+                    if cand_phone:
+                        results["phone"] = (cand_phone, confs[k])
+                    else:
+                        for pk in range(k + 1, min(k + 3, num_boxes)):
+                            cand_phone = normalize_phone_number(lines[pk].strip())
+                            if cand_phone:
+                                results["phone"] = (cand_phone, confs[pk])
+                                break
             if is_spouse and contact_name:
                 results["spouseName"] = (contact_name, contact_conf)
 
         if re.search(r"SPOUSE['’]?S?\s*NAME", upper):
             for k in range(i + 1, min(i + 4, num_boxes)):
-                cand = lines[k].strip()
-                cand_clean = re.sub(r"^[.\s:]+|[.\s:]+$", "", cand)
-                if cand_clean and not any(kw in cand_clean.upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY"]):
+                cand_clean = clean_person_name(lines[k].strip())
+                if cand_clean and not any(kw in cand_clean for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY"]):
                     results["spouseName"] = (cand_clean, confs[k])
                     break
 
@@ -181,7 +282,6 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float
         if re.search(r"PASSPORT\s*(NUMBER|NO)", upper) and not re.search(r"PREVIOUS", upper):
             for k in range(i + 1, min(i + 6, num_boxes)):
                 cand = lines[k].strip()
-                # Passport number format: 1-2 letters + 7-9 digits (e.g. A21496961)
                 if re.match(r"^[A-Z]{1,2}[0-9]{7,9}$", cand):
                     results["passportNumber"] = (cand, confs[k])
                     break
@@ -207,7 +307,6 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float
         if "PLACE OF BIRTH" in upper:
             for k in range(i + 1, min(i + 5, num_boxes)):
                 cand = lines[k].strip()
-                # Must be a word of at least 3 letters, not single letter, not keywords
                 cand_clean = re.sub(r"\d+", "", cand).strip()
                 if len(cand_clean) >= 3 and not any(kw in cand_clean.upper() for kw in ["DATE", "ISSUE", "SEX", "AUTHORITY", "DIP"]):
                     if "," in cand_clean:
@@ -226,8 +325,8 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float
                     break
 
         # 12. Date of Issue
-        if re.search(r"DATE\s*OF\s*[IS]+SUE", upper):
-            for k in range(i + 1, min(i + 5, num_boxes)):
+        if re.search(r"(?:DATE\s*OF\s*[IS]+SUE|ISSUE\s*DATE|DATE\s*OF\s*ISSUANCE|ISSUED\s*ON|D['’]?ÉMISSION)", upper):
+            for k in range(i, min(i + 5, num_boxes)):
                 cand = lines[k].strip()
                 norm_d = normalize_date(cand)
                 if norm_d:
@@ -235,8 +334,8 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float
                     break
 
         # 13. Date of Expiry
-        if re.search(r"DATE\s*OF\s*EXPIRY|DATEOFEXPIRY", upper):
-            for k in range(i + 1, min(i + 5, num_boxes)):
+        if re.search(r"(?:DATE\s*OF\s*EXPIR[Y|ATION]|EXPIR[Y|ATION]\s*DATE|EXPIRES\s*ON|VALID\s*UNTIL|D['’]?EXPIRATION)", upper):
+            for k in range(i, min(i + 5, num_boxes)):
                 cand = lines[k].strip()
                 norm_d = normalize_date(cand)
                 if norm_d:
@@ -248,7 +347,6 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float
             for k in range(i + 1, min(i + 4, num_boxes)):
                 cand = lines[k].strip()
                 if "DIP" in cand.upper() or "/" in cand:
-                    # Clean up DIPIDHAKA -> DIP/DHAKA
                     clean_dip = cand.replace("DIPIDHAKA", "DIP/DHAKA")
                     results["issuePlace"] = (clean_dip, confs[k])
                     break
@@ -282,6 +380,21 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float
                 avg_c = sum([p[1] for p in addr_parts]) / len(addr_parts)
                 results["address_raw"] = (combined_addr, avg_c)
 
+        # 18. General Phone / Mobile detection near label anywhere in document
+        if "phone" not in results and re.search(r"(?:\b[ET]ELEPHONE|\bPHONE|\bMOBILE|\bCONTACT|\bTEL)(?:\s*(?:NO|NUMBER))?", upper):
+            cand_phone = normalize_phone_number(text)
+            if cand_phone:
+                results["phone"] = (cand_phone, confs[i])
+            else:
+                for pk in range(i + 1, min(i + 5, num_boxes)):
+                    pk_cand = lines[pk].strip()
+                    if any(kw in pk_cand.upper() for kw in ["EMERGENCY", "RELATIONSHIP", "ADDRESS", "PASSPORT", "SIGNATURE", "DATE", "NAME"]):
+                        continue
+                    cand_phone = normalize_phone_number(pk_cand)
+                    if cand_phone:
+                        results["phone"] = (cand_phone, confs[pk])
+                        break
+
     # General fallback for passport number if not captured next to label
     if "passportNumber" not in results:
         for k in range(num_boxes):
@@ -289,6 +402,17 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[str, float
             if re.match(r"^[A-Z][0-9]{8}$", cand):
                 results["passportNumber"] = (cand, confs[k])
                 break
+
+    # General fallback for phone number if not captured next to label
+    if "phone" not in results:
+        for k in range(num_boxes):
+            cand = lines[k].strip()
+            m_bd = re.search(r"(?:\+?880[\s-]?)?0?1[3-9]\d{2}[\s-]?\d{6}", cand)
+            if m_bd:
+                norm_p = normalize_phone_number(m_bd.group(0))
+                if norm_p:
+                    results["phone"] = (norm_p, confs[k])
+                    break
 
     return results
 
@@ -386,36 +510,67 @@ def extract_passport(pdf_source: Union[str, bytes]) -> PassportExtractionResult:
             source="mrz", confidence=parsed_mrz.confidence, rawValue=parsed_mrz.surname
         )
 
-    # Given Name: When MRZ has multi-token separation (e.g. "SHREE JOTIMOY"), prefer MRZ over merged OCR
-    if parsed_mrz and parsed_mrz.given_names and " " in parsed_mrz.given_names:
-        result.personal.givenName = parsed_mrz.given_names
-        result.fieldSources["personal.givenName"] = FieldSource(
-            source="mrz", confidence=parsed_mrz.confidence, rawValue=parsed_mrz.given_names
-        )
-    elif "givenName" in visual:
-        result.personal.givenName = visual["givenName"][0]
-        result.fieldSources["personal.givenName"] = FieldSource(
-            source="ocr", confidence=visual["givenName"][1], rawValue=visual["givenName"][0]
-        )
-    elif parsed_mrz and parsed_mrz.given_names:
-        result.personal.givenName = parsed_mrz.given_names
-        result.fieldSources["personal.givenName"] = FieldSource(
-            source="mrz", confidence=parsed_mrz.confidence, rawValue=parsed_mrz.given_names
-        )
+    # Given Name arbitration:
+    visual_given = ""
+    visual_given_conf = 0.0
+    if "givenName" in visual:
+        visual_given = clean_person_name(visual["givenName"][0])
+        visual_given_conf = visual["givenName"][1]
 
-    # Full Name
+    mrz_given = ""
+    if parsed_mrz and parsed_mrz.given_names:
+        mrz_given = clean_person_name(parsed_mrz.given_names)
+
+    # Deterministic Precedence:
+    # A. If both sources agree on letters, use the one preserving token boundaries/spaces
+    if mrz_given and visual_given and visual_given.replace(" ", "") == mrz_given.replace(" ", ""):
+        chosen_given = mrz_given if " " in mrz_given else visual_given
+        chosen_source = "mrz" if " " in mrz_given else "ocr"
+        chosen_conf = parsed_mrz.confidence if chosen_source == "mrz" else visual_given_conf
+        result.personal.givenName = chosen_given
+        result.fieldSources["personal.givenName"] = FieldSource(
+            source=chosen_source, confidence=chosen_conf, rawValue=chosen_given
+        )
+    # B. If visual given name is clean and valid, prefer explicit visual passport field
+    elif visual_given and (" " in visual_given or not (parsed_mrz and parsed_mrz.valid)):
+        result.personal.givenName = visual_given
+        result.fieldSources["personal.givenName"] = FieldSource(
+            source="ocr", confidence=visual_given_conf, rawValue=visual_given
+        )
+    # C. If visual contains noise or was joined and MRZ is valid, use MRZ structured tokens
+    elif mrz_given and parsed_mrz and parsed_mrz.valid:
+        result.personal.givenName = mrz_given
+        result.fieldSources["personal.givenName"] = FieldSource(
+            source="mrz", confidence=parsed_mrz.confidence, rawValue=mrz_given
+        )
+    elif visual_given:
+        result.personal.givenName = visual_given
+        result.fieldSources["personal.givenName"] = FieldSource(
+            source="ocr", confidence=visual_given_conf, rawValue=visual_given
+        )
+    else:
+        result.personal.givenName = ""
+
+    # Full Name: single space between given name and surname
     if result.personal.givenName and result.personal.surname:
-        result.personal.fullName = f"{result.personal.givenName} {result.personal.surname}".strip()
+        result.personal.fullName = f"{result.personal.givenName.strip()} {result.personal.surname.strip()}"
+        result.personal.fullName = re.sub(r"\s+", " ", result.personal.fullName).strip()
         result.fieldSources["personal.fullName"] = FieldSource(
             source="ocr" if "fullName" in visual else "mrz",
             confidence=0.95,
             rawValue=result.personal.fullName,
         )
     elif "fullName" in visual:
-        result.personal.fullName = visual["fullName"][0]
-        result.fieldSources["personal.fullName"] = FieldSource(
-            source="ocr", confidence=visual["fullName"][1], rawValue=visual["fullName"][0]
-        )
+        clean_fn = clean_person_name(visual["fullName"][0])
+        if clean_fn:
+            result.personal.fullName = clean_fn
+            result.fieldSources["personal.fullName"] = FieldSource(
+                source="ocr", confidence=visual["fullName"][1], rawValue=result.personal.fullName
+            )
+    elif result.personal.givenName:
+        result.personal.fullName = result.personal.givenName.strip()
+    elif result.personal.surname:
+        result.personal.fullName = result.personal.surname.strip()
 
     # Date of birth
     if parsed_mrz and parsed_mrz.valid and parsed_mrz.date_of_birth:
