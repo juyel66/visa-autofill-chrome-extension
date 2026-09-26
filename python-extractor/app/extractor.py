@@ -684,8 +684,16 @@ def extract_passport(pdf_source: Union[str, bytes]) -> PassportExtractionResult:
     # Validate: expiryDate > issueDate
     if result.passport.issueDate and result.passport.expiryDate:
         if result.passport.expiryDate <= result.passport.issueDate:
-            # Corrupted expiry date - clear or keep only if verified
-            pass
+            # If visual was <= issueDate but MRZ has a valid expiry > issueDate, prefer valid MRZ result
+            if parsed_mrz and parsed_mrz.valid and parsed_mrz.expiry_date and parsed_mrz.expiry_date > result.passport.issueDate:
+                result.passport.expiryDate = parsed_mrz.expiry_date
+                result.fieldSources["passport.expiryDate"] = FieldSource(
+                    source="mrz", confidence=parsed_mrz.confidence, rawValue=parsed_mrz.expiry_date
+                )
+            else:
+                # Impossible date rejected: never silently accept expiry <= issueDate
+                result.passport.expiryDate = ""
+                result.fieldSources.pop("passport.expiryDate", None)
 
     # Issue Place (visual only)
     if "issuePlace" in visual:
