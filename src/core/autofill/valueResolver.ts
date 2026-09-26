@@ -53,7 +53,7 @@ export function resolveRegistrationEmail(
 export function resolveApplicantValue(
   applicant: ApplicantProfile,
   path?: string,
-  options?: { accountEmail?: string; disableTemporaryEmail?: boolean }
+  options?: { accountEmail?: string; disableTemporaryEmail?: boolean; disableEmploymentDefaults?: boolean }
 ): string | undefined {
   if (!applicant || !path) return undefined
 
@@ -364,6 +364,9 @@ export function resolveApplicantValue(
     if (applicant.employment?.presentOccupation && applicant.employment.presentOccupation.trim() !== '') {
       return applicant.employment.presentOccupation.trim()
     }
+    if (options?.disableEmploymentDefaults) {
+      return undefined
+    }
     return 'WORKER'
   }
 
@@ -376,6 +379,9 @@ export function resolveApplicantValue(
   ) {
     if (applicant.employment?.employerName && applicant.employment.employerName.trim() !== '') {
       return applicant.employment.employerName.trim().toUpperCase()
+    }
+    if (options?.disableEmploymentDefaults) {
+      return undefined
     }
     const fullName = [applicant.personalInfo?.givenNames, applicant.personalInfo?.surname]
       .filter(Boolean)
@@ -396,6 +402,9 @@ export function resolveApplicantValue(
     if (applicant.employment?.designationRank && applicant.employment.designationRank.trim() !== '') {
       return applicant.employment.designationRank.trim().toUpperCase()
     }
+    if (options?.disableEmploymentDefaults) {
+      return undefined
+    }
     return 'WORKER'
   }
 
@@ -412,6 +421,9 @@ export function resolveApplicantValue(
     if (applicant.employment?.employerAddress && typeof applicant.employment.employerAddress === 'object') {
       const parts = [applicant.employment.employerAddress.addressLine1, applicant.employment.employerAddress.villageTownCity || applicant.employment.employerAddress.addressLine2].filter(Boolean)
       if (parts.length > 0) return parts.join(', ').trim().toUpperCase()
+    }
+    if (options?.disableEmploymentDefaults) {
+      return undefined
     }
     const addr1 = applicant.presentAddress?.addressLine1 || applicant.permanentAddress?.addressLine1
     const addr2 = applicant.presentAddress?.villageTownCity || applicant.presentAddress?.addressLine2 || applicant.permanentAddress?.villageTownCity || applicant.permanentAddress?.addressLine2
@@ -598,6 +610,28 @@ export function resolveApplicantValue(
   }
   if (path === 'contact.mobile' && applicant.presentAddress?.mobile) {
     return applicant.presentAddress.mobile
+  }
+
+  // Generic safe nested path traversal fallback (e.g. family.father.name, passport.otherPassportDetails.passportNumber)
+  if (path.includes('.')) {
+    const segments = path.split('.')
+    let current: unknown = applicant
+    for (const seg of segments) {
+      if (current === undefined || current === null || typeof current !== 'object') {
+        current = undefined
+        break
+      }
+      current = (current as Record<string, unknown>)[seg]
+    }
+    if (typeof current === 'string' && current.trim() !== '') {
+      return current.trim()
+    }
+    if (typeof current === 'boolean') {
+      return current ? 'Yes' : 'No'
+    }
+    if (typeof current === 'number') {
+      return String(current)
+    }
   }
 
   return undefined
