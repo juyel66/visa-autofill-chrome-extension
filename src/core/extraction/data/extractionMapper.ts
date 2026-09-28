@@ -101,16 +101,22 @@ export function applyExtractionToApplicant(
     const cleanDigits = derivedPhone.replace(/[^\d]/g, '')
     if (derivedPhone.startsWith('+880') || cleanDigits.startsWith('880')) {
       if (!derivedIsd) derivedIsd = '880'
-      if (!derivedMob) derivedMob = cleanDigits.slice(3)
+      if (!derivedMob || derivedMob === derivedPhone || derivedMob.startsWith('+880') || derivedMob.startsWith('880')) {
+        derivedMob = cleanDigits.slice(3)
+      }
     } else if (derivedPhone.startsWith('+')) {
       const intlMatch = derivedPhone.match(/^\+(\d{1,4})(\d{6,14})$/)
       if (intlMatch) {
         if (!derivedIsd) derivedIsd = intlMatch[1]
-        if (!derivedMob) derivedMob = intlMatch[2]
+        if (!derivedMob || derivedMob === derivedPhone || derivedMob.startsWith('+')) {
+          derivedMob = intlMatch[2]
+        }
       }
     } else if (cleanDigits.startsWith('01') && cleanDigits.length >= 10) {
       if (!derivedIsd) derivedIsd = '880'
-      if (!derivedMob) derivedMob = cleanDigits.slice(1)
+      if (!derivedMob || derivedMob === derivedPhone || cleanDigits.startsWith('01')) {
+        derivedMob = cleanDigits.slice(1)
+      }
     }
   } else if (derivedMob && derivedIsd) {
     derivedPhone = `+${derivedIsd}${derivedMob.replace(/^0+/, '')}`
