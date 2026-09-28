@@ -1,11 +1,13 @@
 import type { Gender } from '../../applicant/types'
 
-export type ExtractionSource = 'ai' | 'mrz' | 'pdf-text' | 'ocr' | 'manual-review'
+export type ExtractionSource = 'ai' | 'mrz' | 'pdf-text' | 'ocr' | 'manual-review' | 'derived'
 
 export interface ExtractedField<T> {
   value: T
   source: ExtractionSource
   confidence?: number // 0 to 100
+  hasConflict?: boolean
+  conflictDetails?: string
 }
 
 export interface ExtractedFamilyMember {
@@ -111,6 +113,7 @@ export interface ExtractedApplicantData {
     stateProvince?: ExtractedField<string>
     country?: ExtractedField<string>
     postalCode?: ExtractedField<string>
+    sameAsPresentAddress?: ExtractedField<boolean>
   }
   family?: {
     father?: ExtractedFamilyMember
