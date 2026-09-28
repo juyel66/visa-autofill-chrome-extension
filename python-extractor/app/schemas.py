@@ -39,6 +39,7 @@ class AddressData(BaseModel):
     postalCode: str = ""
     country: str = ""
     phone: str = ""
+    sameAsPresentAddress: Optional[bool] = None
 
 
 class PersonInfo(BaseModel):
@@ -62,15 +63,19 @@ class MRZData(BaseModel):
 
 
 class FieldSource(BaseModel):
-    source: str = ""  # "pdf_text" | "ocr" | "mrz"
+    source: str = ""  # "pdf_text" | "ocr" | "ocr_spatial" | "mrz" | "derived"
     confidence: float = 0.0
     rawValue: str = ""
+    hasConflict: bool = False
+    conflictDetails: Optional[str] = None
 
 
 class PassportExtractionResult(BaseModel):
     personal: PersonalData = Field(default_factory=PersonalData)
     passport: PassportData = Field(default_factory=PassportData)
     address: AddressData = Field(default_factory=AddressData)
+    presentAddress: Optional[AddressData] = None
+    permanentAddress: Optional[AddressData] = None
     family: FamilyData = Field(default_factory=FamilyData)
     mrz: MRZData = Field(default_factory=MRZData)
     fieldSources: Dict[str, FieldSource] = Field(default_factory=dict)
