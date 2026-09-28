@@ -1,4 +1,5 @@
 import type { SavedApplication } from './types'
+import { pruneDocumentStoragePayloads } from '../document/documentStorage'
 
 const SAVED_APPLICATIONS_STORAGE_KEY = 'visa_autofill_saved_applications'
 
@@ -73,10 +74,28 @@ export async function saveApplication(app: SavedApplication): Promise<void> {
   }
 
   return new Promise<void>((resolve, reject) => {
-    storage.set({ [SAVED_APPLICATIONS_STORAGE_KEY]: nextList }, () => {
+    storage.set({ [SAVED_APPLICATIONS_STORAGE_KEY]: nextList }, async () => {
       if (chrome.runtime?.lastError) {
+        const errorMsg = chrome.runtime.lastError.message || ''
+        if (/quota|kQuotaBytes/i.test(errorMsg)) {
+          console.warn('[ApplicationStorage] Quota exceeded saving application. Pruning document payloads and retrying...')
+          try {
+            await pruneDocumentStoragePayloads(true)
+            storage.set({ [SAVED_APPLICATIONS_STORAGE_KEY]: nextList }, () => {
+              if (chrome.runtime?.lastError) {
+                console.error('[ApplicationStorage] Retry after prune failed:', chrome.runtime.lastError)
+                reject(new Error(chrome.runtime.lastError.message))
+              } else {
+                resolve()
+              }
+            })
+            return
+          } catch (pruneErr) {
+            console.error('[ApplicationStorage] Prune retry error:', pruneErr)
+          }
+        }
         console.error('[ApplicationStorage] Error saving application:', chrome.runtime.lastError)
-        reject(chrome.runtime.lastError)
+        reject(new Error(chrome.runtime.lastError.message))
       } else {
         resolve()
       }
