@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { Button } from '../../components/ui'
 import type { ApplicantProfile } from '../../core/applicant'
 import {
   getDocumentsByApplicantId,
   getLatestDocument,
   saveDocument,
+  pruneDocumentStoragePayloads,
 } from '../../core/document'
 import type { DocumentRecord } from '../../core/document'
 import { saveApplicant } from '../../core/storage'
@@ -48,6 +49,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'passport' | 'ogd'>('passport')
 
   const [isExtracting, setIsExtracting] = useState<boolean>(false)
+  const isExtractingRef = useRef<boolean>(false)
   const [isAutofilling, setIsAutofilling] = useState<boolean>(false)
   const [isUndoing, setIsUndoing] = useState<boolean>(false)
   const [canUndo, setCanUndo] = useState<boolean>(false)
@@ -174,268 +176,266 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const file = e.target.files?.[0]
     if (!file || !selectedApplicant) return
 
+    if (isExtractingRef.current) return
+    isExtractingRef.current = true
+
     setErrorMessage(null)
     setIsExtracting(true)
 
     try {
-      const reader = new FileReader()
-      reader.onload = async () => {
-        const dataUrl = reader.result as string
-        const newDoc: DocumentRecord = {
-          documentId: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          applicantId: selectedApplicant.applicantId,
-          documentType: targetType,
-          fileName: file.name,
-          fileSize: file.size,
-          mimeType: file.type || 'application/pdf',
-          fileDataUrl: dataUrl,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          status: 'processing',
-          source: 'user-upload',
-          extractedDataConfirmed: false,
-        }
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Failed to read uploaded file.'))
+        reader.readAsDataURL(file)
+      })
 
-        const pipelineResult = await processUploadedDocumentPayload(
-          dataUrl,
-          file.name,
-          file.type
-        )
-
-        const extractedApplicant = pipelineResult.hasExtractedFields ? pipelineResult.extractedData : null
-        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-
-        const diagPdfStatus = pipelineResult.diagnostics.pdfTextFound ? 'FOUND' : 'NO TEXT'
-        const diagImgStatus = isPdf ? 'RENDERED CANVAS' : 'IMAGE FILE'
-        const diagImgMime = isPdf ? 'image/png' : file.type || 'image/jpeg'
-        const diagImgBytes = file.size
-        const diagOcrStatus = pipelineResult.diagnostics.ocrExecutedCount > 0 ? 'SUCCESS' : 'NOT EXECUTED'
-        const diagOcrChars = pipelineResult.diagnostics.pdfTextChars
-        const diagOcrError: string | undefined = pipelineResult.diagnostics.errors.length > 0 ? pipelineResult.diagnostics.errors.join('; ') : undefined
-        const diagMrzStatus = pipelineResult.diagnostics.mrzFound ? 'FOUND' : 'NOT FOUND'
-        const diagWorkerInit = 'YES'
-        const diagLangLoaded = 'YES'
-        const diagOcrExecuted = pipelineResult.diagnostics.ocrExecutedCount > 0 ? 'YES' : 'NO'
-        const workerUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract/worker.min.js') : 'default'
-        const coreUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
-        const langUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
-
-        const hasFields = Boolean(
-          extractedApplicant &&
-          (extractedApplicant.personal?.lastName?.value ||
-           extractedApplicant.personal?.firstName?.value ||
-           extractedApplicant.passport?.passportNumber?.value ||
-           extractedApplicant.family?.father?.name?.value)
-        )
-
-        if (hasFields && extractedApplicant) {
-          newDoc.extractedData = extractedApplicant
-          newDoc.extractedDataConfirmed = true
-          newDoc.status = 'processed'
-        } else {
-          newDoc.extractedDataConfirmed = false
-          newDoc.status = 'failed'
-        }
-
-        console.group('📋 [VISA AUTOFILL] FULL EXTRACTED DOCUMENT DATA')
-        console.log('Document ID:', newDoc.documentId)
-        console.log('Document Type:', targetType)
-        console.log('File Name:', file.name)
-        console.log('Full Extracted Data Object:', extractedApplicant)
-        console.log('Personal:', extractedApplicant?.personal)
-        console.log('Passport:', extractedApplicant?.passport)
-        console.log('Contact:', extractedApplicant?.contact)
-        console.log('Present Address:', extractedApplicant?.presentAddress)
-        console.log('Permanent Address:', extractedApplicant?.permanentAddress)
-        console.log('Family:', extractedApplicant?.family)
-        console.log('Employment:', extractedApplicant?.employment)
-        console.log('Travel:', extractedApplicant?.travel)
-        console.log('Previous Visa:', extractedApplicant?.previousVisa)
-        console.log('Sponsor India:', extractedApplicant?.sponsorIndia)
-        console.log('Sponsor Mission:', extractedApplicant?.sponsorMission)
-        console.groupEnd()
-
-        await saveDocument(newDoc)
-
-        if (hasFields && extractedApplicant) {
-          // =========================================================================
-          // SUCCESS PATH: Gemini extracted document fields -> Auto-fill application & profile
-          // =========================================================================
-          if (targetType === 'passport') {
-            try {
-              const updatedProfile = applyExtractionToApplicant(selectedApplicant, extractedApplicant)
-              await saveApplicant(updatedProfile)
-            } catch (syncErr) {
-              console.warn('Could not sync applicant profile with passport extraction:', syncErr)
-            }
-          }
-
-          const docs = await getDocumentsByApplicantId(selectedApplicant.applicantId)
-          const pDoc = targetType === 'passport' ? newDoc : getLatestDocument(docs, 'passport')
-          const oDoc = targetType === 'ogd' ? newDoc : getLatestDocument(docs, 'ogd')
-          const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
-          const mergedApp = populateApplicationFromDocuments({
-            applicantId: selectedApplicant.applicantId,
-            passportDoc: pDoc,
-            ogdDoc: oDoc,
-            existingApp,
-            notes: selectedApplicant.notes,
-          })
-
-          await saveApplication(mergedApp)
-          setSavedApplication(mergedApp)
-          await refreshApplicantData()
-          setIsExtracting(false)
-
-          const savedCount = Object.keys(mergedApp.fields).filter(
-            (k) =>
-              mergedApp.fields[k] &&
-              typeof mergedApp.fields[k] === 'object' &&
-              typeof mergedApp.fields[k].value === 'string' &&
-              mergedApp.fields[k].value.trim() !== ''
-          ).length
-
-          setDiagnostic({
-            fileName: file.name,
-            pdfTextStatus: diagPdfStatus,
-            imagePayloadStatus: diagImgStatus,
-            imageMime: diagImgMime,
-            imageBytes: diagImgBytes,
-            ocrStatus: diagOcrStatus,
-            ocrCharCount: diagOcrChars,
-            ocrError: diagOcrError,
-            workerUrl,
-            coreUrl,
-            langUrl,
-            workerInitialized: diagWorkerInit,
-            languageLoaded: diagLangLoaded,
-            ocrExecuted: diagOcrExecuted,
-            mrzStatus: diagMrzStatus,
-            extractedFieldsCount: 15,
-            savedAppFieldsCount: savedCount,
-          })
-
-          const workspaceUrl = chrome?.runtime?.getURL
-            ? chrome.runtime.getURL(
-                `application.html?applicantId=${encodeURIComponent(
-                  selectedApplicant.applicantId
-                )}&documentType=${encodeURIComponent(targetType)}`
-              )
-            : `application.html?applicantId=${encodeURIComponent(
-                selectedApplicant.applicantId
-              )}&documentType=${encodeURIComponent(targetType)}`
-
-          if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
-            chrome.tabs.create({ url: workspaceUrl })
-          } else {
-            window.open(workspaceUrl, '_blank')
-          }
-
-          showToast(`✓ Document auto-filled with Gemini (${savedCount} fields populated) & workspace opened.`)
-        } else {
-          // =========================================================================
-          // ERROR PATH: Gemini failed / Quota exceeded / API error
-          // Requirement: "ager kono pdf er data existing e rakhba na blank ey rakhba
-          // r jegula common segula rakhe diba , like nationality r ja ja thake segula"
-          // =========================================================================
-          const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
-          const blankApp = createBlankApplicationWithDefaults({
-            applicantId: selectedApplicant.applicantId,
-            notes: selectedApplicant.notes,
-            existingAppId: existingApp?.applicationId,
-          })
-
-          await saveApplication(blankApp)
-          setSavedApplication(blankApp)
-
-          // Reset applicant profile's personal / passport fields so old PDF data does not linger
-          const cleanedProfile: ApplicantProfile = {
-            applicantId: selectedApplicant.applicantId,
-            createdAt: selectedApplicant.createdAt,
-            updatedAt: new Date().toISOString(),
-            notes: selectedApplicant.notes,
-            registration: {
-              applyingFromCountry: 'BANGLADESH',
-              indianMission: selectedApplicant.registration?.indianMission || 'BANGLADESH-DHAKA',
-              nationality: 'BANGLADESH',
-            },
-            personalInfo: undefined,
-            passport: undefined,
-            presentAddress: undefined,
-            permanentAddress: undefined,
-            family: undefined,
-            employment: undefined,
-            travel: undefined,
-            previousVisa: undefined,
-          }
-          await saveApplicant(cleanedProfile)
-          await refreshApplicantData()
-          setIsExtracting(false)
-
-          const savedCount = Object.keys(blankApp.fields).filter(
-            (k) =>
-              blankApp.fields[k] &&
-              typeof blankApp.fields[k] === 'object' &&
-              typeof blankApp.fields[k].value === 'string' &&
-              blankApp.fields[k].value.trim() !== ''
-          ).length
-
-          setDiagnostic({
-            fileName: file.name,
-            pdfTextStatus: diagPdfStatus,
-            imagePayloadStatus: diagImgStatus,
-            imageMime: diagImgMime,
-            imageBytes: diagImgBytes,
-            ocrStatus: diagOcrStatus,
-            ocrCharCount: diagOcrChars,
-            ocrError: diagOcrError,
-            workerUrl,
-            coreUrl,
-            langUrl,
-            workerInitialized: diagWorkerInit,
-            languageLoaded: diagLangLoaded,
-            ocrExecuted: diagOcrExecuted,
-            mrzStatus: diagMrzStatus,
-            extractedFieldsCount: 0,
-            savedAppFieldsCount: savedCount,
-          })
-
-          const errDetail = pipelineResult.geminiError || 'Gemini extraction failed or quota exhausted.'
-          const isQuota = Boolean(pipelineResult.isQuotaExceeded)
-
-          const workspaceUrl = chrome?.runtime?.getURL
-            ? chrome.runtime.getURL(
-                `application.html?applicantId=${encodeURIComponent(
-                  selectedApplicant.applicantId
-                )}&documentType=${encodeURIComponent(targetType)}&geminiError=${encodeURIComponent(
-                  errDetail
-                )}${isQuota ? '&quotaExceeded=true' : ''}&manualMode=true`
-              )
-            : `application.html?applicantId=${encodeURIComponent(
-                selectedApplicant.applicantId
-              )}&documentType=${encodeURIComponent(targetType)}&geminiError=${encodeURIComponent(
-                errDetail
-              )}${isQuota ? '&quotaExceeded=true' : ''}&manualMode=true`
-
-          if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
-            chrome.tabs.create({ url: workspaceUrl })
-          } else {
-            window.open(workspaceUrl, '_blank')
-          }
-
-          const userMsg = isQuota
-            ? '⚠️ Gemini Quota Exceeded (কোটা শেষ)! Workspace opened for manual entry.'
-            : `⚠️ Gemini error: ${errDetail}. Workspace opened for manual entry.`
-          setErrorMessage(userMsg)
-          showToast(userMsg)
-        }
+      const newDoc: DocumentRecord = {
+        documentId: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        applicantId: selectedApplicant.applicantId,
+        documentType: targetType,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || 'application/pdf',
+        fileDataUrl: dataUrl,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: 'processing',
+        source: 'user-upload',
+        extractedDataConfirmed: false,
       }
 
-      reader.readAsDataURL(file)
-    } catch (err) {
-      console.error('File upload error:', err)
-      setErrorMessage('Failed to upload document.')
+      const pipelineResult = await processUploadedDocumentPayload(
+        dataUrl,
+        file.name,
+        file.type
+      )
+
+      const extractedApplicant = pipelineResult.hasExtractedFields ? pipelineResult.extractedData : null
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+
+      const diagPdfStatus = pipelineResult.diagnostics.pdfTextFound ? 'FOUND' : 'NO TEXT'
+      const diagImgStatus = isPdf ? 'RENDERED CANVAS' : 'IMAGE FILE'
+      const diagImgMime = isPdf ? 'image/png' : file.type || 'image/jpeg'
+      const diagImgBytes = file.size
+      const diagOcrStatus = pipelineResult.diagnostics.ocrExecutedCount > 0 ? 'SUCCESS' : 'NOT EXECUTED'
+      const diagOcrChars = pipelineResult.diagnostics.pdfTextChars
+      const diagOcrError: string | undefined = pipelineResult.diagnostics.errors.length > 0 ? pipelineResult.diagnostics.errors.join('; ') : undefined
+      const diagMrzStatus = pipelineResult.diagnostics.mrzFound ? 'FOUND' : 'NOT FOUND'
+      const diagWorkerInit = 'YES'
+      const diagLangLoaded = 'YES'
+      const diagOcrExecuted = pipelineResult.diagnostics.ocrExecutedCount > 0 ? 'YES' : 'NO'
+      const workerUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract/worker.min.js') : 'default'
+      const coreUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
+      const langUrl = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('tesseract') : 'default'
+
+      const hasFields = Boolean(
+        pipelineResult.hasExtractedFields && extractedApplicant
+      )
+
+      if (hasFields && extractedApplicant) {
+        newDoc.extractedData = extractedApplicant
+        newDoc.extractedDataConfirmed = true
+        newDoc.status = 'processed'
+      } else {
+        newDoc.extractedDataConfirmed = false
+        newDoc.status = 'failed'
+      }
+
+      console.group('📋 [VISA AUTOFILL] FULL EXTRACTED DOCUMENT DATA')
+      console.log('Document ID:', newDoc.documentId)
+      console.log('Document Type:', targetType)
+      console.log('File Name:', file.name)
+      console.log('Full Extracted Data Object:', extractedApplicant)
+      console.groupEnd()
+
+      await saveDocument(newDoc)
+
+      if (hasFields && extractedApplicant) {
+        // =========================================================================
+        // SUCCESS PATH: Extracted document fields -> Auto-fill application & profile
+        // =========================================================================
+        if (targetType === 'passport') {
+          try {
+            const updatedProfile = applyExtractionToApplicant(selectedApplicant, extractedApplicant)
+            await saveApplicant(updatedProfile)
+          } catch (syncErr) {
+            console.warn('Could not sync applicant profile with passport extraction:', syncErr)
+          }
+        }
+
+        const docs = await getDocumentsByApplicantId(selectedApplicant.applicantId)
+        const pDoc = targetType === 'passport' ? newDoc : getLatestDocument(docs, 'passport')
+        const oDoc = targetType === 'ogd' ? newDoc : getLatestDocument(docs, 'ogd')
+        const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
+        const mergedApp = populateApplicationFromDocuments({
+          applicantId: selectedApplicant.applicantId,
+          passportDoc: pDoc,
+          ogdDoc: oDoc,
+          existingApp,
+          notes: selectedApplicant.notes,
+        })
+
+        await saveApplication(mergedApp)
+        setSavedApplication(mergedApp)
+        await refreshApplicantData()
+
+        const savedCount = Object.keys(mergedApp.fields).filter(
+          (k) =>
+            mergedApp.fields[k] &&
+            typeof mergedApp.fields[k] === 'object' &&
+            typeof mergedApp.fields[k].value === 'string' &&
+            mergedApp.fields[k].value.trim() !== ''
+        ).length
+
+        setDiagnostic({
+          fileName: file.name,
+          pdfTextStatus: diagPdfStatus,
+          imagePayloadStatus: diagImgStatus,
+          imageMime: diagImgMime,
+          imageBytes: diagImgBytes,
+          ocrStatus: diagOcrStatus,
+          ocrCharCount: diagOcrChars,
+          ocrError: diagOcrError,
+          workerUrl,
+          coreUrl,
+          langUrl,
+          workerInitialized: diagWorkerInit,
+          languageLoaded: diagLangLoaded,
+          ocrExecuted: diagOcrExecuted,
+          mrzStatus: diagMrzStatus,
+          extractedFieldsCount: 16,
+          savedAppFieldsCount: savedCount,
+        })
+
+        const workspaceUrl = chrome?.runtime?.getURL
+          ? chrome.runtime.getURL(
+              `application.html?applicantId=${encodeURIComponent(
+                selectedApplicant.applicantId
+              )}&documentType=${encodeURIComponent(targetType)}`
+            )
+          : `application.html?applicantId=${encodeURIComponent(
+              selectedApplicant.applicantId
+            )}&documentType=${encodeURIComponent(targetType)}`
+
+        if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+          chrome.tabs.create({ url: workspaceUrl })
+        } else {
+          window.open(workspaceUrl, '_blank')
+        }
+
+        showToast(`✓ Document extracted (${savedCount} fields populated) & workspace opened.`)
+      } else {
+        // =========================================================================
+        // ERROR PATH: Document extraction returned no usable fields
+        // =========================================================================
+        const existingApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
+        const blankApp = createBlankApplicationWithDefaults({
+          applicantId: selectedApplicant.applicantId,
+          notes: selectedApplicant.notes,
+          existingAppId: existingApp?.applicationId,
+        })
+
+        await saveApplication(blankApp)
+        setSavedApplication(blankApp)
+
+        // Reset applicant profile's personal / passport fields so old PDF data does not linger
+        const cleanedProfile: ApplicantProfile = {
+          applicantId: selectedApplicant.applicantId,
+          createdAt: selectedApplicant.createdAt,
+          updatedAt: new Date().toISOString(),
+          notes: selectedApplicant.notes,
+          registration: {
+            applyingFromCountry: 'BANGLADESH',
+            indianMission: selectedApplicant.registration?.indianMission || 'BANGLADESH-DHAKA',
+            nationality: 'BANGLADESH',
+          },
+          personalInfo: undefined,
+          passport: undefined,
+          presentAddress: undefined,
+          permanentAddress: undefined,
+          family: undefined,
+          employment: undefined,
+          travel: undefined,
+          previousVisa: undefined,
+        }
+        await saveApplicant(cleanedProfile)
+        await refreshApplicantData()
+
+        const savedCount = Object.keys(blankApp.fields).filter(
+          (k) =>
+            blankApp.fields[k] &&
+            typeof blankApp.fields[k] === 'object' &&
+            typeof blankApp.fields[k].value === 'string' &&
+            blankApp.fields[k].value.trim() !== ''
+        ).length
+
+        setDiagnostic({
+          fileName: file.name,
+          pdfTextStatus: diagPdfStatus,
+          imagePayloadStatus: diagImgStatus,
+          imageMime: diagImgMime,
+          imageBytes: diagImgBytes,
+          ocrStatus: diagOcrStatus,
+          ocrCharCount: diagOcrChars,
+          ocrError: diagOcrError,
+          workerUrl,
+          coreUrl,
+          langUrl,
+          workerInitialized: diagWorkerInit,
+          languageLoaded: diagLangLoaded,
+          ocrExecuted: diagOcrExecuted,
+          mrzStatus: diagMrzStatus,
+          extractedFieldsCount: 0,
+          savedAppFieldsCount: savedCount,
+        })
+
+        const errDetail = pipelineResult.extractionError || pipelineResult.geminiError || 'Document extraction returned no fields.'
+
+        const workspaceUrl = chrome?.runtime?.getURL
+          ? chrome.runtime.getURL(
+              `application.html?applicantId=${encodeURIComponent(
+                selectedApplicant.applicantId
+              )}&documentType=${encodeURIComponent(targetType)}&extractionError=${encodeURIComponent(
+                errDetail
+              )}&manualMode=true`
+            )
+          : `application.html?applicantId=${encodeURIComponent(
+              selectedApplicant.applicantId
+            )}&documentType=${encodeURIComponent(targetType)}&extractionError=${encodeURIComponent(
+              errDetail
+            )}&manualMode=true`
+
+        if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+          chrome.tabs.create({ url: workspaceUrl })
+        } else {
+          window.open(workspaceUrl, '_blank')
+        }
+
+        const userMsg = `⚠️ Extraction note: ${errDetail}. Workspace opened for manual entry.`
+        setErrorMessage(userMsg)
+        showToast(userMsg)
+      }
+    } catch (err: unknown) {
+      console.error('File upload/extraction error:', err)
+      const errObj = err as { message?: string }
+      let userMsg = errObj?.message || 'Failed to extract document.'
+      if (/quota|kQuotaBytes/i.test(userMsg)) {
+        userMsg = 'Storage limit reached. Pruned cached preview data to free space. Please try uploading your document again.'
+        try {
+          await pruneDocumentStoragePayloads(true)
+        } catch {
+          // ignore
+        }
+      }
+      setErrorMessage(userMsg)
+      showToast(`⚠️ ${userMsg}`)
+    } finally {
+      isExtractingRef.current = false
       setIsExtracting(false)
+      if (e.target) {
+        e.target.value = ''
+      }
     }
   }
 
