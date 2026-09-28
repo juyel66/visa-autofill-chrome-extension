@@ -119,13 +119,45 @@ export function resolveApprovedProductDefault(
     }
   }
 
+  // 1c. Applicant Previous Nationality Default
+  if (
+    key === 'appl.prev_nationality' ||
+    key === 'prev_nationality' ||
+    key === 'previous_nationality'
+  ) {
+    if (context.isApplicantBangladeshi || !context.hasDocumentNationality) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: BANGLADESH previous nationality for applicant',
+      }
+    }
+  }
+
+  // 1d. Applicant Previous Country Default / Previous Passport Country of Issue
+  if (
+    key === 'appl.prev_country' ||
+    key === 'prev_country' ||
+    key === 'previous_country' ||
+    key === 'appl.prev_passport_country_issue'
+  ) {
+    if (context.isApplicantBangladeshi || !context.hasDocumentNationality) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: BANGLADESH previous country for applicant',
+      }
+    }
+  }
+
   // 2. Present Country & Country of Residence
   if (
     key === 'appl.countryname' ||
     key === 'present_country' ||
-    key === 'pres_country'
+    key === 'pres_country' ||
+    key === 'country'
   ) {
-    if (context.isApplicantBangladeshi) {
+    if (context.isApplicantBangladeshi || !context.hasDocumentNationality) {
       return {
         value: 'BANGLADESH',
         source: 'derived',
@@ -136,7 +168,7 @@ export function resolveApprovedProductDefault(
 
   // 3. Permanent Country
   if (key === 'permanent_country') {
-    if (context.isApplicantBangladeshi) {
+    if (context.isApplicantBangladeshi || !context.hasDocumentNationality) {
       return {
         value: 'BANGLADESH',
         source: 'derived',
@@ -260,6 +292,17 @@ export function resolveApprovedProductDefault(
         reason: 'Approved product default: Father country of birth matches Bangladeshi family descent',
       }
     }
+
+    if (
+      (key === 'father_prev_country' || key === 'appl.father_prev_country') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Father previous country matches Bangladeshi family descent',
+      }
+    }
   }
 
   // 11. Mother Defaults (Task 119: only when mother exists)
@@ -307,6 +350,17 @@ export function resolveApprovedProductDefault(
         reason: 'Approved product default: Mother country of birth matches Bangladeshi family descent',
       }
     }
+
+    if (
+      (key === 'mother_prev_country' || key === 'appl.mother_prev_country') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Mother previous country matches Bangladeshi family descent',
+      }
+    }
   }
 
   // 12. Spouse Defaults (Task 119: only when spouse exists)
@@ -349,6 +403,17 @@ export function resolveApprovedProductDefault(
         value: 'BANGLADESH',
         source: 'derived',
         reason: 'Approved product default: BANGLADESH country of birth for spouse',
+      }
+    }
+
+    if (
+      (key === 'spouse_prev_country' || key === 'appl.spouse_prev_country') &&
+      (context.isApplicantBangladeshi || !context.hasDocumentNationality)
+    ) {
+      return {
+        value: 'BANGLADESH',
+        source: 'derived',
+        reason: 'Approved product default: Spouse previous country matches Bangladeshi family descent',
       }
     }
   }
