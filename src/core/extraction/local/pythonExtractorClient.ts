@@ -46,14 +46,15 @@ export interface PythonPassportData {
 }
 
 export interface PythonAddressData {
-  line1: string
-  line2: string
-  city: string
-  district: string
+  line1?: string
+  line2?: string
+  city?: string
+  district?: string
   stateProvince?: string
-  postalCode: string
-  country: string
+  postalCode?: string
+  country?: string
   phone?: string
+  sameAsPresentAddress?: boolean
 }
 
 export interface PythonPersonInfo {
@@ -80,13 +81,17 @@ export interface PythonMRZData {
 export interface PythonFieldSource {
   source: string // "pdf_text" | "ocr" | "mrz"
   confidence: number
-  rawValue: string
+  rawValue?: string
+  hasConflict?: boolean
+  conflictDetails?: string
 }
 
 export interface PythonPassportExtractionResult {
   personal: PythonPersonalData
   passport: PythonPassportData
-  address: PythonAddressData
+  address?: PythonAddressData
+  presentAddress?: PythonAddressData
+  permanentAddress?: PythonAddressData
   family?: PythonFamilyData
   mrz: PythonMRZData
   fieldSources: Record<string, PythonFieldSource>
@@ -282,10 +287,12 @@ function toPercentageConfidence(conf?: number): number | undefined {
  */
 function resolveSource(sourceStr?: string, defaultSource: ExtractionSource = 'ocr'): ExtractionSource {
   if (!sourceStr) return defaultSource
-  const lower = sourceStr.toLowerCase()
+  const lower = sourceStr.toLowerCase().trim()
   if (lower === 'mrz') return 'mrz'
   if (lower === 'ocr') return 'ocr'
   if (lower === 'pdf_text' || lower === 'pdf-text') return 'pdf-text'
+  if (lower === 'derived') return 'derived' as any
+  if (lower === 'manual') return 'manual-review'
   return defaultSource
 }
 
@@ -296,13 +303,20 @@ function createExtractedField<T>(
   value: T,
   sourceStr?: string,
   rawConfidence?: number,
-  fallbackSource: ExtractionSource = 'ocr'
+  fallbackSource: ExtractionSource = 'ocr',
+  hasConflict?: boolean,
+  conflictDetails?: string
 ): ExtractedField<T> {
-  return {
+  const field: ExtractedField<T> = {
     value,
     source: resolveSource(sourceStr, fallbackSource),
     confidence: toPercentageConfidence(rawConfidence),
   }
+  if (hasConflict) {
+    field.hasConflict = true
+    field.conflictDetails = conflictDetails
+  }
+  return field
 }
 
 // ============================================================================
@@ -438,7 +452,14 @@ export function mapPythonResultToExtractedApplicant(
     const normIssue = normalizeExtractedDate(pass.issueDate)
     if (normIssue) {
       const rawConf = fs['passport.issueDate']?.confidence
-      result.passport!.issueDate = createExtractedField(normIssue, fs['passport.issueDate']?.source, rawConf, 'ocr')
+      result.passport!.issueDate = createExtractedField(
+        normIssue,
+        fs['passport.issueDate']?.source,
+        rawConf,
+        'ocr',
+        fs['passport.issueDate']?.hasConflict,
+        fs['passport.issueDate']?.conflictDetails
+      )
     }
   }
 
@@ -447,7 +468,14 @@ export function mapPythonResultToExtractedApplicant(
     const normExpiry = normalizeExtractedDate(pass.expiryDate)
     if (normExpiry) {
       const rawConf = fs['passport.expiryDate']?.confidence ?? (mrz.detected ? mrz.confidence : undefined)
-      result.passport!.expiryDate = createExtractedField(normExpiry, fs['passport.expiryDate']?.source, rawConf, 'ocr')
+      result.passport!.expiryDate = createExtractedField(
+        normExpiry,
+        fs['passport.expiryDate']?.source,
+        rawConf,
+        'ocr',
+        fs['passport.expiryDate']?.hasConflict,
+        fs['passport.expiryDate']?.conflictDetails
+      )
     }
   }
 
@@ -496,48 +524,144 @@ export function mapPythonResultToExtractedApplicant(
   }
 
   // --- 3. ADDRESS PARTICULARS ---
-  const addrConf = fs['address']?.confidence
-  const addrSource = fs['address']?.source
+  const rawPresAddr = res.presentAddress
+  const rawPermAddr = res.permanentAddress
+  const rawGenAddr = res.address
 
-  if (addr.line1 && addr.line1.trim()) {
-    result.permanentAddress!.addressLine1 = createExtractedField(addr.line1.trim().toUpperCase(), addrSource, addrConf, 'ocr')
-    result.presentAddress!.addressLine1 = createExtractedField(addr.line1.trim().toUpperCase(), addrSource, addrConf, 'ocr')
+  const hasExplicitPresent = Boolean(
+    rawPresAddr && (rawPresAddr.line1 || rawPresAddr.city || rawPresAddr.district || rawPresAddr.postalCode)
+  )
+  const hasExplicitPermanent = Boolean(
+    rawPermAddr && (rawPermAddr.line1 || rawPermAddr.city || rawPermAddr.district || rawPermAddr.postalCode)
+  )
+  const hasGenericAddr = Boolean(
+    rawGenAddr && (rawGenAddr.line1 || rawGenAddr.city || rawGenAddr.district || rawGenAddr.postalCode)
+  )
+
+  const presSource = fs['presentAddress']?.source || fs['address']?.source || 'ocr'
+  const presConf = fs['presentAddress']?.confidence ?? fs['address']?.confidence
+  const permSource = fs['permanentAddress']?.source || fs['address']?.source || 'ocr'
+  const permConf = fs['permanentAddress']?.confidence ?? fs['address']?.confidence
+
+  let effPresent: PythonAddressData | undefined
+  let effPermanent: PythonAddressData | undefined
+  let isPermanentCopiedFromPresent = false
+
+  if (hasExplicitPresent && hasExplicitPermanent) {
+    effPresent = rawPresAddr
+    effPermanent = rawPermAddr
+  } else if (hasExplicitPresent && !hasExplicitPermanent) {
+    effPresent = rawPresAddr
+    effPermanent = rawPresAddr
+    isPermanentCopiedFromPresent = true
+  } else if (!hasExplicitPresent && hasExplicitPermanent) {
+    effPermanent = rawPermAddr
+    effPresent = rawPermAddr // In passport, printed address is Permanent Address; populates Present Address too
+  } else if (hasGenericAddr) {
+    effPresent = rawGenAddr
+    effPermanent = rawGenAddr
+    isPermanentCopiedFromPresent = true
   }
-  if (addr.line2 && addr.line2.trim()) {
-    result.permanentAddress!.addressLine2 = createExtractedField(addr.line2.trim().toUpperCase(), addrSource, addrConf, 'ocr')
-    result.presentAddress!.addressLine2 = createExtractedField(addr.line2.trim().toUpperCase(), addrSource, addrConf, 'ocr')
+
+  // Populate Present Address
+  if (effPresent) {
+    if (effPresent.line1 && effPresent.line1.trim()) {
+      result.presentAddress!.addressLine1 = createExtractedField(effPresent.line1.trim().toUpperCase(), presSource, presConf, 'ocr')
+    }
+    if (effPresent.line2 && effPresent.line2.trim()) {
+      result.presentAddress!.addressLine2 = createExtractedField(effPresent.line2.trim().toUpperCase(), presSource, presConf, 'ocr')
+    }
+    if (effPresent.city && effPresent.city.trim()) {
+      result.presentAddress!.villageTownCity = createExtractedField(effPresent.city.trim().toUpperCase(), presSource, presConf, 'ocr')
+    }
+    if (effPresent.district && effPresent.district.trim()) {
+      result.presentAddress!.district = createExtractedField(effPresent.district.trim().toUpperCase(), presSource, presConf, 'ocr')
+    }
+    if (effPresent.stateProvince && effPresent.stateProvince.trim()) {
+      result.presentAddress!.stateProvince = createExtractedField(effPresent.stateProvince.trim().toUpperCase(), presSource, presConf, 'ocr')
+    }
+    if (effPresent.postalCode && effPresent.postalCode.trim()) {
+      const presPostalConf = fs['presentAddress.postalCode']?.confidence ?? fs['address.postalCode']?.confidence ?? presConf
+      const presPostalSource = fs['presentAddress.postalCode']?.source ?? fs['address.postalCode']?.source ?? presSource
+      const presPostalConflict = fs['presentAddress.postalCode']?.hasConflict ?? fs['address.postalCode']?.hasConflict
+      const presPostalDetails = fs['presentAddress.postalCode']?.conflictDetails ?? fs['address.postalCode']?.conflictDetails
+      result.presentAddress!.postalCode = createExtractedField(
+        effPresent.postalCode.trim(),
+        presPostalSource,
+        presPostalConf,
+        'ocr',
+        presPostalConflict,
+        presPostalDetails
+      )
+    }
+    if (effPresent.country && effPresent.country.trim()) {
+      const normAc = normalizeExtractedCountry(effPresent.country)
+      result.presentAddress!.country = createExtractedField(normAc, presSource, presConf, 'ocr')
+    }
   }
-  if (addr.city && addr.city.trim()) {
-    result.permanentAddress!.villageTownCity = createExtractedField(addr.city.trim().toUpperCase(), addrSource, addrConf, 'ocr')
-    result.presentAddress!.villageTownCity = createExtractedField(addr.city.trim().toUpperCase(), addrSource, addrConf, 'ocr')
+
+  // Populate Permanent Address
+  if (effPermanent) {
+    const permEffSource = isPermanentCopiedFromPresent ? 'derived' : permSource
+    if (effPermanent.line1 && effPermanent.line1.trim()) {
+      result.permanentAddress!.addressLine1 = createExtractedField(effPermanent.line1.trim().toUpperCase(), permEffSource, permConf, 'ocr')
+    }
+    if (effPermanent.line2 && effPermanent.line2.trim()) {
+      result.permanentAddress!.addressLine2 = createExtractedField(effPermanent.line2.trim().toUpperCase(), permEffSource, permConf, 'ocr')
+    }
+    if (effPermanent.city && effPermanent.city.trim()) {
+      result.permanentAddress!.villageTownCity = createExtractedField(effPermanent.city.trim().toUpperCase(), permEffSource, permConf, 'ocr')
+    }
+    if (effPermanent.district && effPermanent.district.trim()) {
+      result.permanentAddress!.district = createExtractedField(effPermanent.district.trim().toUpperCase(), permEffSource, permConf, 'ocr')
+    }
+    if (effPermanent.stateProvince && effPermanent.stateProvince.trim()) {
+      result.permanentAddress!.stateProvince = createExtractedField(effPermanent.stateProvince.trim().toUpperCase(), permEffSource, permConf, 'ocr')
+    }
+    if (effPermanent.postalCode && effPermanent.postalCode.trim()) {
+      const permPostalConf = isPermanentCopiedFromPresent
+        ? (fs['presentAddress.postalCode']?.confidence ?? fs['address.postalCode']?.confidence ?? presConf)
+        : (fs['permanentAddress.postalCode']?.confidence ?? fs['address.postalCode']?.confidence ?? permConf)
+      const permPostalSource = isPermanentCopiedFromPresent
+        ? 'derived'
+        : (fs['permanentAddress.postalCode']?.source ?? fs['address.postalCode']?.source ?? permSource)
+      const permPostalConflict = fs['permanentAddress.postalCode']?.hasConflict ?? (isPermanentCopiedFromPresent ? fs['presentAddress.postalCode']?.hasConflict : undefined)
+      const permPostalDetails = fs['permanentAddress.postalCode']?.conflictDetails ?? (isPermanentCopiedFromPresent ? fs['presentAddress.postalCode']?.conflictDetails : undefined)
+      result.permanentAddress!.postalCode = createExtractedField(
+        effPermanent.postalCode.trim(),
+        permPostalSource,
+        permPostalConf,
+        'ocr',
+        permPostalConflict,
+        permPostalDetails
+      )
+    }
+    if (effPermanent.country && effPermanent.country.trim()) {
+      const normAc = normalizeExtractedCountry(effPermanent.country)
+      result.permanentAddress!.country = createExtractedField(normAc, permEffSource, permConf, 'ocr')
+    }
+    result.permanentAddress!.sameAsPresentAddress = createExtractedField(
+      isPermanentCopiedFromPresent,
+      isPermanentCopiedFromPresent ? 'derived' : 'ocr',
+      1.0,
+      'ocr'
+    )
   }
-  if (addr.district && addr.district.trim()) {
-    result.permanentAddress!.district = createExtractedField(addr.district.trim().toUpperCase(), addrSource, addrConf, 'ocr')
-    result.presentAddress!.district = createExtractedField(addr.district.trim().toUpperCase(), addrSource, addrConf, 'ocr')
-  }
-  if (addr.stateProvince && addr.stateProvince.trim()) {
-    result.permanentAddress!.stateProvince = createExtractedField(addr.stateProvince.trim().toUpperCase(), addrSource, addrConf, 'ocr')
-    result.presentAddress!.stateProvince = createExtractedField(addr.stateProvince.trim().toUpperCase(), addrSource, addrConf, 'ocr')
-  }
-  if (addr.postalCode && addr.postalCode.trim()) {
-    result.permanentAddress!.postalCode = createExtractedField(addr.postalCode.trim(), addrSource, addrConf, 'ocr')
-    result.presentAddress!.postalCode = createExtractedField(addr.postalCode.trim(), addrSource, addrConf, 'ocr')
-  }
-  if (addr.country && addr.country.trim()) {
-    const normAc = normalizeExtractedCountry(addr.country)
-    result.permanentAddress!.country = createExtractedField(normAc, addrSource, addrConf, 'ocr')
-    result.presentAddress!.country = createExtractedField(normAc, addrSource, addrConf, 'ocr')
-  }
-  if (addr.phone && addr.phone.trim()) {
-    const rawP = addr.phone.trim()
-    result.presentAddress!.phone = createExtractedField(rawP, addrSource, addrConf, 'ocr')
-    result.presentAddress!.mobile = createExtractedField(rawP, addrSource, addrConf, 'ocr')
+
+  // Phone / Mobile / ISD
+  const rawP = effPresent?.phone || effPermanent?.phone || addr.phone
+  if (rawP && rawP.trim()) {
+    const cleanP = rawP.trim()
+    const cleanDigits = cleanP.replace(/\D/g, '')
+    const mobVal = cleanDigits.startsWith('880') ? cleanDigits.slice(3) : (cleanDigits.startsWith('01') && cleanDigits.length >= 10 ? cleanDigits.slice(1) : cleanP)
+    result.presentAddress!.phone = createExtractedField(cleanP, presSource, presConf, 'ocr')
+    result.presentAddress!.mobile = createExtractedField(mobVal, presSource, presConf, 'ocr')
     result.contact = result.contact || {}
-    result.contact.phone = createExtractedField(rawP, addrSource, addrConf, 'ocr')
-    result.contact.mobile = createExtractedField(rawP, addrSource, addrConf, 'ocr')
-    if (rawP.startsWith('+880') || rawP.replace(/\D/g, '').startsWith('880')) {
-      result.contact.isdCode = createExtractedField('880', addrSource, addrConf, 'ocr')
-      result.presentAddress!.isdCode = createExtractedField('880', addrSource, addrConf, 'ocr')
+    result.contact.phone = createExtractedField(cleanP, presSource, presConf, 'ocr')
+    result.contact.mobile = createExtractedField(mobVal, presSource, presConf, 'ocr')
+    if (cleanP.startsWith('+880') || cleanDigits.startsWith('880')) {
+      result.contact.isdCode = createExtractedField('880', presSource, presConf, 'ocr')
+      result.presentAddress!.isdCode = createExtractedField('880', presSource, presConf, 'ocr')
     }
   }
 
@@ -620,6 +744,8 @@ export function payloadToBlob(input: string | Blob | File, defaultFileName = 'pa
   throw new PythonExtractorError('Invalid file payload: expected Data URL or Blob.', 'INVALID_FILE')
 }
 
+const inFlightExtractions = new Map<string, Promise<PythonPassportExtractionResult>>()
+
 /**
  * Calls the local Python extraction FastAPI service at POST /extract-passport.
  */
@@ -650,94 +776,107 @@ export async function extractPassportWithPython(
     throw new PythonExtractorError('Uploaded document payload is empty.', 'INVALID_FILE')
   }
 
-  const formData = new FormData()
-  // Match FastAPI parameter: file: UploadFile = File(...)
-  formData.append('file', blob, resolvedFileName)
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => {
-    controller.abort()
-  }, timeoutMs)
-
-  onProgress?.({ percent: 35, text: 'Executing local Python OCR & MRZ parser...' })
-
-  try {
-    // Note: Do NOT set Content-Type header when sending FormData! fetch sets boundary automatically.
-    const response = await fetch(`${baseUrl}/extract-passport`, {
-      method: 'POST',
-      body: formData,
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      let errorDetail = ''
-      try {
-        const errorJson = await response.json()
-        errorDetail = errorJson.detail || JSON.stringify(errorJson)
-      } catch {
-        errorDetail = await response.text()
-      }
-      throw new PythonExtractorError(
-        `Python extraction service returned HTTP ${response.status}: ${errorDetail || response.statusText}`,
-        'HTTP_ERROR',
-        response.status
-      )
-    }
-
-    let jsonResult: unknown
-    try {
-      jsonResult = await response.json()
-    } catch {
-      throw new PythonExtractorError(
-        'Invalid JSON response returned by local Python extractor.',
-        'INVALID_RESPONSE'
-      )
-    }
-
-    // Validate essential structure
-    const parsed = jsonResult as PythonPassportExtractionResult
-    if (!parsed || typeof parsed !== 'object' || !parsed.personal || !parsed.passport) {
-      throw new PythonExtractorError(
-        'Python extractor returned incomplete response schema: missing personal or passport data.',
-        'INVALID_RESPONSE'
-      )
-    }
-
-    onProgress?.({ percent: 85, text: 'Local Python OCR extraction complete. Mapping fields...' })
-    return parsed
-  } catch (err: unknown) {
-    if (err instanceof PythonExtractorError) {
-      throw err
-    }
-
-    const errorObj = err as { name?: string; message?: string }
-    if (errorObj?.name === 'AbortError') {
-      throw new PythonExtractorError(
-        `Local Python extractor timed out after ${Math.round(timeoutMs / 1000)} seconds. Start or check the service on port 8001.`,
-        'TIMEOUT'
-      )
-    }
-
-    const msg = errorObj?.message || String(err)
-    const causeStr = (err as { cause?: { code?: string; message?: string } })?.cause
-      ? String((err as { cause?: { code?: string; message?: string } }).cause?.code || (err as { cause?: { message?: string } }).cause?.message || '')
-      : ''
-    const combinedMsg = `${msg} ${causeStr}`.toLowerCase()
-    if (
-      combinedMsg.includes('failed to fetch') ||
-      combinedMsg.includes('fetch failed') ||
-      combinedMsg.includes('networkerror') ||
-      combinedMsg.includes('econnrefused') ||
-      combinedMsg.includes('connection refused')
-    ) {
-      throw new PythonExtractorError(
-        'Local Python extractor is not running. Start the Python extraction service on port 8001.',
-        'UNAVAILABLE'
-      )
-    }
-
-    throw new PythonExtractorError(`Failed to communicate with local Python extractor: ${msg}`, 'EXTRACTION_FAILED')
-  } finally {
-    clearTimeout(timeoutId)
+  const dedupeKey = `${baseUrl}_${resolvedFileName}_${blob.size}`
+  const existingPromise = inFlightExtractions.get(dedupeKey)
+  if (existingPromise) {
+    return existingPromise
   }
+
+  const executionPromise = (async () => {
+    const formData = new FormData()
+    // Match FastAPI parameter: file: UploadFile = File(...)
+    formData.append('file', blob, resolvedFileName)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+      controller.abort()
+    }, timeoutMs)
+
+    onProgress?.({ percent: 35, text: 'Executing local Python OCR & MRZ parser...' })
+
+    try {
+      // Note: Do NOT set Content-Type header when sending FormData! fetch sets boundary automatically.
+      const response = await fetch(`${baseUrl}/extract-passport`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        let errorDetail = ''
+        try {
+          const errorJson = await response.json()
+          errorDetail = errorJson.detail || JSON.stringify(errorJson)
+        } catch {
+          errorDetail = await response.text()
+        }
+        throw new PythonExtractorError(
+          `Python extraction service returned HTTP ${response.status}: ${errorDetail || response.statusText}`,
+          'HTTP_ERROR',
+          response.status
+        )
+      }
+
+      let jsonResult: unknown
+      try {
+        jsonResult = await response.json()
+      } catch {
+        throw new PythonExtractorError(
+          'Invalid JSON response returned by local Python extractor.',
+          'INVALID_RESPONSE'
+        )
+      }
+
+      // Validate essential structure
+      const parsed = jsonResult as PythonPassportExtractionResult
+      if (!parsed || typeof parsed !== 'object' || !parsed.personal || !parsed.passport) {
+        throw new PythonExtractorError(
+          'Python extractor returned incomplete response schema: missing personal or passport data.',
+          'INVALID_RESPONSE'
+        )
+      }
+
+      onProgress?.({ percent: 85, text: 'Local Python OCR extraction complete. Mapping fields...' })
+      return parsed
+    } catch (err: unknown) {
+      if (err instanceof PythonExtractorError) {
+        throw err
+      }
+
+      const errorObj = err as { name?: string; message?: string }
+      if (errorObj?.name === 'AbortError') {
+        throw new PythonExtractorError(
+          `Local Python extractor timed out after ${Math.round(timeoutMs / 1000)} seconds. Start or check the service on port 8001.`,
+          'TIMEOUT'
+        )
+      }
+
+      const msg = errorObj?.message || String(err)
+      const causeStr = (err as { cause?: { code?: string; message?: string } })?.cause
+        ? String((err as { cause?: { code?: string; message?: string } }).cause?.code || (err as { cause?: { message?: string } }).cause?.message || '')
+        : ''
+      const combinedMsg = `${msg} ${causeStr}`.toLowerCase()
+      if (
+        combinedMsg.includes('failed to fetch') ||
+        combinedMsg.includes('fetch failed') ||
+        combinedMsg.includes('networkerror') ||
+        combinedMsg.includes('econnrefused') ||
+        combinedMsg.includes('connection refused')
+      ) {
+        throw new PythonExtractorError(
+          'Local Python extractor is not running. Start the Python extraction service on port 8001.',
+          'UNAVAILABLE'
+        )
+      }
+
+      throw new PythonExtractorError(`Failed to communicate with local Python extractor: ${msg}`, 'EXTRACTION_FAILED')
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  })().finally(() => {
+    inFlightExtractions.delete(dedupeKey)
+  })
+
+  inFlightExtractions.set(dedupeKey, executionPromise)
+  return executionPromise
 }
