@@ -1,4 +1,5 @@
 import type { ApplicantProfile } from '../applicant/types'
+import { pruneDocumentStoragePayloads } from '../document/documentStorage'
 
 export const APPLICANTS_STORAGE_KEY = 'visa_autofill_applicants'
 export const SELECTED_APPLICANT_STORAGE_KEY = 'visa_autofill_selected_applicant_id'
@@ -45,8 +46,26 @@ async function storageSet<T>(key: string, value: T): Promise<void> {
   try {
     if (isChromeStorageAvailable()) {
       return new Promise<void>((resolve, reject) => {
-        chrome.storage.local.set({ [key]: value }, () => {
+        chrome.storage.local.set({ [key]: value }, async () => {
           if (chrome.runtime?.lastError) {
+            const errorMsg = chrome.runtime.lastError.message || ''
+            if (/quota|kQuotaBytes/i.test(errorMsg)) {
+              console.warn(`[ApplicantStorage] Quota exceeded writing "${key}". Pruning document storage payloads and retrying...`)
+              try {
+                await pruneDocumentStoragePayloads(true)
+                chrome.storage.local.set({ [key]: value }, () => {
+                  if (chrome.runtime?.lastError) {
+                    console.error(`[ApplicantStorage] Retry after prune failed for "${key}":`, chrome.runtime.lastError)
+                    reject(new Error(chrome.runtime.lastError.message))
+                  } else {
+                    resolve()
+                  }
+                })
+                return
+              } catch (pruneErr) {
+                console.error('[ApplicantStorage] Prune retry error:', pruneErr)
+              }
+            }
             console.error(`[Visa Autofill Storage] chrome.storage.local.set error for "${key}":`, chrome.runtime.lastError)
             reject(new Error(chrome.runtime.lastError.message))
           } else {
