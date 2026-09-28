@@ -2819,6 +2819,7 @@ function getFieldSourcePriority(fieldKey: string, source: ExtractionSource): num
       'pdf-text': 3,
       ocr: 4,
       'manual-review': 5,
+      derived: 6,
     }
     return mrzPriority[source] ?? 99
   }
@@ -2829,6 +2830,7 @@ function getFieldSourcePriority(fieldKey: string, source: ExtractionSource): num
     'pdf-text': 3,
     ocr: 4,
     'manual-review': 5,
+    derived: 6,
   }
   return aiPrimaryPriority[source] ?? 99
 }
