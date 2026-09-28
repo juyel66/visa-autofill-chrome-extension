@@ -190,15 +190,30 @@ export function resolveApplicantValue(
     path === 'appl.perm_add2' ||
     path === 'perm_addr2' ||
     path === 'perm_add2' ||
-    path === 'permanentAddress.villageTownCity' ||
-    path === 'appl.perm_city' ||
-    path === 'permanent_village_town_city'
+    path === 'perm_address2'
   ) {
     const raw = (
-      applicant.presentAddress?.villageTownCity ||
+      applicant.permanentAddress?.addressLine2 ||
+      applicant.permanentAddress?.villageTownCity ||
       applicant.presentAddress?.addressLine2 ||
+      applicant.presentAddress?.villageTownCity ||
+      ''
+    ).trim()
+    if (!raw) return undefined
+    return raw.toUpperCase()
+  }
+
+  if (
+    path === 'permanentAddress.villageTownCity' ||
+    path === 'appl.perm_city' ||
+    path === 'permanent_village_town_city' ||
+    path === 'perm_city'
+  ) {
+    const raw = (
       applicant.permanentAddress?.villageTownCity ||
       applicant.permanentAddress?.addressLine2 ||
+      applicant.presentAddress?.villageTownCity ||
+      applicant.presentAddress?.addressLine2 ||
       ''
     ).trim()
     if (!raw) return undefined
@@ -537,39 +552,51 @@ export function resolveApplicantValue(
   }
 
   // Cross-lookup fallback for address fields between presentAddress and permanentAddress
-  if (path === 'presentAddress.addressLine1' && applicant.permanentAddress?.addressLine1) {
-    return applicant.permanentAddress.addressLine1
+  if (path === 'presentAddress.addressLine1') {
+    return applicant.presentAddress?.addressLine1 || applicant.permanentAddress?.addressLine1
   }
-  if (path === 'permanentAddress.addressLine1' && applicant.presentAddress?.addressLine1) {
-    return applicant.presentAddress.addressLine1
+  if (path === 'permanentAddress.addressLine1') {
+    return applicant.permanentAddress?.addressLine1 || applicant.presentAddress?.addressLine1
   }
-  if (path === 'presentAddress.addressLine2' || path === 'presentAddress.villageTownCity') {
-    return (
-      applicant.presentAddress?.villageTownCity ||
-      applicant.presentAddress?.addressLine2 ||
-      applicant.permanentAddress?.villageTownCity ||
-      applicant.permanentAddress?.addressLine2
-    )
+  if (path === 'presentAddress.addressLine2') {
+    return applicant.presentAddress?.addressLine2 || applicant.permanentAddress?.addressLine2
+  }
+  if (path === 'presentAddress.villageTownCity') {
+    return applicant.presentAddress?.villageTownCity || applicant.permanentAddress?.villageTownCity
   }
   if (
     path === 'permanentAddress.addressLine2' ||
-    path === 'permanentAddress.villageTownCity' ||
     path === 'appl.perm_add2' ||
     path === 'perm_add2' ||
-    path === 'permanent_village_town_city' ||
-    path === 'appl.perm_city'
+    path === 'perm_addr2'
   ) {
-    const rawVal =
-      applicant.presentAddress?.villageTownCity ||
-      applicant.presentAddress?.addressLine2 ||
-      applicant.permanentAddress?.villageTownCity ||
-      applicant.permanentAddress?.addressLine2
+    const rawVal = applicant.permanentAddress?.addressLine2 || applicant.presentAddress?.addressLine2
     if (rawVal && rawVal.trim() !== '') {
       return rawVal.trim().toUpperCase()
     }
     return undefined
   }
-  if (path === 'presentAddress.stateProvince' || path === 'presentAddress.district' || path === 'presentAddress.state_name') {
+  if (
+    path === 'permanentAddress.villageTownCity' ||
+    path === 'permanent_village_town_city' ||
+    path === 'appl.perm_city' ||
+    path === 'perm_city'
+  ) {
+    const rawVal = applicant.permanentAddress?.villageTownCity || applicant.presentAddress?.villageTownCity
+    if (rawVal && rawVal.trim() !== '') {
+      return rawVal.trim().toUpperCase()
+    }
+    return undefined
+  }
+  if (path === 'presentAddress.stateProvince' || path === 'presentAddress.state_name') {
+    return (
+      applicant.presentAddress?.stateProvince ||
+      applicant.presentAddress?.district ||
+      applicant.permanentAddress?.stateProvince ||
+      applicant.permanentAddress?.district
+    )
+  }
+  if (path === 'presentAddress.district') {
     return (
       applicant.presentAddress?.district ||
       applicant.presentAddress?.stateProvince ||
@@ -577,7 +604,15 @@ export function resolveApplicantValue(
       applicant.permanentAddress?.stateProvince
     )
   }
-  if (path === 'permanentAddress.stateProvince' || path === 'permanentAddress.district') {
+  if (path === 'permanentAddress.stateProvince' || path === 'appl.perm_state' || path === 'perm_state') {
+    return (
+      applicant.permanentAddress?.stateProvince ||
+      applicant.permanentAddress?.district ||
+      applicant.presentAddress?.stateProvince ||
+      applicant.presentAddress?.district
+    )
+  }
+  if (path === 'permanentAddress.district' || path === 'appl.perm_district' || path === 'perm_district') {
     return (
       applicant.permanentAddress?.district ||
       applicant.permanentAddress?.stateProvince ||
@@ -585,11 +620,11 @@ export function resolveApplicantValue(
       applicant.presentAddress?.stateProvince
     )
   }
-  if (path === 'presentAddress.postalCode' && applicant.permanentAddress?.postalCode) {
-    return applicant.permanentAddress.postalCode
+  if (path === 'presentAddress.postalCode' || path === 'pincode') {
+    return applicant.presentAddress?.postalCode || applicant.permanentAddress?.postalCode
   }
-  if (path === 'permanentAddress.postalCode' && applicant.presentAddress?.postalCode) {
-    return applicant.presentAddress.postalCode
+  if (path === 'permanentAddress.postalCode' || path === 'permanent_postal_code' || path === 'appl.perm_pincode' || path === 'perm_pincode') {
+    return applicant.permanentAddress?.postalCode || applicant.presentAddress?.postalCode
   }
 
   // Cross-lookup fallback for phone, mobile, isdCode between contact and presentAddress
