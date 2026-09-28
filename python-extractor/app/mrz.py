@@ -95,6 +95,9 @@ def clean_mrz_line(raw: str) -> str:
     cleaned = cleaned.replace("[", "<").replace("]", "<").replace("{", "<").replace("}", "<")
     cleaned = cleaned.replace(" ", "")
     cleaned = re.sub(r"[^A-Z0-9<]", "", cleaned)
+    # If starts with PBGD or PIND without < after P, insert <
+    if re.match(r"^P[A-Z]{3}", cleaned) and not cleaned.startswith("P<"):
+        cleaned = "P<" + cleaned[1:]
     return cleaned
 
 
@@ -102,12 +105,18 @@ def is_candidate_line1(cleaned: str) -> bool:
     """Check if cleaned text is candidate for MRZ Line 1."""
     if not (cleaned.startswith("P<") or (cleaned.startswith("P") and len(cleaned) >= 15)):
         return False
-    if "<" not in cleaned:
+    # Filter out normal English headers starting with P or common words
+    if any(kw in cleaned for kw in [
+        "PEOPLES", "PEOPLE", "REPUBLIC", "BANGLADESH", "PERSONAL", "PERMANENT",
+        "PASSPORT", "SIGNATURE", "EMERGENCY", "GOVERNMENT", "MINISTRY", "CONTACT",
+        "NATIONALITY", "AUTHORITY", "DATE"
+    ]):
         return False
-    # Filter out normal English headers starting with P
-    if any(kw in cleaned for kw in ["PERSONAL", "PERMANENT", "PASSPORT", "SIGNATURE", "EMERGENCY"]):
-        return False
-    return True
+    if "<" in cleaned:
+        return True
+    if re.match(r"^P<?[A-Z]{3}", cleaned):
+        return True
+    return False
 
 
 def is_candidate_line2(cleaned: str) -> bool:
@@ -126,6 +135,7 @@ def find_mrz_lines(ocr_lines: List[Tuple[str, float]]) -> Optional[Tuple[str, st
     """
     Find 2 candidate TD3 lines from OCR results.
     Returns (line1, line2, avg_confidence) if found.
+    Searches bottom-up since MRZ is located at the bottom of the passport page.
     """
     line1_candidates = []
     line2_candidates = []
@@ -137,9 +147,9 @@ def find_mrz_lines(ocr_lines: List[Tuple[str, float]]) -> Optional[Tuple[str, st
         if is_candidate_line2(cleaned):
             line2_candidates.append((cleaned, conf))
 
-    # Look for matching pair where check digits pass
-    for l1, conf1 in line1_candidates:
-        for l2, conf2 in line2_candidates:
+    # Look for matching pair where check digits pass (prioritize bottom of the page)
+    for l1, conf1 in reversed(line1_candidates):
+        for l2, conf2 in reversed(line2_candidates):
             if len(l2) >= 28:
                 c_doc = verify_check_digit(l2[0:9], l2[9])
                 c_dob = verify_check_digit(l2[13:19], l2[19])
@@ -148,9 +158,9 @@ def find_mrz_lines(ocr_lines: List[Tuple[str, float]]) -> Optional[Tuple[str, st
                     avg_conf = (conf1 + conf2) / 2.0
                     return l1, l2, avg_conf
 
-    # Fallback to pair if candidates exist
+    # Fallback to pair if candidates exist (from bottom of page)
     if line1_candidates and line2_candidates:
-        l1, conf1 = line1_candidates[-1]  # Typically at bottom of page
+        l1, conf1 = line1_candidates[-1]
         l2, conf2 = line2_candidates[-1]
         return l1, l2, (conf1 + conf2) / 2.0
 
@@ -161,7 +171,8 @@ def parse_td3_mrz(
     line1: str,
     line2: str,
     confidence: float = 0.0,
-    surname_hint: Optional[str] = None
+    surname_hint: Optional[str] = None,
+    given_name_hint: Optional[str] = None,
 ) -> ParsedMRZ:
     """
     Parse and validate a standard 2-line TD3 MRZ.
@@ -202,6 +213,11 @@ def parse_td3_mrz(
             result.surname = clean_hint
             g_tokens = [p for p in rem.split("<") if p and p.isalpha()]
             result.given_names = " ".join(g_tokens).strip()
+        elif given_name_hint and content.endswith(given_name_hint.upper().strip()):
+            clean_g = given_name_hint.upper().strip()
+            rem_s = content[:-len(clean_g)].rstrip("<")
+            result.surname = rem_s
+            result.given_names = clean_g
         elif "<" in content:
             sub_tokens = [p for p in content.split("<") if p and p.isalpha()]
             result.surname = sub_tokens[0].strip() if sub_tokens else ""
