@@ -36,6 +36,7 @@
   "permissions": [
     "activeTab",
     "storage",
+    "unlimitedStorage",
     "scripting"
   ],
   "content_security_policy": {
