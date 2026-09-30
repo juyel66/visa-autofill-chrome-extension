@@ -31,8 +31,46 @@ def test_parse_address_components():
     addr = parse_address_components(raw)
     assert addr.postalCode == "5120"
     assert addr.district == "THAKURGAON"
-    assert addr.city == "THAKURGAON"
+    assert addr.city == "RANISANKAIL, MUZAHIDABAD COLONI"
     assert "KASHIPUR" in addr.line1
+
+
+def test_user_comma_based_splitting_rules():
+    # Example 1: Exactly 3 components
+    # "KASHIPUR, RANISANKAIL, THAKURGAON" -> House = KASHIPUR, Village/Town/City = RANISANKAIL, State/District = THAKURGAON
+    ex1 = parse_address_components("KASHIPUR, RANISANKAIL, THAKURGAON")
+    assert ex1.line1 == "KASHIPUR"
+    assert ex1.city == "RANISANKAIL"
+    assert ex1.stateProvince == "THAKURGAON"
+    assert ex1.district == "THAKURGAON"
+
+    # Example 2: Exactly 4 components (2 middle components joined by ", ")
+    # "A, B, C, D" -> House = A, Village/Town/City = B, C, State/District = D
+    ex2 = parse_address_components("A, B, C, D")
+    assert ex2.line1 == "A"
+    assert ex2.city == "B, C"
+    assert ex2.stateProvince == "D"
+
+    # Example 3: Exactly 5 components (3 middle components joined by ", ")
+    # "A, B, C, D, E" -> House = A, Village/Town/City = B, C, D, State/District = E
+    ex3 = parse_address_components("A, B, C, D, E")
+    assert ex3.line1 == "A"
+    assert ex3.city == "B, C, D"
+    assert ex3.stateProvince == "E"
+
+    # Example 4: Exactly 2 components
+    # "A, B" -> House = A, State/District = B, Village/Town/City remains empty
+    ex4 = parse_address_components("A, B")
+    assert ex4.line1 == "A"
+    assert ex4.city == ""
+    assert ex4.stateProvince == "B"
+
+    # Example 5: Exactly 1 component
+    # "A" -> House = A, Village/Town/City and State/District remain empty
+    ex5 = parse_address_components("A")
+    assert ex5.line1 == "A"
+    assert ex5.city == ""
+    assert ex5.stateProvince == ""
 
 
 def test_end_to_end_passport_extraction():
@@ -198,9 +236,8 @@ def test_task120_case_a_structured_labeled_address():
     raw = "VILL: KASHIPUR, PO: RANISANKAIL, DIST: THAKURGAON, PIN: 5120"
     addr = parse_address_components(raw)
     assert "KASHIPUR" in addr.line1
-    assert "RANISANKAIL" in addr.line2
+    assert addr.city == "RANISANKAIL"
     assert addr.district == "THAKURGAON"
-    assert addr.city == "THAKURGAON"
     assert addr.postalCode == "5120"
 
 
@@ -220,10 +257,9 @@ def test_task120_case_b_address_split_across_multiple_ocr_boxes():
     lines, conf = blocks["present"]
     addr = parse_address_components(lines)
     assert "KASHIPUR" in addr.line1
-    assert "RANISANKAIL" in addr.line2
+    assert addr.city == "RANISANKAIL, MUZAHIDABAD COLONI"
     assert "MUZAHIDABAD COLONI" in addr.line2
     assert addr.district == "THAKURGAON"
-    assert addr.city == "THAKURGAON"
     assert addr.postalCode == "5120"
 
 
