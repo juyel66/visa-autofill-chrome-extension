@@ -170,20 +170,23 @@ export function resolveApplicantValue(
 
   // Address Line 1
   if (path === 'presentAddress.addressLine1' || path === 'appl.pres_add1' || path === 'pres_addr1' || path === 'pres_add1') {
-    return applicant.presentAddress?.addressLine1 || applicant.permanentAddress?.addressLine1
+    const raw = applicant.presentAddress?.addressLine1 || applicant.permanentAddress?.addressLine1
+    return raw ? raw.replace(/,\s*/g, ', ').trim() : undefined
   }
   if (path === 'permanentAddress.addressLine1' || path === 'appl.perm_add1' || path === 'perm_addr1' || path === 'perm_add1') {
-    return applicant.permanentAddress?.addressLine1 || applicant.presentAddress?.addressLine1
+    const raw = applicant.permanentAddress?.addressLine1 || applicant.presentAddress?.addressLine1
+    return raw ? raw.replace(/,\s*/g, ', ').trim() : undefined
   }
 
   // Address Line 2
   if (path === 'presentAddress.addressLine2' || path === 'appl.pres_add2' || path === 'pres_addr2' || path === 'pres_add2') {
-    return (
+    const raw = (
       applicant.presentAddress?.addressLine2 ||
       applicant.presentAddress?.villageTownCity ||
       applicant.permanentAddress?.addressLine2 ||
       applicant.permanentAddress?.villageTownCity
     )
+    return raw ? raw.replace(/,\s*/g, ', ').trim() : undefined
   }
   if (
     path === 'permanentAddress.addressLine2' ||
@@ -200,7 +203,7 @@ export function resolveApplicantValue(
       ''
     ).trim()
     if (!raw) return undefined
-    return raw.toUpperCase()
+    return raw.toUpperCase().replace(/,\s*/g, ', ')
   }
 
   if (
@@ -217,17 +220,18 @@ export function resolveApplicantValue(
       ''
     ).trim()
     if (!raw) return undefined
-    return raw.toUpperCase()
+    return raw.toUpperCase().replace(/,\s*/g, ', ')
   }
 
   // Village / Town / City (Present Address)
   if (path === 'presentAddress.villageTownCity' || path === 'appl.pres_city' || path === 'village_town_city') {
-    return (
+    const raw = (
       applicant.presentAddress?.villageTownCity ||
       applicant.presentAddress?.addressLine2 ||
       applicant.permanentAddress?.villageTownCity ||
       applicant.permanentAddress?.addressLine2
     )
+    return raw ? raw.replace(/,\s*/g, ', ').trim() : undefined
   }
 
   // State / Province / District
@@ -246,7 +250,8 @@ export function resolveApplicantValue(
       sanitizeDistrict(applicant.presentAddress?.district) ||
       sanitizeDistrict(applicant.presentAddress?.stateProvince) ||
       sanitizeDistrict(applicant.permanentAddress?.district) ||
-      sanitizeDistrict(applicant.permanentAddress?.stateProvince)
+      sanitizeDistrict(applicant.permanentAddress?.stateProvince) ||
+      sanitizeDistrict(applicant.personalInfo?.townCityOfBirth)
     if (d) return d
   }
   if (
@@ -263,7 +268,8 @@ export function resolveApplicantValue(
       sanitizeDistrict(applicant.permanentAddress?.district) ||
       sanitizeDistrict(applicant.permanentAddress?.stateProvince) ||
       sanitizeDistrict(applicant.presentAddress?.district) ||
-      sanitizeDistrict(applicant.presentAddress?.stateProvince)
+      sanitizeDistrict(applicant.presentAddress?.stateProvince) ||
+      sanitizeDistrict(applicant.personalInfo?.townCityOfBirth)
     if (d) return d
   }
 
@@ -593,7 +599,8 @@ export function resolveApplicantValue(
       applicant.presentAddress?.stateProvince ||
       applicant.presentAddress?.district ||
       applicant.permanentAddress?.stateProvince ||
-      applicant.permanentAddress?.district
+      applicant.permanentAddress?.district ||
+      applicant.personalInfo?.townCityOfBirth
     )
   }
   if (path === 'presentAddress.district') {
@@ -601,7 +608,8 @@ export function resolveApplicantValue(
       applicant.presentAddress?.district ||
       applicant.presentAddress?.stateProvince ||
       applicant.permanentAddress?.district ||
-      applicant.permanentAddress?.stateProvince
+      applicant.permanentAddress?.stateProvince ||
+      applicant.personalInfo?.townCityOfBirth
     )
   }
   if (path === 'permanentAddress.stateProvince' || path === 'appl.perm_state' || path === 'perm_state') {
@@ -609,7 +617,8 @@ export function resolveApplicantValue(
       applicant.permanentAddress?.stateProvince ||
       applicant.permanentAddress?.district ||
       applicant.presentAddress?.stateProvince ||
-      applicant.presentAddress?.district
+      applicant.presentAddress?.district ||
+      applicant.personalInfo?.townCityOfBirth
     )
   }
   if (path === 'permanentAddress.district' || path === 'appl.perm_district' || path === 'perm_district') {
@@ -617,7 +626,8 @@ export function resolveApplicantValue(
       applicant.permanentAddress?.district ||
       applicant.permanentAddress?.stateProvince ||
       applicant.presentAddress?.district ||
-      applicant.presentAddress?.stateProvince
+      applicant.presentAddress?.stateProvince ||
+      applicant.personalInfo?.townCityOfBirth
     )
   }
   if (path === 'presentAddress.postalCode' || path === 'pincode') {
