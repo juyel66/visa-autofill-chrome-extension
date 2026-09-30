@@ -387,6 +387,137 @@ BANGLADESH_DISTRICTS = {
     "BANDARBAN", "BRAHMANBARIA", "CHANDPUR", "CHITTAGONG", "CHATTOGRAM", "COMILLA", "CUMILLA", "COXS BAZAR", "COX'S BAZAR", "FENI", "KHAGRACHARI", "LAKSHMIPUR", "NOAKHALI", "RANGAMATI"
 }
 
+BANGLADESH_UPAZILAS = {
+    # Thakurgaon
+    "THAKURGAON SADAR", "BALIADANGI", "HARIPUR", "RANISANKAIL", "PIRGANJ",
+    # Panchagarh
+    "PANCHAGARH SADAR", "DEBIGANJ", "BODA", "ATWARI", "TETULIA",
+    # Dinajpur
+    "DINAJPUR SADAR", "BIRGANJ", "BIRAL", "BOCHAGANJ", "CHIRIRBANDAR", "PHULBARI", "GHORAGHAT", "HAKIMPUR", "KAHAROLE", "KHANSAMA", "NAWABGANJ", "PARBATIPUR", "BIROL",
+    # Nilphamari
+    "NILPHAMARI SADAR", "SAIDPUR", "JALDHAKA", "KISHOREGANJ", "DOMAR", "DIMLA",
+    # Rangpur
+    "RANGPUR SADAR", "BADARGANJ", "GANGGACHARA", "KAUNIA", "MITHAPUKUR", "PIRGACHHA", "TARAGANJ",
+    # Kurigram
+    "KURIGRAM SADAR", "NAGESHWARI", "BHURUNGAMARI", "RAJARHAT", "ULIPUR", "CHILMARI", "ROWMARI", "CHAR RAJIBPUR",
+    # Lalmonirhat
+    "LALMONIRHAT SADAR", "ADITMARI", "KALIGANJ", "HATIBANDHA", "PATGRAM",
+    # Gaibandha
+    "GAIBANDHA SADAR", "SADULLAPUR", "GOBINDAGANJ", "SUNDARGANJ", "SAGHATA", "PHULCHHARI", "PALASHBARI",
+    # Bogura
+    "BOGURA SADAR", "ADAMDIGHI", "DHUNAT", "DHUPCHANCHIA", "GABTALI", "KAHALOO", "NANDIGRAM", "SARIAKANDI", "SHAJAHANPUR", "SHERPUR", "SHIBGANJ", "SONATOLA",
+    # Joypurhat
+    "JOYPURHAT SADAR", "AKKELPUR", "KALAI", "KHETLAL", "PANCHBIBI",
+    # Naogaon
+    "NAOGAON SADAR", "ATRAI", "BADALGACHHI", "DHAMOIRHAT", "MANDA", "MAHADEVPUR", "NIAMATPUR", "PATNITALA", "PORSHA", "RANINAGAR", "SAPAHAR",
+    # Natore
+    "NATORE SADAR", "BAGATIPARA", "BARAIGRAM", "GURUDASPUR", "LALPUR", "SINGRA", "NALDANGA",
+    # Chapainawabganj
+    "CHAPAI NAWABGANJ SADAR", "BHOLAHAT", "GOMASTAPUR", "NACHOLE", "SHIBGANJ",
+    # Pabna
+    "PABNA SADAR", "ATGHARIA", "BERA", "BHANGURA", "CHATMOHAR", "FARIDPUR", "ISHWARDI", "SANTHIA", "SUJANAGAR",
+    # Rajshahi
+    "RAJSHAHI SADAR", "BAGHA", "BAGMARA", "CHARGHAT", "DURGAPUR", "GODAGARI", "MOHANPUR", "PABA", "PUTHIA", "TANORE",
+    # Sirajganj
+    "SIRAJGANJ SADAR", "BELKUCHI", "CHOUHALI", "KAMARKHANDA", "KAZIPUR", "ROYGANJ", "SHAHJADPUR", "TARASH", "ULLAPARA",
+    # Dhaka
+    "DHAMRAI", "DOHAR", "KERANIGANJ", "NAWABGANJ", "SAVAR", "DHANMONDI", "GULSHAN", "MIRPUR", "MOHAMMADPUR", "UTTARA", "MOTIJHEEL", "BANANI", "TEJGAON", "RAMNA", "LALBAGH", "KOTWALI", "PALTAN", "KHILGAON", "SUTRAPUR", "BADDA", "DEMRA", "JATRA BARI", "KAFRUL", "CANTONMENT", "SHYAMPUR", "KADAMTALI", "HAZARIBAGH", "SHAHBAGH",
+    # Gazipur
+    "GAZIPUR SADAR", "KALIAKAIR", "KALIGANJ", "KAPASIA", "SREEPUR", "TONGI",
+    # Kishoreganj
+    "KISHOREGANJ SADAR", "ASTAGRAM", "BAJITPUR", "BHAIRAB", "HOSSAINPUR", "ITNA", "KARIMGANJ", "KATIADI", "KULLIARCHAR", "MITHAMAIN", "NIKLI", "PAKUNDIA", "TARAIL",
+    # Manikganj
+    "MANIKGANJ SADAR", "DAULATPUR", "GHIOR", "HARIRAMPUR", "SATURIA", "SHIBALAYA", "SINGAIR",
+    # Munshiganj
+    "MUNSHIGANJ SADAR", "GAZARIA", "LOHAJANG", "SIRAJDIKHAN", "SREENAGAR", "TONGIBARI",
+    # Narayanganj
+    "NARAYANGANJ SADAR", "ARAIHAZAR", "BANDAR", "RUPGANJ", "SONARGAON",
+    # Narsingdi
+    "NARSINGDI SADAR", "BELABO", "MONOHARDI", "PALASH", "RAIPURA", "SHIBPUR",
+    # Tangail
+    "TANGAIL SADAR", "BASHAIL", "BHUAPUR", "DELDUAR", "DHANBARI", "GHATAIL", "GOPALPUR", "KALIHATI", "MADHUPUR", "MIRZAPUR", "NAGARPUR", "SAKHIPUR",
+    # Faridpur
+    "FARIDPUR SADAR", "ALFADANGA", "BHANGA", "BOALMARI", "CHARBHADRASAN", "MADHUKHALI", "NAGARKANDA", "SADARPUR", "SALTHA",
+    # Gopalganj
+    "GOPALGANJ SADAR", "KASHIANI", "KOTALIPARA", "MUKSUDPUR", "TUNGIPARA",
+    # Madaripur
+    "MADARIPUR SADAR", "KALKINI", "RAJOIR", "SHIBCHAR",
+    # Rajbari
+    "RAJBARI SADAR", "BALIAKANDI", "GOALANDA", "PANGSHA", "KALUKHALI",
+    # Shariatpur
+    "SHARIATPUR SADAR", "BHEDARGANJ", "DAMUDYA", "GOSAIRHAT", "NARIA", "ZANJIRA",
+    # Mymensingh
+    "MYMENSINGH SADAR", "BHALUKA", "DHOBAURA", "FULBARIA", "GAFFARGAON", "GAURIPUR", "HALUAGHAT", "ISHWARGANJ", "MUKTAGACHHA", "NANDAIL", "PHULPUR", "TRISHAL", "TARA KANDA",
+    # Jamalpur
+    "JAMALPUR SADAR", "BAKSHIGANJ", "DEWANGANJ", "ISLAMPUR", "MADARGANJ", "MELANDAPUR", "SARISHABARI",
+    # Netrokona
+    "NETROKONA SADAR", "ATPARA", "BARHATTA", "DURGAPUR", "KHALIAJURI", "KALMAKANDA", "KENDUA", "MADAN", "MOHANGANJ", "PURBADHALA",
+    # Sherpur
+    "SHERPUR SADAR", "JHINAGATI", "NAKHLA", "NALITABARI", "SREEBARDI",
+    # Sylhet
+    "SYLHET SADAR", "BALAGANJ", "BEANIBAZAR", "BISHWANATH", "COMPANIGANJ", "FENCHUGANJ", "GOLAPGANJ", "GOWAINGHAT", "JAINTIAPUR", "KANAIGHAT", "OSMANINAGAR", "ZAKIGANJ", "SOUTH SURMA",
+    # Moulvibazar
+    "MOULVIBAZAR SADAR", "BARLEKHA", "JURI", "KAMALGANJ", "KULAURA", "RAJNAGAR", "SREEMANGAL",
+    # Habiganj
+    "HABIGANJ SADAR", "AJMIRIGANJ", "BAHUBAL", "BANIACHONG", "CHUNARUGHAT", "LAKHAI", "MADHABPUR", "NABIGANJ", "SHAYESTAGANJ",
+    # Sunamganj
+    "SUNAMGANJ SADAR", "BISHWAMBARPUR", "CHHATAK", "DERAI", "DHARAMPASHA", "DOWARABAZAR", "JAGANNATHPUR", "JAMALGANJ", "SHANTIGANJ", "SULLA", "TAHIRPUR", "MADHYANAGAR",
+    # Chittagong
+    "ANWARA", "BANSHKHALI", "BOALKHALI", "CHANDANAISH", "FATIKCHHARI", "HATHAZARI", "LOHAGARA", "MIRSHARAI", "PATIYA", "RANGUNIA", "RAOZAN", "SANDWIP", "SATKANIA", "SITAKUNDA", "KARNAPHULI", "KOTWALI", "PANCHLAISH", "DOUBLE MOORING", "PAHARTALI", "BANDAR", "CHANDGAON", "HALISHAHAR", "KHULSHI", "BAKALIA", "BAYEZID",
+    # Cox's Bazar
+    "COX'S BAZAR SADAR", "CHAKARIA", "KUTUBDIA", "MAHESHKHALI", "RAMU", "TEKNAF", "UKHIYA", "PEKUA", "EIDGAON",
+    # Comilla
+    "COMILLA SADAR", "BARURA", "BRAHMANPARA", "BURICHANG", "CHANDINA", "CHOUDDAGRAM", "DAUDKANDI", "DEBIDWAR", "HOMNA", "LAKSAM", "MURADNAGAR", "NANGALKOT", "MEGHNA", "TITAS", "MONOHARGANJ", "LALMAI",
+    # Brahmanbaria
+    "BRAHMANBARIA SADAR", "AKHAURA", "ASHUGANJ", "BANCHHARAMPUR", "BIJOYNAGAR", "KASBA", "NABINAGAR", "NASIRNAGAR", "SARAIL",
+    # Chandpur
+    "CHANDPUR SADAR", "FARIDGANJ", "HAJIGANJ", "HAYMCHAR", "KACHUA", "MATLAB NORTH", "MATLAB SOUTH", "SHAHRASTI",
+    # Feni
+    "FENI SADAR", "CHHAGALNAIYA", "DAGANBHUIYAN", "PARSHURAM", "FULGAZI", "SONAGAZI",
+    # Noakhali
+    "NOAKHALI SADAR", "BEGUMGANJ", "CHATKHIL", "COMPANIGANJ", "HATIYA", "SENBAGH", "SONAIMURI", "SUBARNACHAR", "KABIRHAT",
+    # Lakshmipur
+    "LAKSHMIPUR SADAR", "RAIPUR", "RAMGANJ", "RAMGATI", "KAMALNAGAR",
+    # Khagrachhari
+    "KHAGRACHHARI SADAR", "DIGHINALA", "LAKSHMICHHARI", "MAHALCHHARI", "MANIKCHHARI", "MATIRANGA", "PANCHHARI", "RAMGARH", "GUIMARA",
+    # Rangamati
+    "RANGAMATI SADAR", "BAGHAICHHARI", "BARKAL", "BELAICHHARI", "JURAICHHARI", "KAPTAI", "KAW KHALI", "LANGADU", "NANNERCHAR", "RAJASTHALI",
+    # Bandarban
+    "BANDARBAN SADAR", "ALIKADAM", "LAMA", "NAIKHONGCHHARI", "ROWANGCHHARI", "RUMA", "THANCHI",
+    # Khulna
+    "KOYRA", "DUMURIA", "PAIKGACHHA", "RUPSA", "TEROKHADA", "BATIAGHATA", "DACOPE", "DIGHALIA", "PHULTALA",
+    # Bagerhat
+    "BAGERHAT SADAR", "CHITALMARI", "FAKIRHAT", "KACHUA", "MOLLAHAT", "MONGLA", "MORRELGANJ", "RAMPAL", "SARANKHOLA",
+    # Satkhira
+    "SATKHIRA SADAR", "ASSASUNI", "DEBHATA", "KALAROA", "KALIGANJ", "SHYAMNAGAR", "TALA",
+    # Jessore
+    "JESSORE SADAR", "ABHAYNAGAR", "BAGHERPARA", "CHAUGACHHA", "JHIKARGACHHA", "KESHABPUR", "MANIRAMPUR", "SHARSHA",
+    # Jhenaidah
+    "JHENAIDAH SADAR", "HARINAKUNDA", "KALIGANJ", "KOTCHANDPUR", "MAHESHPUR", "SHAILKUPA",
+    # Magura
+    "MAGURA SADAR", "MOHAMMADPUR", "SHALIKHA", "SREEPUR",
+    # Narail
+    "NARAIL SADAR", "KALIA", "LOHAGARA",
+    # Kushtia
+    "KUSHTIA SADAR", "BHERAMARA", "DAULATPUR", "KHOKSA", "KUMARKHALI", "MIRPUR",
+    # Chuadanga
+    "CHUADANGA SADAR", "ALAMDANGA", "DAMURHUDA", "JIBANNAGAR",
+    # Meherpur
+    "MEHERPUR SADAR", "GANGNI", "MUJIBNAGAR",
+    # Barisal
+    "BARISAL SADAR", "AGAILJHARA", "BABUGANJ", "BAKERGANJ", "BANARIPARA", "GAURNADI", "HIZLA", "MEHENDIGANJ", "MULADI", "WAZIRPUR",
+    # Bhola
+    "BHOLA SADAR", "BURHANUDDIN", "CHAR FASSON", "DAULATKHAN", "LALMOHAN", "MANPURA", "TAZUMUDDIN",
+    # Jhalokati
+    "JHALOKATI SADAR", "KATHALIA", "NALCHHITY", "RAJAPUR",
+    # Pirojpur
+    "PIROJPUR SADAR", "BHANDARIA", "KAWKHALI", "MATHBARIA", "NAZIRPUR", "NESARABAD", "INDURKANI",
+    # Barguna
+    "BARGUNA SADAR", "AMTALI", "BAMNA", "BETAGI", "PATHARGHATA", "TALTALI",
+    # Patuakhali
+    "PATUAKHALI SADAR", "BAUPHAL", "DASHMINA", "DUMKI", "GALACHIPA", "KALAPARA", "MIRZAGANJ", "RANGABALI"
+}
+
 
 def parse_box_coords(bbox) -> Tuple[float, float, float, float]:
     """Normalize bounding box to (min_x, min_y, max_x, max_y)."""
@@ -439,14 +570,11 @@ def extract_address_blocks_from_boxes(boxes: List[OCRBox]) -> Dict[str, Tuple[Li
     for i, b in enumerate(boxes):
         txt = b.text.strip().upper()
         x1, y1, x2, y2 = parse_box_coords(b.bbox)
-        if any(kw in txt for kw in [
-            'FAMILY DETAILS', 'EMERGENCY', 'EMERGENCY CONTACT', 'MERGENCY', 'SIGNATURE OF',
-            'SIGNATURE', 'PASSPORT NO', 'P<', 'H<', 'PBGD',
-            'PEOPLES REPUBLIC', "PEOPLE'S REPUBLIC", 'PASSPORT', 'GOVERNMENT OF',
-            'PERSONAL DATA', 'SURNAME', 'SUNAME', 'GIVEN NAME', 'NATIONALITY',
-            'DATE OF BIRTH', 'PLACE OF BIRTH', 'ISSUING AUTHORITY', 'PREVIOUS PASSPORT',
-            'TELEPHONE', 'PHONE NO', 'MOBILE NO'
-        ]):
+        if (
+            re.search(r"\b(?:FAMILY\s*DETAILS|E[MO]RGENCY(?:\s*CONTACT)?|M[EO]RGENCY|SIGNATURE(?:\s*OF)?|PASSPORT\s*NO|PEOPLE'?S\s*REPUBLIC|PERSONAL\s*DATA|DATE\s*OF\s*BIRTH|PLACE\s*OF\s*BIRTH|PREVIOUS\s*PASSPORT)\b", txt)
+            or txt in ('P<', 'H<', 'PBGD', 'PASSPORT')
+            or (txt.startswith('NAME:') and not any(k in txt for k in ('ADDRESS', 'VILL', 'ROAD')))
+        ):
             stops.append((y1, txt))
 
     # 2. Compound Present / Permanent labels (absorbs multiline words like Present / Address)
@@ -470,7 +598,11 @@ def extract_address_blocks_from_boxes(boxes: List[OCRBox]) -> Dict[str, Tuple[Li
                     break
 
         # Permanent Address variations
-        elif re.search(r'[A-Z]*ERMANENT\s*ADD(?:RESS)?', txt) or re.search(r'PERM\.?\s*ADD', txt):
+        elif (
+            re.search(r'[A-Z]*(?:ERMANENT|MANENT|ANENT)\s*(?:RESIDENTIAL\s*)?ADD(?:RESS)?', txt) or
+            re.search(r'PERM\.?\s*ADD', txt) or
+            'PERMANENT ADDRESS' in txt
+        ):
             anchors.append(('permanent', x1, y1, x2, y2, i))
             used_label_indices.add(i)
         elif txt in ('PERMANENT', 'ERMANENT', 'PERM', 'PERM.', 'PERMANENT:', 'ERMANENT:', 'PERMANENT ADD', 'PERMANENT ADD.'):
@@ -488,7 +620,7 @@ def extract_address_blocks_from_boxes(boxes: List[OCRBox]) -> Dict[str, Tuple[Li
             continue
         txt = b.text.strip().upper()
         x1, y1, x2, y2 = parse_box_coords(b.bbox)
-        if (re.search(r'^\b[A-Z]*DDRESS[:.]?$', txt) or re.search(r'^\bADDRESS[:.]?$', txt) or txt.startswith('ADDRESS OF') or txt in ('ADDRESS', 'ADDRESS.', 'DDRESS', 'DDRESS.', 'DRESS', 'DRESS.')) and not any(kw in txt for kw in ['EMAIL', 'WEB', 'PHONE']):
+        if (re.search(r'^\b[A-Z]*DDRESS[:.]?', txt) or txt.startswith('ADDRESS OF') or txt in ('ADDRESS', 'ADDRESS.', 'DDRESS', 'DDRESS.', 'DRESS', 'DRESS.')) and not any(kw in txt for kw in ['EMAIL', 'WEB', 'PHONE']):
             anchors.append(('generic', x1, y1, x2, y2, i))
             used_label_indices.add(i)
 
@@ -502,12 +634,18 @@ def extract_address_blocks_from_boxes(boxes: List[OCRBox]) -> Dict[str, Tuple[Li
 
         next_y = ay1 + 160.0  # Physical address block in passport is never > 160px tall
         if k + 1 < len(anchors):
-            next_y = min(next_y, anchors[k + 1][2] - 10)
+            next_y = min(next_y, anchors[k + 1][2] - 5)
         for sy, stxt in stops:
             if sy > ay1 + 10:
-                next_y = min(next_y, sy - 10)
+                next_y = min(next_y, sy - 5)
 
         collected = []
+        # Check if the anchor box itself contained address text after the label
+        anchor_box = boxes[a_idx]
+        rem_anchor_txt = re.sub(r'^[A-Z\s]*ADD(?:RESS)?[:.]?\s*', '', anchor_box.text, flags=re.IGNORECASE).strip()
+        if len(rem_anchor_txt) >= 3 and not any(kw in rem_anchor_txt.upper() for kw in ['FAMILY', 'EMERGENCY', 'CONTACT']):
+            collected.append((ay1, ax1, rem_anchor_txt, anchor_box.confidence))
+
         for j, b in enumerate(boxes):
             if j in used_label_indices:
                 continue
@@ -515,25 +653,33 @@ def extract_address_blocks_from_boxes(boxes: List[OCRBox]) -> Dict[str, Tuple[Li
             btxt = b.text.strip()
             bupper = btxt.upper()
 
-            if (ay1 - 35 <= by1 <= next_y):
+            # Clean trailing noise like 'Email address...' or 'Phone No...' from the box
+            clean_b = re.sub(r"\b(?:Email|E-mail)\s*(?:address|id)?.*$", "", btxt, flags=re.IGNORECASE).strip()
+            clean_b = re.sub(r"\b(?:Phone|Mobile|Cell|Tel)\s*(?:No|Number|\/Cell No)?.*$", "", clean_b, flags=re.IGNORECASE).strip()
+            if not clean_b:
+                continue
+
+            min_y = ay1 - 10 if k == 0 else ay1 - 5
+            if (min_y <= by1 <= next_y):
                 is_right_col = (ax1 + 30 <= bx1 <= ax1 + 750)
                 is_below = (abs(bx1 - ax1) < 150 and by1 >= ay2 - 5)
                 if is_right_col or is_below:
-                    # Ignore phone, mobile, email labels and values
-                    if any(kw in bupper for kw in ['PHONE', 'MOBILE', 'EMAIL', '@', 'CELL', 'TEL', '+880', '017', '018', '019', '013', '014', '015', '016']):
+                    # Ignore pure phone, mobile, email labels and values
+                    if clean_b.upper() in ('PHONE', 'MOBILE', 'EMAIL', 'CELL', 'TEL'):
                         continue
-                    if len(btxt) <= 2 and not btxt.isdigit():
+                    if len(clean_b) <= 2 and not clean_b.isdigit():
                         continue
                     # Ignore relations and passport main page fields/labels
-                    if any(kw in bupper for kw in [
+                    if any(kw in clean_b.upper() for kw in [
                         'FAMILY DETAILS', 'NAME OF', 'RELATION', 'SPOUSE', 'HUSBAND', 'WIFE',
                         'FATHER', 'MOTHER', 'PEOPLES REPUBLIC', "PEOPLE'S REPUBLIC", 'PASSPORT',
                         'SURNAME', 'SUNAME', 'GIVEN NAME', 'NATIONALITY', 'BANGLADESHI',
                         'DATE OF BIRTH', 'PLACE OF BIRTH', 'ISSUING AUTHORITY', 'DATE OF ISSUE',
-                        'DATE OF EXPIRY', 'PBGD', 'P<', 'TYPE', 'COUNTRY CODE', 'PREVIOUS PASSPORT'
+                        'DATE OF EXPIRY', 'PBGD', 'P<', 'TYPE', 'COUNTRY CODE', 'PREVIOUS PASSPORT',
+                        'EMERGENCY', 'EMORGENCY', 'CONTACT'
                     ]):
                         continue
-                    collected.append((by1, bx1, btxt, b.confidence))
+                    collected.append((by1, bx1, clean_b, b.confidence))
 
         collected.sort(key=lambda item: (round(item[0] / 15) * 15, item[1]))
         if collected:
@@ -1674,146 +1820,135 @@ def parse_address_components(
     is_bangladeshi: bool = True,
     known_info: Optional[Dict[str, str]] = None
 ) -> AddressData:
-    """Parse raw address lines or string into structured AddressData."""
+    """Parse raw address lines or string into structured AddressData using comma-based splitting."""
     addr = AddressData()
     if not raw_input:
         return addr
 
-    # Flatten and tokenize raw input
     lines = [raw_input] if isinstance(raw_input, str) else list(raw_input)
-    parts: List[str] = []
-    for line in lines:
-        sub = line.replace(";", ",").replace("\n", ",")
-        # Split on comma, or period when between multi-character tokens (e.g. 5120.THAKURGAON or KASHIPUR.RANISANKAIL)
-        for p in re.split(r"[,]\s*|(?<=[A-Za-z0-9]{2})\.(?=[A-Za-z0-9]{2})|\.\s+", sub):
-            clean_p = p.strip()
-            if clean_p:
-                if clean_p.upper().startswith("KASHIPUR") and len(clean_p) > 8:
-                    parts.append("KASHIPUR")
-                    parts.append(clean_p[8:].strip())
-                else:
-                    parts.append(clean_p)
 
-    # 1. Phone extraction if embedded in address
-    new_parts = []
-    for p in parts:
-        m_ph = re.search(r"(?:(?:PHONE|MOBILE|TEL|TEL\.?|MOB\.?)[:\s]*)?(\+?880[\s-]?[0-9]{9,11}|01[3-9]\d{8})", p, re.IGNORECASE)
+    # 1. Strip label prefixes if any line starts with address labels
+    cleaned_lines = []
+    for line in lines:
+        l = line.strip()
+        l = re.sub(r'^(?:PRESENT|PERMANENT|RESIDENTIAL)\s*(?:ADD(?:RESS)?)?[:.]?\s*', '', l, flags=re.IGNORECASE).strip()
+        l = re.sub(r'^(?:RESIDENTIAL\s*)?ADD(?:RESS)?[:.]?\s*', '', l, flags=re.IGNORECASE).strip()
+        if l:
+            cleaned_lines.append(l)
+
+    # 2. Phone & Email extraction
+    no_phone_lines = []
+    for l in cleaned_lines:
+        m_ph = re.search(r"(?:(?:PHONE|MOBILE|TEL|TEL\.?|MOB\.?)[:\s]*)?(\+?880[\s-]?[0-9]{9,11}|01[3-9]\d{8})", l, re.IGNORECASE)
         if m_ph and not addr.phone:
             addr.phone = m_ph.group(1).replace(" ", "").replace("-", "")
-            p = (p[:m_ph.start()] + " " + p[m_ph.end():]).strip()
-        p = re.sub(r"^[,\s.-]+|[,\s.-]+$", "", p)
-        if p:
-            new_parts.append(p)
-    parts = new_parts
+        # Remove emails completely
+        l = re.sub(r"[\w.+-]+@[\w-]+\.[\w.-]+", "", l)
+        # Remove phone strings
+        l = re.sub(r"(?:(?:PHONE|MOBILE|TEL|TEL\.?|MOB\.?)[:\s]*)?(?:\+?880[\s-]?[0-9]{9,11}|01[3-9]\d{8})", "", l, flags=re.IGNORECASE)
+        l = re.sub(r"\b(?:Phone|Mobile|Cell|Tel)\s*(?:No|Number|\/Cell No)?[:.-]*", "", l, flags=re.IGNORECASE)
+        l = l.strip()
+        if l:
+            no_phone_lines.append(l)
 
-    # 2. Postal Code (ZIP / PIN)
-    new_parts = []
-    for p in parts:
-        m_lbl = re.search(r"(?:\b(?:POSTAL|POST|ZIP|PIN|PINCODE)\s*(?:CODE)?[:\s-]*(\d{4,6})\b)", p, re.IGNORECASE)
-        if m_lbl and not addr.postalCode:
-            c_lbl = m_lbl.group(1)
-            if not is_excluded_postal_code(c_lbl, known_info, is_explicit=True):
-                addr.postalCode = c_lbl
-                p = (p[:m_lbl.start()] + " " + p[m_lbl.end():]).strip()
+    # 3. Combine into normalized text
+    combined = ", ".join(no_phone_lines)
+    combined = combined.replace(";", ",").replace("\n", ",")
+    combined = re.sub(r',\s*', ', ', combined)
 
-        # Foreign zip code (5 digits, e.g. USA 10018)
-        if not is_bangladeshi and not addr.postalCode:
-            m_foreign = re.search(r"\b\d{5}(?:-\d{4})?\b", p)
-            if m_foreign:
-                addr.postalCode = m_foreign.group(0)
-                p = (p[:m_foreign.start()] + " " + p[m_foreign.end():]).strip()
-
-        m_bd = re.search(r"\b([1-9]\d{3})\b", p)
-        if m_bd and not addr.postalCode:
-            cand = m_bd.group(1)
-            p_upper = p.upper()
-            is_date = (
-                bool(re.search(r"\b(?:DOB|YEAR|DATE|BIRTH|ISSUE|EXPIR\w*|VALID|ON|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\b", p_upper))
-                or bool(re.search(r"(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*[,\s]+" + cand + r"\b", p, re.IGNORECASE))
-                or bool(re.search(r"\b\d{1,2}[-/]\d{1,2}[-/]" + cand + r"\b", p))
-                or bool(re.search(r"\b" + cand + r"[-/]\d{1,2}[-/]\d{1,2}\b", p))
-            )
-            if not is_date and not is_excluded_postal_code(cand, known_info, is_explicit=False):
-                addr.postalCode = cand
-                p = (p[:m_bd.start()] + " " + p[m_bd.end():]).strip()
-
-        p = re.sub(r"^[,\s.-]+|[,\s.-]+$", "", p)
-        if p:
-            new_parts.append(p)
-    parts = new_parts
-
-    # 3. Country
-    new_parts = []
-    for p in parts:
-        upper = p.upper()
-        if "BANGLADESH" in upper:
-            addr.country = "BANGLADESH"
-            p = re.sub(r"\bBANGLADESH\b", "", p, flags=re.IGNORECASE).strip()
-        elif "INDIA" in upper:
-            addr.country = "INDIA"
-            p = re.sub(r"\bINDIA\b", "", p, flags=re.IGNORECASE).strip()
-        elif "UNITED KINGDOM" in upper or "UK" in upper:
-            addr.country = "UNITED KINGDOM"
-            p = re.sub(r"\b(?:UNITED KINGDOM|UK)\b", "", p, flags=re.IGNORECASE).strip()
-        elif "UNITED STATES" in upper or "USA" in upper:
-            addr.country = "USA"
-            p = re.sub(r"\b(?:UNITED STATES|USA)\b", "", p, flags=re.IGNORECASE).strip()
-        p = re.sub(r"^[,\s.-]+|[,\s.-]+$", "", p)
-        if p:
-            new_parts.append(p)
-    parts = new_parts
-
-    if not addr.country and is_bangladeshi:
+    # 4. Extract Country
+    upper_comb = combined.upper()
+    if re.search(r"\bBANGLADESH\b", upper_comb):
+        addr.country = "BANGLADESH"
+        combined = re.sub(r"\bBANGLADESH\b", "", combined, flags=re.IGNORECASE)
+    elif re.search(r"\bINDIA\b", upper_comb):
+        addr.country = "INDIA"
+        combined = re.sub(r"\bINDIA\b", "", combined, flags=re.IGNORECASE)
+    elif re.search(r"\b(?:UNITED\s*KINGDOM|UK)\b", upper_comb):
+        addr.country = "UNITED KINGDOM"
+        combined = re.sub(r"\b(?:UNITED\s*KINGDOM|UK)\b", "", combined, flags=re.IGNORECASE)
+    elif re.search(r"\b(?:UNITED\s*STATES|USA)\b", upper_comb):
+        addr.country = "USA"
+        combined = re.sub(r"\b(?:UNITED\s*STATES|USA)\b", "", combined, flags=re.IGNORECASE)
+    elif is_bangladeshi:
         addr.country = "BANGLADESH"
 
-    # 4. Explicit Labels (Dist, Vill, City, State, Div)
-    new_parts = []
-    for p in parts:
-        m_dist = re.search(r"\b(?:DIST(?:RICT)?|DIST\.)[:\s]+([A-Za-z\s]+)", p, re.IGNORECASE)
-        if m_dist and not addr.district:
-            addr.district = m_dist.group(1).strip().upper()
-            p = (p[:m_dist.start()] + " " + p[m_dist.end():]).strip()
+    # 5. Extract Postal Code (ZIP / PIN)
+    m_lbl = re.search(r"(?:\b(?:POSTAL|POST|ZIP|PIN|PINCODE)\s*(?:CODE)?[:\s-]*(\d{4,6})\b)", combined, re.IGNORECASE)
+    if m_lbl:
+        c_lbl = m_lbl.group(1)
+        if not is_excluded_postal_code(c_lbl, known_info, is_explicit=True):
+            addr.postalCode = c_lbl
+            combined = combined[:m_lbl.start()] + " " + combined[m_lbl.end():]
+    else:
+        if is_bangladeshi:
+            m_bd = re.search(r"(?:[\s,;:\-]+|^)([1-9]\d{3})(?:[\s,;:\-]+|$|[A-Za-z])", combined)
+            if m_bd:
+                cand = m_bd.group(1)
+                if not is_excluded_postal_code(cand, known_info, is_explicit=False):
+                    addr.postalCode = cand
+                    combined = combined[:m_bd.start(1)] + ", " + combined[m_bd.end(1):]
+            else:
+                m_bd_fallback = re.search(r"([1-9]\d{3})", combined)
+                if m_bd_fallback:
+                    cand = m_bd_fallback.group(1)
+                    if not is_excluded_postal_code(cand, known_info, is_explicit=False):
+                        addr.postalCode = cand
+                        combined = combined[:m_bd_fallback.start(1)] + ", " + combined[m_bd_fallback.end(1):]
+        else:
+            m_foreign = re.search(r"\b\d{5}(?:-\d{4})?\b", combined)
+            if m_foreign:
+                cand = m_foreign.group(0)
+                if not is_excluded_postal_code(cand, known_info, is_explicit=False):
+                    addr.postalCode = cand
+                    combined = combined[:m_foreign.start()] + ", " + combined[m_foreign.end():]
 
-        m_city = re.search(r"\b(?:CITY|TOWN|VILL(?:AGE)?\/TOWN\/CITY|VILL\/TOWN)[:\s]+([A-Za-z\s]+)", p, re.IGNORECASE)
-        if m_city and not addr.city:
-            addr.city = m_city.group(1).strip().upper()
-            p = (p[:m_city.start()] + " " + p[m_city.end():]).strip()
+    # Clean residual hyphens or dashes left before postal code (e.g. "KEUTGAON - 5110" -> "KEUTGAON")
+    combined = re.sub(r'[\s\-]+$', '', combined)
 
-        m_div = re.search(r"\b(?:DIV(?:ISION)?|STATE|PROVINCE)[:\s]+([A-Za-z\s]+)", p, re.IGNORECASE)
-        if m_div and not addr.stateProvince:
-            addr.stateProvince = m_div.group(1).strip().upper()
-            p = (p[:m_div.start()] + " " + p[m_div.end():]).strip()
+    # 6. Helper: recursively split fused tokens without spaces (e.g. BISHNUPURPIRGANJKEUTGAON)
+    known_geo = sorted(list(set(list(BANGLADESH_UPAZILAS) + list(BANGLADESH_DISTRICTS))), key=len, reverse=True)
 
-        p = re.sub(r"^[,\s.-]+|[,\s.-]+$", "", p)
-        if p:
-            new_parts.append(p)
-    parts = new_parts
+    def split_fused_token(tok: str) -> List[str]:
+        if " " in tok.strip():
+            return [tok]
+        t_clean = tok.strip(".,:;-_/\\<>[]{}()\"'!?#*~")
+        if not t_clean:
+            return []
+        t_up = t_clean.upper()
+        for g in known_geo:
+            if len(g) < 4:
+                continue
+            idx = t_up.find(g)
+            if idx != -1:
+                pre = t_clean[:idx].strip(".,:;-_/\\<>[]{}()\"'!?#*~")
+                match_val = t_clean[idx:idx+len(g)].strip(".,:;-_/\\<>[]{}()\"'!?#*~")
+                post = t_clean[idx+len(g):].strip(".,:;-_/\\<>[]{}()\"'!?#*~")
+                if pre.upper().endswith("PU") and g.startswith("R"):
+                    pre += "R"
+                res = []
+                if pre:
+                    res.extend(split_fused_token(pre))
+                if match_val:
+                    res.append(match_val)
+                if post:
+                    res.extend(split_fused_token(post))
+                return res
+        return [tok]
 
-    # 5. Known District Matching
-    new_parts = []
-    for p in parts:
-        upper = p.upper()
-        found_dist = None
-        for d in BANGLADESH_DISTRICTS:
-            if re.search(r"\b" + re.escape(d) + r"\b", upper):
-                found_dist = d
-                break
-        if found_dist and not addr.district:
-            addr.district = found_dist
-            p = re.sub(r"\b" + re.escape(found_dist) + r"\b", "", p, flags=re.IGNORECASE).strip()
-        p = re.sub(r"^[,\s.-]+|[,\s.-]+$", "", p)
-        if p:
-            new_parts.append(p)
-    parts = new_parts
+    split_pieces: List[str] = []
+    for piece in combined.split(","):
+        p_clean = piece.strip()
+        if p_clean:
+            fused_splits = split_fused_token(p_clean)
+            split_pieces.extend(fused_splits)
 
-    if addr.district and not addr.city:
-        addr.city = addr.district
-
-    # 6. Clean OCR word joins, non-address labels, and trailers (generalized, no fixture-specific hardcoding)
-    EXCLUDED_ADDRESS_PARTS = {
-        "SPOUSE", "WIFE", "HUSBAND", "FATHER", "MOTHER", "SON", "DAUGHTER",
-        "SELF", "BROTHER", "SISTER", "RELATION", "RELATIONSHIP",
-        "EMERGENCY CONTACT", "EMERGENCY", "CONTACT",
+    EXCLUDED_LABELS = {
+        "PRESENT", "PERMANENT", "RESIDENTIAL", "PRESENT ADDRESS", "PERMANENT ADDRESS",
+        "PRESENT ADD", "PERMANENT ADD", "ADDRESS", "ADDRESS DETAILS",
+        "PO", "P.O", "P.O.", "POST OFFICE", "VILL", "VILL.", "VILLAGE",
+        "DIST", "DIST.", "DISTRICT", "PIN", "PINCODE", "POST", "ROAD", "HOUSE",
+        "EMERGENCY CONTACT", "EMERGENCY", "EMORGENCY", "CONTACT",
         "PASSPORT", "PEOPLES REPUBLIC OF BANGLADESH", "PEOPLES REPUBLIC",
         "PEOPLE'S REPUBLIC OF BANGLADESH", "PEOPLE'S REPUBLIC",
         "TYPE", "COUNTRY CODE", "PASSPORT NO", "PASSPORT NUMBER",
@@ -1822,23 +1957,93 @@ def parse_address_components(
         "DATE OF ISSUE", "DATE OF EXPIRY", "PREVIOUS PASSPORT"
     }
 
-    clean_parts = []
-    for p in parts:
-        p = re.sub(r"\bEmail\s*address.*$", "", p, flags=re.IGNORECASE).strip()
-        p = re.sub(r"\bPhone\s*(?:No)?.*$", "", p, flags=re.IGNORECASE).strip()
-        p = re.sub(r"^[,\s.:_/-]+|[,\s.:_/-]+$", "", p)
-        upper_p = p.upper()
-        if upper_p in EXCLUDED_ADDRESS_PARTS or any(upper_p.startswith(kw) for kw in ["RELATION", "RELATIONSHIP:", "SPOUSE"]):
+    # 7. Collect clean comma components
+    components: List[str] = []
+    for p in split_pieces:
+        clean = re.sub(r"^[,\s.:_/-]+|[,\s.:_/-]+$", "", p).strip()
+        clean = re.sub(r"\s+", " ", clean).strip()
+        upper = clean.upper()
+        if not clean:
             continue
-        if any(kw in upper_p for kw in ["PEOPLES REPUBLIC", "PASSPORT NO", "PASSPORT NUM", "DATE OF BIRTH", "DATE OF ISSUE"]):
+        if upper in EXCLUDED_LABELS:
             continue
-        if p and len(p) >= 2:
-            clean_parts.append(p)
+        if any(upper.startswith(kw) for kw in ["RELATION", "RELATIONSHIP", "SPOUSE", "EMERGENCY", "EMORGENCY"]):
+            continue
+        if "@" in clean or re.search(r"^\+?\d{7,15}$", clean.replace(" ", "").replace("-", "")):
+            continue
 
-    if len(clean_parts) >= 1:
-        addr.line1 = clean_parts[0]
-    if len(clean_parts) >= 2:
-        addr.line2 = ", ".join(clean_parts[1:])
+        # Strip prefixes like "PRESENT:", "PERMANENT:", "VILL:", "PO:", "DIST:", "VILL -", "P.O." but keep words like "HOUSE 10", "VILLAGE ROAD"
+        c_clean = re.sub(r'^(?:PRESENT|PERMANENT|RESIDENTIAL)?\s*(?:ADDRESS|ADD)[:\s.-]*', '', clean, flags=re.IGNORECASE).strip()
+        c_clean = re.sub(r'^(?:PRESENT|PERMANENT|RESIDENTIAL)[:\s.-]+', '', c_clean, flags=re.IGNORECASE).strip()
+        c_clean = re.sub(r'^(?:VILL(?:AGE)?|P\.O\.|POST\s*OFFICE|DIST(?:RICT)?|TOWN|CITY|DIV(?:ISION)?|STATE|PROVINCE|HOLDING)[:\s.-]+', '', c_clean, flags=re.IGNORECASE).strip()
+        c_clean = re.sub(r'^(?:HOUSE|ROAD)[:\-.]+\s*', '', c_clean, flags=re.IGNORECASE).strip()
+        c_clean = re.sub(r'^\b(?:VILL|PO|DIST)\b[:\s.-]+', '', c_clean, flags=re.IGNORECASE).strip()
+        c_clean = re.sub(r"^[,\s.:_/-]+|[,\s.:_/-]+$", "", c_clean).strip()
+        if c_clean:
+            clean = c_clean
+            upper = clean.upper()
+            if upper in EXCLUDED_LABELS:
+                continue
+        else:
+            continue
+
+        components.append(clean)
+
+    # 8. Clean First Component (House No. / Street)
+    if components:
+        c0 = components[0]
+        c0 = re.sub(r'^(?:PRESENT|PERMANENT|RESIDENTIAL)?\s*(?:ADDRESS|ADD)[:\s.-]*', '', c0, flags=re.IGNORECASE).strip()
+        c0 = re.sub(r'^(?:PRESENT|PERMANENT|RESIDENTIAL)[:\s.-]+', '', c0, flags=re.IGNORECASE).strip()
+        c0 = re.sub(r'^(?:VILL(?:AGE)?|P\.O\.|POST\s*OFFICE|DIST(?:RICT)?|TOWN|CITY|DIV(?:ISION)?|STATE|PROVINCE|HOLDING)[:\s.-]+', '', c0, flags=re.IGNORECASE).strip()
+        c0 = re.sub(r'^(?:HOUSE|ROAD)[:\-.]+\s*', '', c0, flags=re.IGNORECASE).strip()
+        c0 = re.sub(r'^\b(?:VILL|PO|DIST)\b[:\s.-]+', '', c0, flags=re.IGNORECASE).strip()
+        c0 = re.sub(r"^[,\s.:_/-]+|[,\s.:_/-]+$", "", c0).strip()
+        if c0:
+            components[0] = c0
+
+    # 9. Place of Birth priority for District / State / Province
+    # Dynamic rule: "ekhn passport e je birth place ache seta tmi direct district er field e bosiye deiba state/prevince/district ey field e"
+    pob_val = ""
+    if known_info and "place_of_birth" in known_info and known_info["place_of_birth"]:
+        raw_pob = known_info["place_of_birth"].split(",")[0].strip().upper()
+        pob_val = re.sub(r'\b(?:BGD|BANGLADESH|IND|INDIA)\b', '', raw_pob).strip()
+
+    # Apply EXACT Comma-Based Splitting Rule
+    # FIRST comma-separated component = House No./Street
+    # LAST comma-separated component = State/Province/District (prioritized with Place of Birth)
+    # EVERYTHING BETWEEN FIRST AND LAST = Village/Town/City
+    if len(components) >= 3:
+        addr.line1 = components[0]
+        addr.city = ", ".join(components[1:-1])
+        addr.line2 = ", ".join(components[1:-1])
+        addr.district = pob_val or components[-1]
+        addr.stateProvince = pob_val or components[-1]
+    elif len(components) == 2:
+        addr.line1 = components[0]
+        addr.city = ""
+        addr.line2 = ""
+        addr.district = pob_val or components[1]
+        addr.stateProvince = pob_val or components[1]
+    elif len(components) == 1:
+        addr.line1 = components[0]
+        addr.city = ""
+        addr.line2 = ""
+        addr.district = pob_val
+        addr.stateProvince = pob_val
+    else:
+        addr.line1 = ""
+        addr.city = ""
+        addr.line2 = ""
+        addr.district = pob_val
+        addr.stateProvince = pob_val
+
+    # Ensure every comma is followed by a space across all address fields
+    for attr in ["line1", "city", "line2", "district", "stateProvince"]:
+        val = getattr(addr, attr)
+        if val:
+            val = re.sub(r',\s*', ', ', val)
+            val = re.sub(r'^[,\s.:_/-]+|[,\s.:_/-]+$', '', val).strip()
+            setattr(addr, attr, val)
 
     return addr
 
@@ -2257,23 +2462,31 @@ def _populate_fields_from_boxes(
         any("BGD" in b.text for b in ocr_boxes)
     )
 
+    pob_for_addr = result.personal.placeOfBirth or visual.get("placeOfBirth", ("", 0.0))[0]
+    known_addr_info = {
+        "place_of_birth": pob_for_addr,
+        "dob": result.personal.dateOfBirth,
+        "passport_no": result.passport.number,
+        "nid": result.personal.nid,
+    }
+
     if has_present:
         p_lines, p_conf = visual["present_address_lines"]
-        result.presentAddress = parse_address_components(p_lines, is_bangladeshi=is_bd)
+        result.presentAddress = parse_address_components(p_lines, is_bangladeshi=is_bd, known_info=known_addr_info)
         result.fieldSources["presentAddress"] = FieldSource(
             source=default_src, confidence=p_conf, rawValue="; ".join(p_lines)
         )
 
     if has_perm:
         pm_lines, pm_conf = visual["permanent_address_lines"]
-        result.permanentAddress = parse_address_components(pm_lines, is_bangladeshi=is_bd)
+        result.permanentAddress = parse_address_components(pm_lines, is_bangladeshi=is_bd, known_info=known_addr_info)
         result.fieldSources["permanentAddress"] = FieldSource(
             source=default_src, confidence=pm_conf, rawValue="; ".join(pm_lines)
         )
 
     if not has_present and not has_perm and has_generic:
         g_lines, g_conf = visual["generic_address_lines"]
-        parsed_g = parse_address_components(g_lines, is_bangladeshi=is_bd)
+        parsed_g = parse_address_components(g_lines, is_bangladeshi=is_bd, known_info=known_addr_info)
         result.presentAddress = parsed_g.model_copy()
         result.permanentAddress = parsed_g.model_copy()
         result.permanentAddress.sameAsPresentAddress = True
@@ -2299,11 +2512,15 @@ def _populate_fields_from_boxes(
     elif not has_present and has_perm:
         # Bangladesh passport case: printed address is Permanent Address; populates Present Address too
         result.presentAddress = result.permanentAddress.model_copy()
+        result.permanentAddress.sameAsPresentAddress = True
         result.address = result.permanentAddress.model_copy()
         result.fieldSources["presentAddress"] = FieldSource(
             source=default_src, confidence=result.fieldSources["permanentAddress"].confidence, rawValue=result.fieldSources["permanentAddress"].rawValue
         )
-        result.fieldSources["address"] = result.fieldSources["permanentAddress"]
+        result.fieldSources["permanentAddress"] = FieldSource(
+            source="derived", confidence=result.fieldSources["permanentAddress"].confidence, rawValue=result.fieldSources["permanentAddress"].rawValue
+        )
+        result.fieldSources["address"] = result.fieldSources["presentAddress"]
     elif has_present and has_perm:
         # Both present and permanent explicitly exist (e.g. Khokon form)
         result.permanentAddress.sameAsPresentAddress = False
@@ -2311,7 +2528,7 @@ def _populate_fields_from_boxes(
         result.fieldSources["address"] = result.fieldSources["presentAddress"]
     elif "address_raw" in visual:
         raw_addr, addr_conf = visual["address_raw"]
-        parsed_addr = parse_address_components(raw_addr, is_bangladeshi=is_bd)
+        parsed_addr = parse_address_components(raw_addr, is_bangladeshi=is_bd, known_info=known_addr_info)
         result.presentAddress = parsed_addr.model_copy()
         result.permanentAddress = parsed_addr.model_copy()
         result.permanentAddress.sameAsPresentAddress = True
@@ -2383,6 +2600,18 @@ def _populate_fields_from_boxes(
         result.permanentAddress = result.presentAddress.model_copy()
         result.permanentAddress.sameAsPresentAddress = True
         result.address = result.presentAddress.model_copy()
+
+    # Dynamic Place of Birth district synchronization
+    # Rule: "ekhn passport e je birth place ache seta tmi direct district er field e bosiye deiba state/prevince/district ey field e"
+    clean_pob = ""
+    if result.personal.placeOfBirth:
+        clean_pob = re.sub(r'\b(?:BGD|BANGLADESH|IND|INDIA)\b', '', result.personal.placeOfBirth).split(",")[0].strip().upper()
+    if clean_pob:
+        for a in [result.presentAddress, result.permanentAddress, result.address]:
+            if a:
+                if not a.district or not a.stateProvince or a.district.upper() != clean_pob:
+                    a.district = clean_pob
+                    a.stateProvince = clean_pob
 
     # Auto-default BANGLADESH for Bangladeshi passports
     if is_bd:
@@ -2536,7 +2765,7 @@ def extract_passport(pdf_source: Union[str, bytes]) -> PassportExtractionResult:
     t_render_start = time.time()
     page_rect = page.rect
     max_pt = max(page_rect.width, page_rect.height)
-    optimal_dpi = 125
+    optimal_dpi = 140
     if max_pt > 1000:
         optimal_dpi = 100
     elif max_pt < 400:
