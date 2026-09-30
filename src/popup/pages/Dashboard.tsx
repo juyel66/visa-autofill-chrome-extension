@@ -176,6 +176,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const file = e.target.files?.[0]
     if (!file || !selectedApplicant) return
 
+    if (targetType === 'passport') {
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+      if (!isPdf) {
+        const err = 'Passport extraction requires a PDF document. Please upload a PDF file.'
+        setErrorMessage(err)
+        showToast(`⚠️ ${err}`)
+        if (e.target) {
+          e.target.value = ''
+        }
+        return
+      }
+    }
+
     if (isExtractingRef.current) return
     isExtractingRef.current = true
 
@@ -390,7 +403,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           savedAppFieldsCount: savedCount,
         })
 
-        const errDetail = pipelineResult.extractionError || pipelineResult.geminiError || 'Document extraction returned no fields.'
+        const errDetail = pipelineResult.extractionError || 'Document extraction returned no fields.'
 
         const workspaceUrl = chrome?.runtime?.getURL
           ? chrome.runtime.getURL(
@@ -720,7 +733,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         Replace File
                         <input
                           type="file"
-                          accept=".pdf,image/*"
+                          accept={activeTab === 'passport' ? '.pdf,application/pdf' : '.pdf,image/*'}
                           onChange={(e) => handleFileUpload(e, activeTab)}
                           className="hidden"
                           disabled={isExtracting}
@@ -739,7 +752,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {isExtracting ? 'Extracting...' : '📄 Upload Document'}
                       <input
                         type="file"
-                        accept=".pdf,image/*"
+                        accept={activeTab === 'passport' ? '.pdf,application/pdf' : '.pdf,image/*'}
                         onChange={(e) => handleFileUpload(e, activeTab)}
                         className="hidden"
                         disabled={isExtracting}
