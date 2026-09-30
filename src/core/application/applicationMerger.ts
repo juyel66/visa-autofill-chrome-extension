@@ -919,18 +919,18 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'village_town_city' || key === 'appl.pres_city' || key === 'pres_city') &&
         !resolvedValue &&
-        (activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district)
+        (activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity)
       ) {
-        resolvedValue = activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district
+        resolvedValue = activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.villageTownCity
         source = activeProfile.presentAddress?.villageTownCity ? activeSource : 'derived'
         docId = activeDocId
       } else if (
         (key === 'district' || key === 'appl.pres_district') &&
         !resolvedValue &&
-        (activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince)
+        (activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince || passportPob)
       ) {
-        const rawDist = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince
-        const cleanDist = rawDist && !['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'].includes(rawDist.trim().toUpperCase()) && rawDist.trim().length > 2 ? rawDist.trim() : (activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district)
+        const rawDist = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince || passportPob
+        const cleanDist = rawDist && !['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'].includes(rawDist.trim().toUpperCase()) && rawDist.trim().length > 2 ? rawDist.trim() : (activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district || passportPob)
         if (cleanDist) {
           resolvedValue = cleanDist
           source = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince ? activeSource : 'derived'
@@ -939,10 +939,10 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'state_province' || key === 'appl.pres_state' || key === 'pres_state' || key === 'state_name' || key === 'pres_add3') &&
         !resolvedValue &&
-        (activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince)
+        (activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince || passportPob)
       ) {
-        const rawDist = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince
-        const cleanDist = rawDist && !['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'].includes(rawDist.trim().toUpperCase()) && rawDist.trim().length > 2 ? rawDist.trim() : (activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district)
+        const rawDist = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince || activeProfile.permanentAddress?.district || activeProfile.permanentAddress?.stateProvince || passportPob
+        const cleanDist = rawDist && !['IN', 'BD', 'BGD', 'IND', 'INDIA', 'BANGLADESH'].includes(rawDist.trim().toUpperCase()) && rawDist.trim().length > 2 ? rawDist.trim() : (activeProfile.presentAddress?.district || activeProfile.permanentAddress?.district || passportPob)
         if (cleanDist) {
           resolvedValue = cleanDist
           source = activeProfile.presentAddress?.district || activeProfile.presentAddress?.stateProvince ? activeSource : 'derived'
@@ -985,9 +985,9 @@ export function populateApplicationFromDocuments(options: {
       } else if (
         (key === 'permanent_village_town_city' || key === 'appl.perm_city' || key === 'perm_city') &&
         !resolvedValue &&
-        (activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district)
+        (activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity)
       ) {
-        resolvedValue = activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity || activeProfile.permanentAddress?.district || activeProfile.presentAddress?.district
+        resolvedValue = activeProfile.permanentAddress?.villageTownCity || activeProfile.presentAddress?.villageTownCity
         source = activeProfile.permanentAddress?.villageTownCity ? activeSource : 'derived'
         docId = activeDocId
       } else if (
@@ -1318,6 +1318,24 @@ export function populateApplicationFromDocuments(options: {
           originalExtractedValue: expField.originalExtractedValue || expDateStr,
         }
       }
+    }
+  }
+
+  // Normalize commas in all address fields so every comma is followed by a space
+  const addressFieldKeys = [
+    'pres_addr1', 'pres_addr2', 'appl.pres_add1', 'appl.pres_add2',
+    'village_town_city', 'appl.pres_city', 'pres_city',
+    'state_province', 'appl.pres_state', 'pres_state', 'state_name', 'pres_add3',
+    'district', 'appl.pres_district',
+    'perm_add1', 'perm_add2', 'appl.perm_add1', 'appl.perm_add2', 'perm_address1', 'perm_address2',
+    'permanent_village_town_city', 'appl.perm_city', 'perm_city',
+    'permanent_state_province', 'appl.perm_state', 'perm_state', 'perm_add3', 'perm_address3',
+    'permanent_district', 'appl.perm_district',
+  ]
+  for (const k of addressFieldKeys) {
+    const f = fields[k]
+    if (f && typeof f.value === 'string' && f.value.includes(',')) {
+      f.value = f.value.replace(/,\s*/g, ', ').trim()
     }
   }
 
