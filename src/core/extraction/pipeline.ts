@@ -1,10 +1,5 @@
 import { mergeExtractedCandidateData } from './data/applicantDataExtractor'
 import {
-  extractApplicantDataWithGemini,
-  getGeminiApiKey,
-  GeminiExtractionError,
-} from './ai/geminiExtractor'
-import {
   extractPassportWithPython,
   mapPythonResultToExtractedApplicant,
   PythonExtractorError,
@@ -27,7 +22,6 @@ export interface ProcessDocumentPipelineResult {
   hasExtractedFields: boolean
   pageCount: number
   sourceTypes: Array<'ai' | 'pdf-text' | 'ocr' | 'mrz'>
-  geminiError?: string
   extractionError?: string
   isQuotaExceeded?: boolean
   diagnostics: {
@@ -68,7 +62,6 @@ export function isExtractionSufficient(
   if (
     hasCoreIdentity &&
     (textChars >= 80 ||
-      merged.passport?.passportNumber?.source === 'ai' ||
       merged.passport?.passportNumber?.source === 'ocr' ||
       merged.passport?.passportNumber?.source === 'mrz')
   ) {
@@ -81,10 +74,9 @@ export function isExtractionSufficient(
 /**
  * Authoritative end-to-end extraction pipeline.
  *
- * On experiment branch `experiment/python-local-ocr`, the Python Local OCR service
- * (FastAPI + PaddleOCR + PyMuPDF on port 8001) is the PRIMARY extraction engine.
- * Gemini remains intact for future reference/comparison, but is NOT called automatically.
- * When Python fails, it does NOT silently fall back to Gemini.
+ * Exclusively driven by the Python Local OCR service
+ * (FastAPI + PaddleOCR + PyMuPDF on port 8001).
+ * Fast text layer (<15ms) is used when available, with PaddleOCR for scanned documents.
  */
 export async function processUploadedDocumentPayload(
   fileDataUrl: string,
@@ -101,74 +93,40 @@ export async function processUploadedDocumentPayload(
   const sourceTypes = new Set<'ai' | 'pdf-text' | 'ocr' | 'mrz'>()
   const errors: string[] = []
 
-  let aiExecuted = false
+  const aiExecuted = false
   let extractionError: string | undefined
-  let isQuotaExceeded = false
+  const isQuotaExceeded = false
   const pageCount = 1
 
   const onProgress = options?.onProgress
 
-  if (options?.forceAi) {
-    // Explicit manual override to run Gemini (retained for future comparison)
-    let apiKey = options?.apiKey
-    if (!apiKey) {
-      try {
-        apiKey = await getGeminiApiKey()
-      } catch (keyErr) {
-        console.warn('Gemini API key resolution warning:', keyErr)
-      }
-    }
+  let pythonResponse: import('./local/pythonExtractorClient').PythonPassportExtractionResult | undefined
 
-    if (!apiKey || apiKey.trim().length === 0) {
-      extractionError = 'Gemini API key is missing or not configured. Please configure your Gemini API key in Settings.'
-      errors.push(extractionError)
-      console.warn('⚠️ [VISA AUTOFILL] Gemini extraction skipped: No API key available.')
-    } else {
-      onProgress?.({ percent: 30, text: 'Extracting document with Gemini AI (Vision Engine)...' })
-      try {
-        const targetMime = isPdf ? 'application/pdf' : (mimeType || 'image/jpeg')
-        const aiCand = await extractApplicantDataWithGemini([fileDataUrl], {
-          apiKey: apiKey.trim(),
-          modelName: options?.modelName,
-          mimeType: targetMime,
-        })
-
-        if (aiCand && hasAnyFields(aiCand)) {
-          aiExecuted = true
-          sourceTypes.add('ai')
-          candidateList.push(aiCand)
-          console.log('⚡ [VISA AUTOFILL] Gemini extraction succeeded!')
-        } else {
-          extractionError = 'Gemini AI returned response but no usable applicant fields were detected in this document.'
-          errors.push(extractionError)
-        }
-      } catch (aiErr) {
-        if (aiErr instanceof GeminiExtractionError) {
-          extractionError = aiErr.message
-          isQuotaExceeded = aiErr.isQuotaExceeded
-        } else {
-          const msg = aiErr instanceof Error ? aiErr.message : String(aiErr)
-          extractionError = msg
-          isQuotaExceeded = /quota|429|resource_exhausted|rate limit/i.test(msg)
-        }
-        errors.push(`Gemini AI extraction failure: ${extractionError}`)
-        console.warn('⚠️ [VISA AUTOFILL] Gemini extraction error:', aiErr)
-      }
-    }
+  // Check if uploaded document is PDF
+  if (!isPdf) {
+    extractionError = 'Only PDF documents are supported for passport extraction. Please upload a PDF file.'
+    errors.push(extractionError)
+    console.warn('⚠️ [VISA AUTOFILL] Non-PDF file passed to passport extraction:', fileName, mimeType)
   } else {
-    // PRIMARY PIPELINE ON THIS EXPERIMENT BRANCH: Python Local OCR Sidecar
+    // SOLE AUTHORITATIVE PIPELINE: Python Local OCR Sidecar
     onProgress?.({ percent: 20, text: 'Connecting to local Python OCR extractor...' })
     try {
       const pythonRaw = await extractPassportWithPython(fileDataUrl, fileName, {
         onProgress,
       })
+      pythonResponse = pythonRaw
 
       const mappedCand = mapPythonResultToExtractedApplicant(pythonRaw)
       if (mappedCand && hasAnyFields(mappedCand)) {
         if (pythonRaw.mrz?.detected) {
           sourceTypes.add('mrz')
         }
-        sourceTypes.add('ocr')
+        if (pythonRaw.diagnostics?.ocrExecuted ?? true) {
+          sourceTypes.add('ocr')
+        }
+        if (pythonRaw.diagnostics?.pdfTextFound) {
+          sourceTypes.add('pdf-text')
+        }
         candidateList.push(mappedCand)
         console.log('⚡ [VISA AUTOFILL] Local Python OCR extraction succeeded as primary engine!')
       } else {
@@ -207,18 +165,25 @@ export async function processUploadedDocumentPayload(
   console.log('Merged Extracted Data:', finalMerged)
   console.groupEnd()
 
+  const pyDiag = pythonResponse?.diagnostics
+  const effPdfTextFound = pyDiag ? pyDiag.pdfTextFound : false
+  const effPdfTextChars = pyDiag ? pyDiag.pdfTextChars : 0
+  const effPageCount = pyDiag ? pyDiag.pageCount : pageCount
+  const effOcrCount = pyDiag
+    ? (pyDiag.ocrExecuted ? (pyDiag.ocrPageCount || 1) : 0)
+    : (sourceTypes.has('ocr') ? 1 : 0)
+
   return {
     extractedData: finalMerged,
     hasExtractedFields,
-    pageCount,
+    pageCount: effPageCount,
     sourceTypes: Array.from(sourceTypes),
-    geminiError: extractionError, // Populated for UI compatibility in Dashboard & App.tsx
     extractionError,
     isQuotaExceeded,
     diagnostics: {
-      pdfTextFound: false,
-      pdfTextChars: 0,
-      ocrExecutedCount: sourceTypes.has('ocr') ? 1 : 0,
+      pdfTextFound: effPdfTextFound,
+      pdfTextChars: effPdfTextChars,
+      ocrExecutedCount: effOcrCount,
       mrzFound: sourceTypes.has('mrz'),
       aiExecuted,
       errors,
