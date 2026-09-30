@@ -257,15 +257,15 @@ export function applyExtractionToApplicant(
           mobile: derivedMob || undefined,
         }
       : undefined,
-    permanentAddress: hasPerm
+    permanentAddress: (hasPerm || hasExplicitPresent)
       ? {
-          addressLine1: perm.addressLine1?.value ? perm.addressLine1.value : undefined,
-          addressLine2: perm.addressLine2?.value ? perm.addressLine2.value : undefined,
-          villageTownCity: perm.villageTownCity?.value ? perm.villageTownCity.value : undefined,
-          district: perm.district?.value ? perm.district.value : undefined,
-          stateProvince: perm.stateProvince?.value ? perm.stateProvince.value : undefined,
-          country: perm.country?.value ? perm.country.value : undefined,
-          postalCode: perm.postalCode?.value ? perm.postalCode.value : undefined,
+          addressLine1: (hasPerm ? perm.addressLine1?.value : pres.addressLine1?.value) || undefined,
+          addressLine2: (hasPerm ? perm.addressLine2?.value : pres.addressLine2?.value) || undefined,
+          villageTownCity: (hasPerm ? perm.villageTownCity?.value : pres.villageTownCity?.value) || undefined,
+          district: (hasPerm ? perm.district?.value : pres.district?.value) || undefined,
+          stateProvince: (hasPerm ? perm.stateProvince?.value : pres.stateProvince?.value) || undefined,
+          country: (hasPerm ? perm.country?.value : pres.country?.value) || undefined,
+          postalCode: (hasPerm ? perm.postalCode?.value : pres.postalCode?.value) || undefined,
         }
       : undefined,
     contact: (hasContact || Boolean(derivedPhone || derivedIsd || derivedMob))
