@@ -1,9 +1,77 @@
 import fs from 'fs'
 import path from 'path'
 import { populateApplicationFromDocuments } from '../application/applicationMerger'
-import { mapGeminiOutputToApplicantData } from '../extraction/ai/geminiExtractor'
+import type { ExtractedApplicantData } from '../extraction/data/types'
 import type { DocumentRecord } from '../document/types'
 import type { SavedApplication } from '../application/types'
+
+function mapMockOutputToApplicantData(raw: Record<string, any>): ExtractedApplicantData {
+  const result: ExtractedApplicantData = {
+    personal: {},
+    passport: {},
+    contact: {},
+    presentAddress: {},
+    permanentAddress: {},
+    family: {},
+    employment: {},
+    travel: {},
+    previousVisa: {},
+    sponsorIndia: {},
+    sponsorMission: {},
+  }
+  const source = 'ai' as const
+  const p = (raw.personal || {})
+  if (p.surname) result.personal!.lastName = { value: String(p.surname).trim().toUpperCase(), source }
+  if (p.givenNames) result.personal!.firstName = { value: String(p.givenNames).trim().toUpperCase(), source }
+  if (p.fullName) result.personal!.fullName = { value: String(p.fullName).trim().toUpperCase(), source }
+  if (p.dateOfBirth) result.personal!.dateOfBirth = { value: String(p.dateOfBirth), source }
+  if (p.sex) result.personal!.gender = { value: String(p.sex).toLowerCase().includes('f') ? 'female' : 'male', source }
+  if (p.townCityOfBirth) result.personal!.townCityOfBirth = { value: String(p.townCityOfBirth).trim().toUpperCase(), source }
+  if (p.countryOfBirth) result.personal!.countryOfBirth = { value: String(p.countryOfBirth).trim().toUpperCase(), source }
+  if (p.nationality) result.personal!.nationality = { value: String(p.nationality).trim().toUpperCase(), source }
+  if (p.religion) result.personal!.religion = { value: String(p.religion).trim().toUpperCase(), source }
+  if (p.educationalQualification) result.personal!.educationalQualification = { value: String(p.educationalQualification).trim().toUpperCase(), source }
+
+  const ppt = (raw.passport || {})
+  if (ppt.passportNumber) result.passport!.passportNumber = { value: String(ppt.passportNumber).trim().toUpperCase(), source }
+  if (ppt.passportType) result.passport!.passportType = { value: String(ppt.passportType).trim().toUpperCase(), source }
+  if (ppt.issuingCountry) result.passport!.issuingCountry = { value: String(ppt.issuingCountry).trim().toUpperCase(), source }
+  if (ppt.placeOfIssue) result.passport!.placeOfIssue = { value: String(ppt.placeOfIssue).trim().toUpperCase(), source }
+  if (ppt.issueDate) result.passport!.issueDate = { value: String(ppt.issueDate), source }
+  if (ppt.expiryDate) result.passport!.expiryDate = { value: String(ppt.expiryDate), source }
+  if (ppt.holdsOtherPassport !== undefined) {
+    result.passport!.holdsOtherPassport = { value: Boolean(ppt.holdsOtherPassport), source }
+  }
+  if (ppt.otherPassportNumber || ppt.otherPassportPlaceOfIssue || ppt.otherPassportCountryOfIssue) {
+    result.passport!.otherPassportDetails = {
+      passportNumber: ppt.otherPassportNumber ? { value: String(ppt.otherPassportNumber), source } : undefined,
+      placeOfIssue: ppt.otherPassportPlaceOfIssue ? { value: String(ppt.otherPassportPlaceOfIssue), source } : undefined,
+      countryOfIssue: ppt.otherPassportCountryOfIssue ? { value: String(ppt.otherPassportCountryOfIssue), source } : undefined,
+    }
+  }
+
+  const c = (raw.contact || {})
+  if (c.phone) result.contact!.phone = { value: String(c.phone), source }
+  if (c.mobile) result.contact!.mobile = { value: String(c.mobile), source }
+  if (c.isdCode) result.contact!.isdCode = { value: String(c.isdCode), source }
+  if (c.email) result.contact!.email = { value: String(c.email), source }
+
+  const pra = (raw.presentAddress || {})
+  if (pra.addressLine1) result.presentAddress!.addressLine1 = { value: String(pra.addressLine1), source }
+  if (pra.district) result.presentAddress!.district = { value: String(pra.district), source }
+  if (pra.country) result.presentAddress!.country = { value: String(pra.country), source }
+
+  const pma = (raw.permanentAddress || {})
+  if (pma.addressLine1) result.permanentAddress!.addressLine1 = { value: String(pma.addressLine1), source }
+  if (pma.district) result.permanentAddress!.district = { value: String(pma.district), source }
+  if (pma.country) result.permanentAddress!.country = { value: String(pma.country), source }
+
+  const fam = (raw.family || {})
+  if (fam.fatherName) result.family!.father = { name: { value: String(fam.fatherName), source } }
+  if (fam.motherName) result.family!.mother = { name: { value: String(fam.motherName), source } }
+
+  return result
+}
 
 export interface Task079TestResult {
   passed: boolean
@@ -85,10 +153,10 @@ export async function runTask079DynamicExtractionTests(): Promise<Task079TestRes
   )
 
   // =========================================================================
-  // 2. Gemini Extraction Schema & Mapping (Strict extraction, no fake confidence)
+  // 2. Structured Extraction Schema & Mapping (Strict extraction, no fake confidence)
   // =========================================================================
-  console.log('🔍 [TASK 079] 2. Gemini Output Mapping & No Fake Confidence Test')
-  const geminiSampleOutput = {
+  console.log('🔍 [TASK 079] 2. Structured Output Mapping & No Fake Confidence Test')
+  const mockSampleOutput = {
     personal: {
       surname: 'KARIM',
       givenNames: 'RAHIM',
@@ -136,16 +204,16 @@ export async function runTask079DynamicExtractionTests(): Promise<Task079TestRes
     },
   }
 
-  const mappedGemini = mapGeminiOutputToApplicantData(geminiSampleOutput)
-  assert(mappedGemini.personal?.lastName?.value === 'KARIM', 'Gemini mapping: lastName is KARIM')
-  assert(mappedGemini.personal?.firstName?.value === 'RAHIM', 'Gemini mapping: firstName is RAHIM')
-  assert(mappedGemini.passport?.passportNumber?.value === 'Z99999999', 'Gemini mapping: passportNumber is Z99999999')
-  assert(mappedGemini.personal?.religion === undefined, 'Gemini mapping: missing religion is undefined')
-  assert(mappedGemini.contact?.email === undefined, 'Gemini mapping: missing email is undefined')
-  assert(mappedGemini.passport?.otherPassportDetails?.placeOfIssue === undefined, 'Gemini mapping: missing previous passport place of issue is undefined (not defaulted)')
+  const mappedMock = mapMockOutputToApplicantData(mockSampleOutput)
+  assert(mappedMock.personal?.lastName?.value === 'KARIM', 'Extraction mapping: lastName is KARIM')
+  assert(mappedMock.personal?.firstName?.value === 'RAHIM', 'Extraction mapping: firstName is RAHIM')
+  assert(mappedMock.passport?.passportNumber?.value === 'Z99999999', 'Extraction mapping: passportNumber is Z99999999')
+  assert(mappedMock.personal?.religion === undefined, 'Extraction mapping: missing religion is undefined')
+  assert(mappedMock.contact?.email === undefined, 'Extraction mapping: missing email is undefined')
+  assert(mappedMock.passport?.otherPassportDetails?.placeOfIssue === undefined, 'Extraction mapping: missing previous passport place of issue is undefined (not defaulted)')
   assert(
-    mappedGemini.personal?.lastName?.confidence === undefined,
-    'Gemini mapping: confidence is NOT fabricated to 99'
+    mappedMock.personal?.lastName?.confidence === undefined,
+    'Extraction mapping: confidence is NOT fabricated to 99'
   )
 
   // =========================================================================
@@ -164,7 +232,7 @@ export async function runTask079DynamicExtractionTests(): Promise<Task079TestRes
     status: 'processed',
     source: 'user-upload',
     extractedDataConfirmed: true,
-    extractedData: mappedGemini,
+    extractedData: mappedMock,
   }
 
   const appA = populateApplicationFromDocuments({
@@ -192,7 +260,7 @@ export async function runTask079DynamicExtractionTests(): Promise<Task079TestRes
   // 4. Synthetic Applicant B (TEST PERSON, X12345678)
   // =========================================================================
   console.log('🔍 [TASK 079] 4. Synthetic Applicant B Workspace Integration')
-  const geminiSampleOutputB = {
+  const mockSampleOutputB = {
     personal: {
       surname: 'PERSON',
       givenNames: 'TEST',
@@ -245,7 +313,7 @@ export async function runTask079DynamicExtractionTests(): Promise<Task079TestRes
     status: 'processed',
     source: 'user-upload',
     extractedDataConfirmed: true,
-    extractedData: mapGeminiOutputToApplicantData(geminiSampleOutputB),
+    extractedData: mapMockOutputToApplicantData(mockSampleOutputB),
   }
 
   const appB = populateApplicationFromDocuments({
@@ -293,9 +361,9 @@ export async function runTask079DynamicExtractionTests(): Promise<Task079TestRes
     ...docRecordA,
     documentId: 'doc_only_perm',
     extractedData: {
-      personal: mappedGemini.personal,
-      passport: mappedGemini.passport,
-      contact: mappedGemini.contact,
+      personal: mappedMock.personal,
+      passport: mappedMock.passport,
+      contact: mappedMock.contact,
       permanentAddress: {
         addressLine1: { value: 'HOUSE 10, VILLAGE ROAD', source: 'ai' },
         district: { value: 'DINAJPUR', source: 'ai' },
