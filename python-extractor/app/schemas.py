@@ -70,6 +70,15 @@ class FieldSource(BaseModel):
     conflictDetails: Optional[str] = None
 
 
+class ExtractionDiagnostics(BaseModel):
+    pdfTextFound: bool = False
+    pdfTextChars: int = 0
+    pageCount: int = 1
+    ocrExecuted: bool = False
+    ocrPageCount: int = 0
+    extractionDurationMs: float = 0.0
+
+
 class PassportExtractionResult(BaseModel):
     personal: PersonalData = Field(default_factory=PersonalData)
     passport: PassportData = Field(default_factory=PassportData)
@@ -80,4 +89,5 @@ class PassportExtractionResult(BaseModel):
     mrz: MRZData = Field(default_factory=MRZData)
     fieldSources: Dict[str, FieldSource] = Field(default_factory=dict)
     processingTimeMs: Optional[float] = None
+    diagnostics: Optional[ExtractionDiagnostics] = None
 
