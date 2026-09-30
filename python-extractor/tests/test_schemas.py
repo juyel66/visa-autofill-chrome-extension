@@ -75,3 +75,24 @@ def test_schema_serialization():
     json_str = result.model_dump_json()
     parsed = json.loads(json_str)
     assert parsed["personal"]["surname"] == "DOE"
+
+
+def test_extraction_diagnostics_schema():
+    from app.schemas import ExtractionDiagnostics
+
+    diag = ExtractionDiagnostics(
+        pdfTextFound=True,
+        pdfTextChars=320,
+        pageCount=2,
+        ocrExecuted=False,
+        ocrPageCount=0,
+        extractionDurationMs=45.2,
+    )
+    result = PassportExtractionResult(diagnostics=diag)
+    dumped = result.model_dump()
+    assert dumped["diagnostics"]["pdfTextFound"] is True
+    assert dumped["diagnostics"]["pdfTextChars"] == 320
+    assert dumped["diagnostics"]["pageCount"] == 2
+    assert dumped["diagnostics"]["ocrExecuted"] is False
+    assert dumped["diagnostics"]["ocrPageCount"] == 0
+    assert dumped["diagnostics"]["extractionDurationMs"] == 45.2
