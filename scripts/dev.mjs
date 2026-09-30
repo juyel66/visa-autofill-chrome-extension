@@ -209,7 +209,7 @@ async function run() {
 
       pythonProcess = spawn(
         pythonExe,
-        ['-m', 'uvicorn', 'app.main:app', '--host', HOST, '--port', String(PORT), '--reload'],
+        ['-m', 'uvicorn', 'app.main:app', '--host', HOST, '--port', String(PORT)],
         {
           cwd: pythonExtractorDir,
           stdio: ['ignore', 'pipe', 'pipe'],
