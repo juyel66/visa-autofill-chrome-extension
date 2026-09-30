@@ -1,8 +1,11 @@
 import os
 import sys
+import threading
 import types
 from typing import Any, List, Optional
 from unittest.mock import MagicMock
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 import numpy as np
 from pydantic import BaseModel, Field
 
@@ -57,44 +60,49 @@ class OCRBox(BaseModel):
     bbox: List[Any] = Field(default_factory=list)
 
 
+_ocr_lock = threading.Lock()
 _ocr_instance = None
 
 
 def get_ocr_instance():
-    """Lazy initialize PaddleOCR instance with safe CPU settings."""
+    """Lazy initialize PaddleOCR instance with safe CPU settings and thread-safe lock."""
     global _ocr_instance
     if _ocr_instance is not None:
         return _ocr_instance
 
-    import paddle.inference as pi
+    with _ocr_lock:
+        if _ocr_instance is not None:
+            return _ocr_instance
 
-    # Patch create_predictor to safely disable oneDNN on CPU
-    orig_create_predictor = pi.create_predictor
+        import paddle.inference as pi
 
-    def safe_create_predictor(config):
-        if hasattr(config, "disable_onednn"):
-            config.disable_onednn()
-        if hasattr(config, "disable_mkldnn"):
-            config.disable_mkldnn()
-        if hasattr(config, "enable_new_ir"):
-            config.enable_new_ir(False)
-        if hasattr(config, "set_cpu_math_library_num_threads"):
-            config.set_cpu_math_library_num_threads(1)
-        return orig_create_predictor(config)
+        # Patch create_predictor to safely disable oneDNN on CPU
+        orig_create_predictor = pi.create_predictor
 
-    pi.create_predictor = safe_create_predictor
+        def safe_create_predictor(config):
+            if hasattr(config, "disable_onednn"):
+                config.disable_onednn()
+            if hasattr(config, "disable_mkldnn"):
+                config.disable_mkldnn()
+            if hasattr(config, "enable_new_ir"):
+                config.enable_new_ir(False)
+            if hasattr(config, "set_cpu_math_library_num_threads"):
+                config.set_cpu_math_library_num_threads(1)
+            return orig_create_predictor(config)
 
-    from paddleocr import PaddleOCR
+        pi.create_predictor = safe_create_predictor
 
-    # Using PP-OCRv4 mobile models which are fast, accurate, and stable on local CPU
-    _ocr_instance = PaddleOCR(
-        ocr_version="PP-OCRv4",
-        lang="en",
-        use_doc_unwarping=False,
-        use_doc_orientation_classify=False,
-        use_textline_orientation=False,
-    )
-    return _ocr_instance
+        from paddleocr import PaddleOCR
+
+        # Using PP-OCRv4 mobile models which are fast, accurate, and stable on local CPU
+        _ocr_instance = PaddleOCR(
+            ocr_version="PP-OCRv4",
+            lang="en",
+            use_doc_unwarping=False,
+            use_doc_orientation_classify=False,
+            use_textline_orientation=False,
+        )
+        return _ocr_instance
 
 
 def run_ocr(image: np.ndarray) -> List[OCRBox]:
