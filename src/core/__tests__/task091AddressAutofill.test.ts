@@ -203,7 +203,7 @@ export async function runTask091AddressAutofillTests(): Promise<TestResult> {
 
   console.log('--- TEST 5: Deduplication of Repeated Segments & Default ISD Code / Country ---')
   {
-    // If Gemini or OCR produced duplicated segment string
+    // If extractor produced duplicated segment string
     const rawDup = 'CHONDARIA, PIRGANJ, KARNAI, PIRGANJ, KARNAI, 5110, THAKURGAON, THAKURGAON'
     const res = parseStructuredAddress(rawDup)
 
