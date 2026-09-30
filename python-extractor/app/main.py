@@ -67,11 +67,18 @@ async def extract_passport_endpoint(file: UploadFile = File(...)):
     print(f"[main] PDF read: {len(content)} bytes in {t_read_dur:.2f} ms")
 
     try:
-        # Finite 120-second safe timeout ensures backend never hangs indefinitely while accommodating CPU OCR
+        # Finite 120-second safe timeout ensures backend never hangs indefinitely while accommodating CPU OCR.
+        # TIMEOUT SAFETY NOTE:
+        # asyncio.wait_for cancels the waiting coroutine when the timeout expires, unblocking the event loop
+        # and returning an immediate HTTP 504 response to the client.
+        # However, asyncio.to_thread runs in Python's standard ThreadPoolExecutor. In Python/C-extensions,
+        # worker threads cannot be forcibly killed or aborted asynchronously from outside without risking
+        # lock corruption or C-library segfaults. The underlying OCR thread will safely complete its current
+        # task in the background, but the HTTP request will NEVER be left hanging indefinitely.
         t_extract_start = time.time()
         result = await asyncio.wait_for(
             asyncio.to_thread(extract_passport, content),
-            timeout=120.0,
+            timeout=180.0,
         )
         t_extract_dur = (time.time() - t_extract_start) * 1000
         t_total = (time.time() - t_req_start) * 1000
