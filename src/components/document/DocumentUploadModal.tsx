@@ -45,6 +45,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       return
     }
 
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    if (category === 'passport' && !isPdf) {
+      setErrorMessage('Passport extraction requires a PDF document. Please upload a PDF file.')
+      setSelectedFile(null)
+      return
+    }
+
     if (!SUPPORTED_MIME_TYPES.includes(file.type)) {
       setErrorMessage('Unsupported file type. Please upload a PDF, JPG, or PNG document.')
       setSelectedFile(null)
@@ -169,7 +176,20 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           <select
             className="w-full p-1.5 rounded border text-xs bg-white font-medium cursor-pointer"
             value={category}
-            onChange={(e) => setCategory(e.target.value as GenericDocumentCategory)}
+            onChange={(e) => {
+              const newCat = e.target.value as GenericDocumentCategory
+              setCategory(newCat)
+              if (newCat === 'passport' && selectedFile) {
+                const isPdf = selectedFile.type === 'application/pdf' || selectedFile.name.toLowerCase().endsWith('.pdf')
+                if (!isPdf) {
+                  setErrorMessage('Passport extraction requires a PDF document. Please upload a PDF file.')
+                  setSelectedFile(null)
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = ''
+                  }
+                }
+              }
+            }}
           >
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>
@@ -182,12 +202,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         {/* File Picker */}
         <div>
           <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
-            Select File (PDF, JPG, PNG - Max 5 MB)
+            {category === 'passport'
+              ? 'Select Passport File (PDF only - Max 5 MB)'
+              : 'Select File (PDF, JPG, PNG - Max 5 MB)'}
           </label>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf, .jpg, .jpeg, .png"
+            accept={category === 'passport' ? '.pdf,application/pdf' : '.pdf, .jpg, .jpeg, .png'}
             onChange={handleFileChange}
             disabled={isUploading}
             className="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
