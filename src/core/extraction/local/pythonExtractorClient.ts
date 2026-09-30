@@ -567,6 +567,7 @@ export function mapPythonResultToExtractedApplicant(
   } else if (!hasExplicitPresent && hasExplicitPermanent) {
     effPermanent = rawPermAddr
     effPresent = rawPermAddr // In passport, printed address is Permanent Address; populates Present Address too
+    isPermanentCopiedFromPresent = true
   } else if (hasGenericAddr) {
     effPresent = rawGenAddr
     effPermanent = rawGenAddr
