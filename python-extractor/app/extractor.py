@@ -19,6 +19,7 @@ _EXTRACTION_CACHE: Dict[str, Any] = {}
 _CACHE_MAX_SIZE: int = 30
 from .schemas import (
     AddressData,
+    ExtractionDiagnostics,
     FamilyData,
     FieldSource,
     MRZData,
@@ -207,7 +208,20 @@ DISALLOWED_NAME_TOKENS = {
     "EMERGENCY", "CONTACT", "ADDRESS", "FATHER", "MOTHER", "GUARDIAN",
     "LEGAL", "SPOUSE", "RELATIONSHIP", "TELEPHONE", "PHONE", "MOBILE",
     "PERMANENT", "PRESENT", "PEOPLE", "REPUBLIC", "OF", "BANGLADESH",
-    "AS", "IN", "FOR", "PREV", "PREVIOUS", "RELATION"
+    "AS", "IN", "FOR", "PREV", "PREVIOUS", "RELATION", "RELATIONS", "ELATION", "ELATIONS", "LATION",
+    "IF", "ANY", "NOT", "APPLICABLE", "APPLY", "NA", "NIL", "NONE", "UNKNOWN",
+    "SAME", "ABOVE", "OTHER", "OTHERS", "PARTICULARS", "APPLICATION", "DETAILS",
+    "PÈRE", "PERE", "MÈRE", "MERE", "NOM", "DU", "DE", "LA",
+    "GENDER", "MARITAL", "STATUS", "RELIGION", "TOWN", "CITY",
+    "CITIZENSHIP", "EDUCATIONAL", "QUALIFICATION", "VISIBLE", "MARKS",
+    "IDENTIFICATION", "CURRENT", "NATURALIZATION", "OCCUPATION", "DESIGNATION",
+    "EMPLOYER", "HOTEL", "TOURIST", "VISA", "JOURNEY", "PORT", "ARRIVAL", "EXIT",
+    "ORGANIZATION", "POSTING", "RANK", "DECLARATION", "STAY", "ENTRY", "ENTRIES",
+    "MONTH", "MONTHS", "YEAR", "YEARS", "DAY", "DAYS",
+    "COLONI", "COLONY", "ROAD", "STREET", "VILL", "VILLAGE", "POST", "DIST",
+    "DISTRICT", "THANA", "UPAZILA", "DIVISION", "ESTATE", "SECTOR", "BLOCK",
+    "HOUSE", "HOLDING", "PARA", "MAHAL", "PO", "PS", "PANCHAGARH", "THAKURGAON",
+    "DHAKA", "RAJSHAHI", "CHITTAGONG", "SYLHET", "KHULNA", "BARISAL", "RANGPUR", "MYMENSINGH"
 }
 
 
@@ -225,7 +239,7 @@ def is_valid_name_token(token: str) -> bool:
     # Person name tokens must never contain digits (e.g. G70E, 70E, 410G7A)
     if re.search(r"\d", t):
         return False
-    # Disallow passport metadata or labels
+    # Disallow passport metadata, labels, or address tokens
     if t.upper() in DISALLOWED_NAME_TOKENS:
         return False
     # Must consist of letters, with optional internal hyphen or apostrophe
@@ -237,9 +251,20 @@ def is_valid_name_token(token: str) -> bool:
 def clean_person_name(cand: str) -> str:
     """
     Clean person name: remove OCR artifacts (e.g. G70E, 70E, random alphanumeric fragments),
-    disallowed keywords, and normalize multi-token spaces.
+    disallowed keywords, placeholder phrases ('IF ANY', 'NOT APPLICABLE'), and normalize multi-token spaces.
+    Strictly rejects strings containing address indicators or placeholder phrases.
     """
     if not cand:
+        return ""
+    cand_upper = cand.strip().upper()
+    if cand_upper in {"IF ANY", "NOT APPLICABLE", "NOT APPLIED", "NA", "N/A", "NONE", "NIL", "UNKNOWN", "NOT APPLY", "SAME AS ABOVE"}:
+        return ""
+    # Reject strings containing obvious address components
+    if any(addr_kw in cand_upper for addr_kw in [
+        "COLONI", "COLONY", "ROAD", "STREET", "VILL", "VILLAGE", "POST", "DIST",
+        "DISTRICT", "THANA", "UPAZILA", "DIVISION", "ESTATE", "SECTOR", "BLOCK",
+        "HOUSE NO", "HOLDING", "HOUSING", "POSTAL CODE", "PINCODE"
+    ]):
         return ""
     cand_norm = cand.replace("<", " ").replace("/", " ")
     raw_tokens = cand_norm.split()
@@ -250,7 +275,37 @@ def clean_person_name(cand: str) -> str:
             valid_tokens.append(clean_tok.upper())
     if not valid_tokens:
         return ""
-    return " ".join(valid_tokens)
+    res = " ".join(valid_tokens)
+    if res in {"IF ANY", "NOT APPLICABLE", "NA", "NONE", "UNKNOWN", "NIL"}:
+        return ""
+    return res
+
+
+def is_applicant_name(cand_str: str, applicant_full: str = "", applicant_given: str = "", applicant_surname: str = "") -> bool:
+    """
+    Check if a candidate person name string matches the applicant's own name,
+    accounting for missing spaces (e.g. 'SHREE JOTIMOYRAY' vs 'SHREE JOTIMOY RAY'),
+    while preventing false matches on shared titles/prefixes (e.g. 'SHREE' or 'MD').
+    """
+    if not cand_str:
+        return False
+    cand_norm = re.sub(r"[\s<]+", "", cand_str).upper()
+    if not cand_norm or len(cand_norm) < 3:
+        return False
+    full_norm = re.sub(r"[\s<]+", "", applicant_full or "").upper()
+    given_norm = re.sub(r"[\s<]+", "", applicant_given or "").upper()
+    rev_full_norm = re.sub(r"[\s<]+", "", f"{applicant_surname or ''}{applicant_given or ''}").upper()
+    fwd_full_norm = re.sub(r"[\s<]+", "", f"{applicant_given or ''}{applicant_surname or ''}").upper()
+
+    if full_norm and cand_norm == full_norm:
+        return True
+    if fwd_full_norm and cand_norm == fwd_full_norm:
+        return True
+    if rev_full_norm and cand_norm == rev_full_norm:
+        return True
+    if given_norm and len(given_norm) >= 4 and cand_norm == given_norm:
+        return True
+    return False
 
 
 def normalize_phone_number(raw: str) -> str:
@@ -1214,38 +1269,58 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                     results["fullName"] = (cand_clean, confs[k])
                     break
 
-        # 4. Father's Name (e.g. "Father's Name", "ather's Name", etc.)
-        if (re.search(r"(?:\bF?ATHER|NOM\s*DU\s*P[EÈ]RE|FÈRE|PERE)(?:['’]?S)?(?:\s*NAME)?", upper) or upper.startswith("ATHER'S NAME") or upper.startswith("ATHER")) and not any(kw in upper for kw in ["MOTHER", "GUARDIAN", "SPOUSE"]) and "fatherName" not in results:
-            after_label = re.sub(r"^.*?(?:F?ATHER|NOM\s*DU\s*P[EÈ]RE|FÈRE|PERE)(?:['’]?S)?(?:\s*NAME)?\s*[:/.-]*\s*", "", text, flags=re.IGNORECASE).strip()
+        # Applicant names set to prevent collision with family members
+        applicant_names = set()
+        if "fullName" in results:
+            applicant_names.add(results["fullName"][0].upper())
+            applicant_names.update(results["fullName"][0].upper().split())
+        if "givenName" in results:
+            applicant_names.add(results["givenName"][0].upper())
+            applicant_names.update(results["givenName"][0].upper().split())
+        if "surname" in results:
+            applicant_names.add(results["surname"][0].upper())
+
+        # 4. Father's Name (e.g. "Father's Name", "ather's Name", "NOM DU PÈRE", etc.)
+        is_father_label = bool(
+            (re.search(r"\b(?:FATHER|FÈRE|PERE|NOM\s*DU\s*P[EÈ]RE)(?:['’]?S)?(?:\s*NAME)?\b", upper) or
+             upper.startswith("ATHER'S NAME") or upper == "FATHER'S" or upper == "FATHER" or upper == "S-NAME") and
+            not any(kw in upper for kw in ["MOTHER", "GUARDIAN", "SPOUSE", "PREVIOUS", "PREV", "OTHER", "PASSPORT"])
+        )
+        if is_father_label and "fatherName" not in results:
+            after_label = re.sub(r"^.*?(?:FATHER|FÈRE|PERE|NOM\s*DU\s*P[EÈ]RE|ATHER|S-NAME)(?:['’]?S)?(?:\s*NAME)?\s*[:/.-]*\s*", "", text, flags=re.IGNORECASE).strip()
             clean_inline = clean_person_name(after_label)
-            if clean_inline and not any(kw in clean_inline.upper() for kw in ["MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH"]):
+            if clean_inline and clean_inline.upper() not in applicant_names and not any(kw in clean_inline.upper() for kw in ["MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH"]):
                 results["fatherName"] = (clean_inline, confs[i])
             else:
                 for k in range(i + 1, min(i + 5, num_boxes)):
-                    cand_clean = clean_person_name(lines[k].strip())
-                    if cand_clean and not any(kw in cand_clean.upper() for kw in ["MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH", "AME"]):
+                    cand_text = lines[k].strip()
+                    if any(kw in cand_text.upper() for kw in ["MOTHER", "GUARDIAN", "SPOUSE", "ADDRESS", "EMERGENCY", "BANGLADESH", "NATIONALITY", "PASSPORT"]):
+                        continue
+                    cand_clean = clean_person_name(cand_text)
+                    if cand_clean and cand_clean.upper() not in applicant_names and not any(kw in cand_clean.upper() for kw in ["MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH", "AME"]):
                         results["fatherName"] = (cand_clean, confs[k])
                         break
 
-        # 5. Mother's Name (e.g. "Mother's Name", "other's Name", "NOM DE LA MÈRE", etc.)
-        if (re.search(r"(?:\bM?OTHER|NOM\s*DE\s*LA\s*M[EÈ]RE|MÈRE|MERE)(?:['’]?S)?(?:\s*NAME)?", upper) or upper.startswith("OTHER'S NAME") or upper.startswith("OTHER")) and "motherName" not in results:
-            after_label = re.sub(r"^.*?(?:M?OTHER|NOM\s*DE\s*LA\s*M[EÈ]RE|MÈRE|MERE)(?:['’]?S)?(?:\s*NAME)?\s*[:/.-]*\s*", "", text, flags=re.IGNORECASE).strip()
+        # 5. Mother's Name (e.g. "Mother's Name", "NOM DE LA MÈRE", etc.)
+        is_mother_label = bool(
+            (re.search(r"\b(?:MOTHER|MÈRE|MERE|NOM\s*DE\s*LA\s*M[EÈ]RE)(?:['’]?S)?(?:\s*NAME)?\b", upper) or
+             (upper.startswith("OTHER'S NAME") and not any(kw in upper for kw in ["PREV", "PREVIOUS", "ALIAS", "ANY", "IF ANY"])) or
+             upper == "MOTHER'S" or upper == "MOTHER") and
+            not any(kw in upper for kw in ["FATHER", "GUARDIAN", "SPOUSE", "PREVIOUS", "PREV", "PASSPORT", "NATIONALITY", "IF ANY", "OTHER NAME"])
+        )
+        if is_mother_label and "motherName" not in results:
+            after_label = re.sub(r"^.*?(?:MOTHER|MÈRE|MERE|NOM\s*DE\s*LA\s*M[EÈ]RE)(?:['’]?S)?(?:\s*NAME)?\s*[:/.-]*\s*", "", text, flags=re.IGNORECASE).strip()
             clean_inline = clean_person_name(after_label)
-            if clean_inline and not any(kw in clean_inline.upper() for kw in ["FATHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "LEGAL", "NAME", "RELATION", "BANGLADESH"]):
+            if clean_inline and clean_inline.upper() not in applicant_names and clean_inline != results.get("fatherName", ("", 0))[0] and not any(kw in clean_inline.upper() for kw in ["FATHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "LEGAL", "NAME", "RELATION", "BANGLADESH"]):
                 results["motherName"] = (clean_inline, confs[i])
             else:
                 for k in range(i + 1, min(i + 5, num_boxes)):
-                    cand_clean = clean_person_name(lines[k].strip())
-                    if cand_clean and not any(kw in cand_clean.upper() for kw in ["FATHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "LEGAL", "NAME", "RELATION", "BANGLADESH", "AME"]):
+                    cand_text = lines[k].strip()
+                    if any(kw in cand_text.upper() for kw in ["FATHER", "GUARDIAN", "SPOUSE", "ADDRESS", "EMERGENCY", "BANGLADESH", "NATIONALITY", "PASSPORT"]):
+                        continue
+                    cand_clean = clean_person_name(cand_text)
+                    if cand_clean and cand_clean.upper() not in applicant_names and cand_clean != results.get("fatherName", ("", 0))[0] and not any(kw in cand_clean.upper() for kw in ["FATHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "LEGAL", "NAME", "RELATION", "BANGLADESH", "AME"]):
                         results["motherName"] = (cand_clean, confs[k])
-                        break
-            # Robust fallback for Father's Name if preceding Mother's Name in standard personal data layout
-            if "fatherName" not in results:
-                for k in range(i - 1, max(-1, i - 4), -1):
-                    cand_clean = clean_person_name(lines[k].strip())
-                    full_name_cand = results.get("fullName", ("", 0.0))[0]
-                    if cand_clean and cand_clean != full_name_cand and not any(kw in lines[k].upper() for kw in ["PERSONAL", "DATA", "EMERGENCY", "CONTACT", "MOTHER", "ADDRESS", "PASSPORT", "GUARDIAN"]):
-                        results["fatherName"] = (cand_clean, confs[k])
                         break
 
         # 6. Emergency Contact & Spouse
@@ -1264,10 +1339,22 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                         if any(rel in rel_val for rel in ["SPOUSE", "WIFE", "HUSBAND"]):
                             is_spouse = True
                             break
+                    if is_spouse and not contact_name:
+                        for prev_k in range(k - 1, max(i, k - 4), -1):
+                            prev_txt = lines[prev_k].strip()
+                            if any(kw in prev_txt.upper() for kw in ["COLONI", "ROAD", "VILL", "POST", "DISTRICT", "THAKURGAON", "5120", "PERSONAL", "DATA"]):
+                                break
+                            prev_clean = clean_person_name(prev_txt)
+                            if (prev_clean and
+                                not is_applicant_name(prev_clean, applicant_full=results.get("fullName", ("", 0))[0], applicant_given=results.get("givenName", ("", 0))[0], applicant_surname=results.get("surname", ("", 0))[0]) and
+                                not any(kw in prev_txt.upper() for kw in ["RELATION", "ELATION", "LATION", "SPOUSE", "NAME", "EMERGENCY"])):
+                                contact_name = prev_clean
+                                contact_conf = confs[prev_k]
+                                break
                 elif (re.search(r"\b[A-Z]*AME[:.]?$", box_upper) or box_upper in ["NAME:", "NAME", "AME", "AME:"]) and not contact_name:
                     if k + 1 < num_boxes:
                         cand_nm = clean_person_name(lines[k + 1].strip())
-                        if cand_nm and not any(kw in cand_nm.upper() for kw in ["RELATION", "SPOUSE", "ADDRESS", "EMERGENCY", "BANGLADESH"]):
+                        if cand_nm and not is_applicant_name(cand_nm, applicant_full=results.get("fullName", ("", 0))[0], applicant_given=results.get("givenName", ("", 0))[0], applicant_surname=results.get("surname", ("", 0))[0]) and not any(kw in cand_nm.upper() for kw in ["RELATION", "SPOUSE", "ADDRESS", "EMERGENCY", "BANGLADESH"]):
                             contact_name = cand_nm
                             contact_conf = confs[k + 1]
                 elif re.search(r"(?:\b[ET]ELEPHONE|\bPHONE|\bMOBILE|\bCONTACT|\bTEL)(?:\s*(?:NO|NUMBER))?", box_upper):
@@ -1284,16 +1371,30 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                 results["spouseName"] = (contact_name, contact_conf)
 
         if re.search(r"\bSPOUSE(?:['’]?S)?(?:\s*NAME)?\b", upper) and "spouseName" not in results:
-            if upper.strip() in ("SPOUSE", "SPOUSE:", "RELATIONSHIP: SPOUSE", "RELATION: SPOUSE") and i > 0:
-                prev_cand = clean_person_name(lines[i - 1].strip())
-                if prev_cand and not any(kw in prev_cand.upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH", "COLONI"]):
-                    results["spouseName"] = (prev_cand, confs[i - 1])
-            if "spouseName" not in results:
-                for k in range(i + 1, min(i + 5, num_boxes)):
+            after_label = re.sub(r"^.*?\bSPOUSE(?:['’]?S)?(?:\s*NAME)?\s*[:/.-]*\s*", "", text, flags=re.IGNORECASE).strip()
+            clean_inline = clean_person_name(after_label)
+            if clean_inline and clean_inline.upper() not in applicant_names:
+                results["spouseName"] = (clean_inline, confs[i])
+            else:
+                found_fwd = False
+                for k in range(i + 1, min(i + 4, num_boxes)):
                     cand_clean = clean_person_name(lines[k].strip())
-                    if cand_clean and not any(kw in cand_clean.upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH", "COLONI", "ROAD", "VILL", "POST"]):
+                    if (cand_clean and
+                        cand_clean.upper() not in applicant_names and
+                        cand_clean != results.get("fatherName", ("", 0))[0] and
+                        cand_clean != results.get("motherName", ("", 0))[0] and
+                        not any(kw in lines[k].upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH", "COLONI", "ROAD", "VILL", "POST"])):
                         results["spouseName"] = (cand_clean, confs[k])
+                        found_fwd = True
                         break
+                if not found_fwd and upper.strip() in ("SPOUSE", "SPOUSE:", "RELATIONSHIP: SPOUSE", "RELATION: SPOUSE") and i > 0:
+                    prev_cand = clean_person_name(lines[i - 1].strip())
+                    if (prev_cand and
+                        prev_cand.upper() not in applicant_names and
+                        prev_cand != results.get("fatherName", ("", 0))[0] and
+                        prev_cand != results.get("motherName", ("", 0))[0] and
+                        not any(kw in lines[i - 1].upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH", "COLONI", "ROAD", "VILL", "POST"])):
+                        results["spouseName"] = (prev_cand, confs[i - 1])
 
         # 7. Previous Passport No
         if re.search(r"(?:PREVIOUS|PREVIOU|PREV)\s*(?:PASSPORT)?\s*(?:NO|NUMBER)?", upper) and "previousPassportNumber" not in results:
@@ -1390,7 +1491,7 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                     break
 
         # 14. Issuing Authority / Place of Issue
-        if re.search(r"(?:[IS]*SUING\s*AUTHORITY|PLACE\s*OF\s*ISSUE)", upper) and "issuePlace" not in results:
+        if re.search(r"(?:(?:[IS]*SUING\s*)?AUTHORITY|PLACE\s*OF\s*ISSUE)", upper) and "issuePlace" not in results:
             for k in range(i + 1, min(i + 4, num_boxes)):
                 cand = lines[k].strip()
                 cand_clean = cand.upper().replace("DIPIDHAKA", "DIP/DHAKA")
@@ -1999,23 +2100,77 @@ def _populate_fields_from_boxes(
                 source=default_src, confidence=visual["previousPassportNumber"][1], rawValue=prev_no
             )
 
+    if not result.passport.previousPassport.number:
+        for b in ocr_boxes:
+            b_txt = b.text.strip().upper()
+            if re.match(r"^[A-Z]{1,2}[0-9]{7,9}$", b_txt) and b_txt != result.passport.number:
+                result.passport.previousPassport.number = b_txt
+                result.fieldSources["passport.previousPassport.number"] = FieldSource(
+                    source=default_src, confidence=b.confidence, rawValue=b_txt
+                )
+                break
+
     # C. Family Data
-    if "fatherName" in visual:
-        result.family.father.name = visual["fatherName"][0]
+    applicant_names_set = set()
+    for n in [result.personal.fullName, result.personal.givenName, result.personal.surname]:
+        if n:
+            applicant_names_set.add(n.strip().upper())
+            applicant_names_set.update(n.strip().upper().split())
+
+    f_val, f_conf = visual.get("fatherName", ("", 0.0))
+    m_val, m_conf = visual.get("motherName", ("", 0.0))
+    s_val, s_conf = visual.get("spouseName", ("", 0.0))
+
+    if f_val and (f_val.upper() in applicant_names_set or f_val.upper() in {"IF ANY", "NOT APPLICABLE", "GENDER", "MALE", "FEMALE"}):
+        f_val = ""
+    if m_val and (m_val.upper() in applicant_names_set or m_val == f_val or m_val.upper() in {"IF ANY", "NOT APPLICABLE", "GENDER", "MALE", "FEMALE"}):
+        m_val = ""
+    if s_val and (s_val.upper() in applicant_names_set or s_val == f_val or s_val == m_val or s_val.upper() in {"IF ANY", "NOT APPLICABLE", "PANCHAGARH", "THAKURGAON"}):
+        s_val = ""
+
+    # Personal Data Page Fallback (Standard Bangladeshi Passport Page 2 layout):
+    # When father or mother not captured by label, find candidate names under personal data header
+    if not f_val or not m_val:
+        p_idx = -1
+        for idx_b, b in enumerate(ocr_boxes):
+            b_u = b.text.strip().upper()
+            if re.search(r"^[A-Z]*ERSONAL\s*DATA", b_u) or "PERSONAL PARTICULARS" in b_u:
+                p_idx = idx_b
+                break
+        if p_idx >= 0:
+            candidates = []
+            for cb_idx in range(p_idx + 1, min(p_idx + 8, len(ocr_boxes))):
+                cb_txt = ocr_boxes[cb_idx].text.strip()
+                if any(kw in cb_txt.upper() for kw in ["COLONI", "ROAD", "VILL", "POST", "DISTRICT", "THAKURGAON", "5120", "EMERGENCY"]):
+                    break
+                cb_clean = clean_person_name(cb_txt)
+                if not cb_clean or is_applicant_name(cb_clean, result.personal.fullName, result.personal.givenName, result.personal.surname):
+                    continue
+                if any(kw in cb_txt.upper() for kw in ["NAME:", "SPOUSE", "RELATION"]):
+                    continue
+                candidates.append((cb_clean, ocr_boxes[cb_idx].confidence))
+
+            if not f_val and len(candidates) >= 1:
+                f_val, f_conf = candidates[0]
+            if not m_val and len(candidates) >= 2:
+                m_val, m_conf = candidates[1]
+
+    if f_val:
+        result.family.father.name = f_val
         result.fieldSources["family.father.name"] = FieldSource(
-            source=default_src, confidence=visual["fatherName"][1], rawValue=visual["fatherName"][0]
+            source=default_src, confidence=f_conf or 0.9, rawValue=f_val
         )
 
-    if "motherName" in visual:
-        result.family.mother.name = visual["motherName"][0]
+    if m_val:
+        result.family.mother.name = m_val
         result.fieldSources["family.mother.name"] = FieldSource(
-            source=default_src, confidence=visual["motherName"][1], rawValue=visual["motherName"][0]
+            source=default_src, confidence=m_conf or 0.9, rawValue=m_val
         )
 
-    if "spouseName" in visual:
-        result.family.spouse.name = visual["spouseName"][0]
+    if s_val:
+        result.family.spouse.name = s_val
         result.fieldSources["family.spouse.name"] = FieldSource(
-            source=default_src, confidence=visual["spouseName"][1], rawValue=visual["spouseName"][0]
+            source=default_src, confidence=s_conf or 0.9, rawValue=s_val
         )
 
     # D. Address Data
@@ -2218,6 +2373,8 @@ def extract_passport(pdf_source: Union[str, bytes]) -> PassportExtractionResult:
         cached_result = copy.deepcopy(_EXTRACTION_CACHE[pdf_hash])
         cached_dur = round((time.time() - start_time) * 1000, 2)
         cached_result.processingTimeMs = cached_dur
+        if cached_result.diagnostics:
+            cached_result.diagnostics.extractionDurationMs = cached_dur
         print(f"[cache] In-memory cache HIT for sha256:{pdf_hash[:12]} in {cached_dur:.2f} ms")
         print(f"[extract] pdf_read: 0.00s")
         print(f"[extract] text_layer: 0.00s")
@@ -2231,10 +2388,14 @@ def extract_passport(pdf_source: Union[str, bytes]) -> PassportExtractionResult:
     t_insp_start = time.time()
     doc, pdf_info = inspect_pdf(pdf_source)
     t_insp_dur = (time.time() - t_insp_start) * 1000
+    total_text_chars = sum(len(p.text) for p in pdf_info.pages)
+    has_text_layer = bool(pdf_info.has_usable_text or total_text_chars > 0)
+    total_pages = pdf_info.total_pages
+
     print(
         f"[extractor] PDF opened & inspected in {t_insp_dur:.2f} ms: "
         f"pages={pdf_info.total_pages}, usable_text={pdf_info.has_usable_text}, "
-        f"selected_page={pdf_info.selected_page_index}"
+        f"selected_page={pdf_info.selected_page_index}, text_chars={total_text_chars}"
     )
 
     page_idx = pdf_info.selected_page_index
@@ -2266,6 +2427,14 @@ def extract_passport(pdf_source: Union[str, bytes]) -> PassportExtractionResult:
             if has_core_fields:
                 total_dur = time.time() - start_time
                 res_cand.processingTimeMs = round(total_dur * 1000, 2)
+                res_cand.diagnostics = ExtractionDiagnostics(
+                    pdfTextFound=has_text_layer,
+                    pdfTextChars=total_text_chars,
+                    pageCount=total_pages,
+                    ocrExecuted=False,
+                    ocrPageCount=0,
+                    extractionDurationMs=res_cand.processingTimeMs or 0.0,
+                )
                 print(f"[extract] pdf_read: {t_insp_dur/1000:.2f}s")
                 print(f"[extract] text_layer: {t_text_dur/1000:.2f}s")
                 print(f"[extract] page_selection: {t_insp_dur/1000:.2f}s")
@@ -2292,9 +2461,16 @@ def extract_passport(pdf_source: Union[str, bytes]) -> PassportExtractionResult:
     # SCANNED PDF PATH (STEP 4): Run OCR only when text layer is insufficient or absent
     print(f"[extractor] Scanned PDF path: running PaddleOCR on prioritized page {page_idx}...")
     t_render_start = time.time()
-    img = render_page_to_image(page, dpi=150)
+    page_rect = page.rect
+    max_pt = max(page_rect.width, page_rect.height)
+    optimal_dpi = 125
+    if max_pt > 1000:
+        optimal_dpi = 100
+    elif max_pt < 400:
+        optimal_dpi = 150
+    img = render_page_to_image(page, dpi=optimal_dpi)
     t_render_dur = (time.time() - t_render_start) * 1000
-    print(f"[extractor] Rendered page to image in {t_render_dur:.2f} ms (shape {img.shape})")
+    print(f"[extractor] Rendered page to image at dpi={optimal_dpi} in {t_render_dur:.2f} ms (shape {img.shape})")
 
     t_ocr_start = time.time()
     print("[extractor] OCR start...")
@@ -2309,6 +2485,14 @@ def extract_passport(pdf_source: Union[str, bytes]) -> PassportExtractionResult:
 
     total_dur = time.time() - start_time
     result.processingTimeMs = round(total_dur * 1000, 2)
+    result.diagnostics = ExtractionDiagnostics(
+        pdfTextFound=has_text_layer,
+        pdfTextChars=total_text_chars,
+        pageCount=total_pages,
+        ocrExecuted=True,
+        ocrPageCount=1,
+        extractionDurationMs=result.processingTimeMs or 0.0,
+    )
     print(f"[extract] pdf_read: {t_insp_dur/1000:.2f}s")
     print(f"[extract] text_layer: {t_text_dur/1000:.2f}s")
     print(f"[extract] page_selection: {t_render_dur/1000:.2f}s")
