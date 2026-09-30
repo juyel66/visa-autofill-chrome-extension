@@ -642,6 +642,123 @@ export async function runPythonExtractorClientTests(): Promise<{ passed: boolean
     assert(indApp.fields['father_nationality']?.value === 'INDIA', 'Indian father preserves INDIA, not forced to BANGLADESH')
   })
 
+  // ==========================================================================
+  // TASK 125: HARDENING & STABILITY TESTS
+  // ==========================================================================
+
+  await testAsync('18. TASK 125: SHA-256 content-based identity calculation', async () => {
+    const { computeSha256 } = await import('../pythonExtractorClient')
+    const contentA = new TextEncoder().encode('PDF CONTENT A - PASSPORT JOSODA')
+    const contentA2 = new TextEncoder().encode('PDF CONTENT A - PASSPORT JOSODA')
+    const contentB = new TextEncoder().encode('PDF CONTENT B - DIFFERENT PASSPORT')
+
+    const hashA = await computeSha256(contentA)
+    const hashA2 = await computeSha256(contentA2)
+    const hashB = await computeSha256(contentB)
+
+    assert(typeof hashA === 'string' && hashA.length >= 16, 'SHA-256 hash A is a valid string')
+    assert(hashA === hashA2, 'Identical content produces identical SHA-256 hash')
+    assert(hashA !== hashB, 'Different content produces different SHA-256 hash')
+  })
+
+  await testAsync('19. TASK 125: In-flight duplicate extraction request deduplication', async () => {
+    const {
+      extractPassportWithPython,
+      clearInFlightExtractions,
+      getInFlightExtractionsCount,
+    } = await import('../pythonExtractorClient')
+
+    clearInFlightExtractions()
+    assert(getInFlightExtractionsCount() === 0, 'In-flight extraction map starts empty')
+
+    // Mock global fetch to test in-flight deduplication
+    const origFetch = global.fetch
+    let fetchCalls = 0
+    let resolvePending: (val?: any) => void
+
+    global.fetch = (async (_url: string, _init?: RequestInit) => {
+      fetchCalls++
+      return new Promise((resolve) => {
+        resolvePending = (val?: any) => {
+          resolve(val || {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              personal: { surname: 'TEST', givenName: 'USER', dateOfBirth: '2000-01-01', gender: 'male', nationality: 'BGD', placeOfBirth: 'DHAKA', countryOfBirth: '', nid: '' },
+              passport: { number: 'E12345678', issueDate: '2020-01-01', expiryDate: '2030-01-01', issuePlace: 'DHAKA', issuingCountry: 'BGD' },
+              address: {},
+              mrz: { detected: true, valid: true, rawLines: [], confidence: 0.99 },
+              fieldSources: {},
+              diagnostics: {
+                pdfTextFound: true,
+                pdfTextChars: 250,
+                pageCount: 1,
+                ocrExecuted: false,
+                ocrPageCount: 0,
+                extractionDurationMs: 35.0,
+              },
+            }),
+          } as any)
+        }
+      })
+    }) as any
+
+    try {
+      const pdfBytes1 = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 53, 10, 1, 2, 3]) // %PDF-1.5
+      const pdfBytesRenamed = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 53, 10, 1, 2, 3]) // exact same bytes, different name
+      const blob1 = new Blob([pdfBytes1], { type: 'application/pdf' })
+      const blobRenamed = new Blob([pdfBytesRenamed], { type: 'application/pdf' })
+
+      // Launch two concurrent extractions of the same PDF content with different filenames
+      const promise1 = extractPassportWithPython(blob1, 'original_passport.pdf')
+      const promise2 = extractPassportWithPython(blobRenamed, 'renamed_copy.pdf')
+
+      // Wait a tick for payload conversion, hashing, and fetch initiation
+      await new Promise((r) => setTimeout(r, 20))
+
+      // Resolve the fetch
+      if (typeof resolvePending! === 'function') {
+        resolvePending!(null)
+      }
+      const [res1, res2] = await Promise.all([promise1, promise2])
+
+      assert(fetchCalls === 1, `fetch was called exactly once (actual: ${fetchCalls}) for duplicate in-flight requests`)
+      assert(res1.passport.number === 'E12345678', 'Result 1 passport matches')
+      assert(res2.passport.number === 'E12345678', 'Result 2 passport matches')
+      assert(res1 === res2, 'Both concurrent callers received the identical extraction result')
+      assert(getInFlightExtractionsCount() === 0, 'In-flight map cleaned up in finally after resolution')
+    } finally {
+      global.fetch = origFetch
+      clearInFlightExtractions()
+    }
+  })
+
+  test('20. TASK 125: Truthful extraction diagnostics schema and mapping', () => {
+    const mockWithDiagnostics: PythonPassportExtractionResult = {
+      personal: { surname: 'RAY', givenName: 'SHREE JOTIMOY', dateOfBirth: '1993-09-18', gender: 'male', nationality: 'BANGLADESHI', placeOfBirth: 'THAKURGAON', countryOfBirth: '', nid: '8235626051' },
+      passport: { number: 'A21496961', issueDate: '2026-01-20', expiryDate: '2031-01-19', issuePlace: 'DIP/DHAKA', issuingCountry: 'BGD' },
+      address: {},
+      mrz: { detected: true, valid: true, rawLines: [], confidence: 0.95 },
+      fieldSources: {},
+      diagnostics: {
+        pdfTextFound: true,
+        pdfTextChars: 412,
+        pageCount: 2,
+        ocrExecuted: false,
+        ocrPageCount: 0,
+        extractionDurationMs: 48.5,
+      },
+    }
+
+    assert(mockWithDiagnostics.diagnostics !== undefined, 'Diagnostics present in result')
+    assert(mockWithDiagnostics.diagnostics?.pdfTextFound === true, 'pdfTextFound is truthfully true')
+    assert(mockWithDiagnostics.diagnostics?.pdfTextChars === 412, 'pdfTextChars is truthfully 412')
+    assert(mockWithDiagnostics.diagnostics?.pageCount === 2, 'pageCount is truthfully 2')
+    assert(mockWithDiagnostics.diagnostics?.ocrExecuted === false, 'ocrExecuted is truthfully false')
+    assert(mockWithDiagnostics.diagnostics?.ocrPageCount === 0, 'ocrPageCount is truthfully 0')
+    assert(mockWithDiagnostics.diagnostics?.extractionDurationMs === 48.5, 'extractionDurationMs is truthfully 48.5')
+  })
+
   console.log(`\n==================================================`)
   console.log(`TASK 115 TESTS RESULT: ${failures.length === 0 ? '✅ ALL PASSED' : '❌ SOME FAILED'}`)
   console.log(`Total tests: ${count}`)
