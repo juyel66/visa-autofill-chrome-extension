@@ -188,7 +188,7 @@ async function runTask116Validation() {
   assert.strictEqual(issuingCountry, 'BANGLADESH', 'issuingCountry matches BANGLADESH')
 
   assert.strictEqual(addressLine1, 'KASHIPUR', 'addressLine1 matches KASHIPUR')
-  assert.strictEqual(city, 'THAKURGAON', 'city matches THAKURGAON')
+  assert.strictEqual(city, 'RANISANKAIL', 'city matches RANISANKAIL')
   assert.strictEqual(district, 'THAKURGAON', 'district matches THAKURGAON')
   assert.strictEqual(postalCode, '5120', 'postalCode matches 5120')
   // Address country is not explicitly written in the passport address box; Python strictly leaves it empty
@@ -326,7 +326,7 @@ async function runTask116Validation() {
   assert(appIssuePlace === 'DHAKA' || appIssuePlace === 'DIP/DHAKA', `SavedApp issue place is normalized (got "${appIssuePlace}")`)
 
   assert.strictEqual(savedApp.fields['pres_addr1']?.value, 'KASHIPUR', 'SavedApp pres_addr1 is KASHIPUR')
-  assert.strictEqual(savedApp.fields['village_town_city']?.value, 'THAKURGAON', 'SavedApp village_town_city is THAKURGAON')
+  assert.strictEqual(savedApp.fields['village_town_city']?.value, 'RANISANKAIL', 'SavedApp village_town_city is RANISANKAIL')
   assert.strictEqual(savedApp.fields['district']?.value, 'THAKURGAON', 'SavedApp district is THAKURGAON')
   assert.strictEqual(savedApp.fields['pincode']?.value, '5120', 'SavedApp pincode is 5120')
   assert.strictEqual(savedApp.fields['pres_phone']?.value, '+8801744777846', 'SavedApp pres_phone is +8801744777846')
