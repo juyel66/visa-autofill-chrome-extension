@@ -63,6 +63,8 @@ export const PASSPORT_IDENTITY_KEYS = new Set([
   'appl.passport_issue_place',
   'appl.father_name',
   'father_name',
+  'appl.fthrname',
+  'fthrname',
   'appl.mother_name',
   'mother_name',
   'appl.spouse_name',
@@ -334,6 +336,31 @@ export function populateApplicationFromDocuments(options: {
             docId = ogdDoc?.documentId
           }
         }
+      }
+    }
+    // Direct document extraction fallback for family details if profile path was partial
+    if (!resolvedValue && (key === 'fthrname' || key === 'appl.fthrname' || key === 'father_name' || key === 'appl.father_name')) {
+      const fDocVal = passportDoc?.extractedData?.family?.father?.name?.value || ogdDoc?.extractedData?.family?.father?.name?.value
+      if (fDocVal) {
+        resolvedValue = fDocVal
+        source = passportDoc?.extractedData?.family?.father?.name?.value ? 'passport' : 'ogd'
+        docId = passportDoc?.extractedData?.family?.father?.name?.value ? passportDoc.documentId : ogdDoc?.documentId
+      }
+    }
+    if (!resolvedValue && (key === 'mother_name' || key === 'appl.mother_name')) {
+      const mDocVal = passportDoc?.extractedData?.family?.mother?.name?.value || ogdDoc?.extractedData?.family?.mother?.name?.value
+      if (mDocVal) {
+        resolvedValue = mDocVal
+        source = passportDoc?.extractedData?.family?.mother?.name?.value ? 'passport' : 'ogd'
+        docId = passportDoc?.extractedData?.family?.mother?.name?.value ? passportDoc.documentId : ogdDoc?.documentId
+      }
+    }
+    if (!resolvedValue && (key === 'spouse_name' || key === 'appl.spouse_name')) {
+      const sDocVal = passportDoc?.extractedData?.family?.spouse?.name?.value || ogdDoc?.extractedData?.family?.spouse?.name?.value
+      if (sDocVal) {
+        resolvedValue = sDocVal
+        source = passportDoc?.extractedData?.family?.spouse?.name?.value ? 'passport' : 'ogd'
+        docId = passportDoc?.extractedData?.family?.spouse?.name?.value ? passportDoc.documentId : ogdDoc?.documentId
       }
     }
 
@@ -1339,7 +1366,7 @@ export function populateApplicationFromDocuments(options: {
 /**
  * Creates a clean application where all applicant identity / document fields are BLANK,
  * and only standard common default values (Nationality, Country, ISD code, etc.) are pre-filled.
- * Used when Gemini extraction fails or quota is exhausted so no old applicant data lingers.
+ * Used when document extraction fails so no old applicant data lingers.
  */
 export function createBlankApplicationWithDefaults(options: {
   applicantId: string
