@@ -1,0 +1,214 @@
+[
+  {
+    "text": "PERSONALDATA-AND EMERGENCY CONTACT",
+    "conf": 0.96
+  },
+  {
+    "text": "SHREE JOTIMOY RAY",
+    "conf": 0.9385
+  },
+  {
+    "text": "Father's Name",
+    "conf": 0.9452
+  },
+  {
+    "text": "SHREE KHIDAR MOHAN",
+    "conf": 0.9653
+  },
+  {
+    "text": "Mother's Name",
+    "conf": 0.9514
+  },
+  {
+    "text": "PANCHAMI RANI",
+    "conf": 0.9624
+  },
+  {
+    "text": "Address",
+    "conf": 0.996
+  },
+  {
+    "text": "KASHIPUR,RANISANKAIL, MUZAHIDABAD COLONI",
+    "conf": 0.9467
+  },
+  {
+    "text": "5120,THAKURGAON",
+    "conf": 0.9808
+  },
+  {
+    "text": "Contact",
+    "conf": 0.9936
+  },
+  {
+    "text": "Narne:",
+    "conf": 0.8139
+  },
+  {
+    "text": "JASHODA RANI",
+    "conf": 0.9684
+  },
+  {
+    "text": "SPOUSE",
+    "conf": 0.9979
+  },
+  {
+    "text": "KASHIPUR, RANISANKAIL, MUZAHIDABAD COLONI",
+    "conf": 0.9155
+  },
+  {
+    "text": "5120,THAKURGAON",
+    "conf": 0.9876
+  },
+  {
+    "text": "No",
+    "conf": 0.9749
+  },
+  {
+    "text": "+8801744777846",
+    "conf": 0.9631
+  },
+  {
+    "text": "C PEOPLE'S REPUBLIC OF BANGLADESH",
+    "conf": 0.898
+  },
+  {
+    "text": "PASSPORT",
+    "conf": 0.9964
+  },
+  {
+    "text": "cefe/Type",
+    "conf": 0.7157
+  },
+  {
+    "text": "cro/CountryCode",
+    "conf": 0.7831
+  },
+  {
+    "text": "P",
+    "conf": 0.9835
+  },
+  {
+    "text": "BGD",
+    "conf": 0.9905
+  },
+  {
+    "text": "A21496961",
+    "conf": 0.9961
+  },
+  {
+    "text": "i/Sumame",
+    "conf": 0.8373
+  },
+  {
+    "text": "RAY",
+    "conf": 0.9951
+  },
+  {
+    "text": "3/Grven Name",
+    "conf": 0.8049
+  },
+  {
+    "text": "SHREE JOTIMOY",
+    "conf": 0.9588
+  },
+  {
+    "text": "EORct/Nationality",
+    "conf": 0.7595
+  },
+  {
+    "text": "BANGLADESHI",
+    "conf": 0.997
+  },
+  {
+    "text": "8235626051",
+    "conf": 0.9978
+  },
+  {
+    "text": "/Date of Birth",
+    "conf": 0.8075
+  },
+  {
+    "text": "/Pre",
+    "conf": 0.8794
+  },
+  {
+    "text": "18SEP1993",
+    "conf": 0.9925
+  },
+  {
+    "text": "BK0965579",
+    "conf": 0.9886
+  },
+  {
+    "text": "au/sex",
+    "conf": 0.5621
+  },
+  {
+    "text": "Place of Birth",
+    "conf": 0.8681
+  },
+  {
+    "text": "M",
+    "conf": 0.9914
+  },
+  {
+    "text": "THAKURGAON",
+    "conf": 0.9968
+  },
+  {
+    "text": "983640",
+    "conf": 0.9983
+  },
+  {
+    "text": "ss/Date ofssue",
+    "conf": 0.7607
+  },
+  {
+    "text": "7ssuingAuthority",
+    "conf": 0.868
+  },
+  {
+    "text": "20JAN2026",
+    "conf": 0.9964
+  },
+  {
+    "text": "DIPIDHAKA",
+    "conf": 0.9947
+  },
+  {
+    "text": "/Date",
+    "conf": 0.7704
+  },
+  {
+    "text": "aa/Hoider's Signature",
+    "conf": 0.8988
+  },
+  {
+    "text": "19JAN2031",
+    "conf": 0.996
+  },
+  {
+    "text": "SOTOXRR",
+    "conf": 0.5279
+  },
+  {
+    "text": "LO",
+    "conf": 0.3442
+  },
+  {
+    "text": "O",
+    "conf": 0.4743
+  },
+  {
+    "text": "GeD",
+    "conf": 0.3279
+  },
+  {
+    "text": "PBGDRAY<SHREE<JOTIMOY<<<<<<",
+    "conf": 0.8709
+  },
+  {
+    "text": "A214969610BGD9309186M31011938235626051<<<48",
+    "conf": 0.9408
+  }
+]
