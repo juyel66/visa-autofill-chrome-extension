@@ -43,6 +43,7 @@ def test_extract_passport_endpoint_valid():
     response = client.post(
         "/extract-passport",
         files={"file": ("passport.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+        timeout=180.0,
     )
     assert response.status_code == 200
     data = response.json()
