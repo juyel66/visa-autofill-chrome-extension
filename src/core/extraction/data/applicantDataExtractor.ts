@@ -2838,7 +2838,7 @@ function getFieldSourcePriority(fieldKey: string, source: ExtractionSource): num
 /**
  * Merges multiple candidate extraction sources using field-specific source priority:
  * - MRZ is authoritative for core passport identity (passport number, DOB, expiry, gender)
- * - Gemini AI is primary for all semantic, family, address, employment, travel, and sponsor fields
+ * - Python extractor is primary for all semantic, family, address, employment, travel, and sponsor fields
  * Records conflicts if candidates from different sources return conflicting non-empty values.
  */
 export function mergeExtractedCandidateData(
