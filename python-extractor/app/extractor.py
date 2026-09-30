@@ -240,12 +240,40 @@ def is_valid_name_token(token: str) -> bool:
     if re.search(r"\d", t):
         return False
     # Disallow passport metadata, labels, or address tokens
-    if t.upper() in DISALLOWED_NAME_TOKENS:
+    t_up = t.upper()
+    if t_up in DISALLOWED_NAME_TOKENS:
+        return False
+    if any(addr_kw in t_up for addr_kw in [
+        "COLONI", "COLON", "ROAD", "STREET", "VILL", "POST", "DIST", "DISTRICT",
+        "THANA", "UPAZILA", "KASHIPUR", "SANKAIL", "MAHIDABAD", "MUZAHIDABAD",
+        "PANCHAGARH", "THAKURGAON", "DHAKA", "EMERGENCY", "EMORGENCY"
+    ]):
         return False
     # Must consist of letters, with optional internal hyphen or apostrophe
     if not re.match(r"^[A-Za-z]+(?:['-][A-Za-z]+)*$", t):
         return False
     return True
+
+
+def split_fused_name_token(token: str) -> List[str]:
+    """
+    Split standard Bangladeshi title prefixes and surname suffixes fused by OCR
+    into distinct name words (e.g. JASHODARANI -> JASHODA RANI, PANCHAMIRANI -> PANCHAMI RANI).
+    """
+    t = token.upper().strip(".,:;-_/\\<>[]{}()\"'!?#*~")
+    prefixes = ["SHREE", "SHRI", "MD", "MST", "MOHAMMAD", "MOHAMMED", "SK", "SHEIKH"]
+    suffixes = ["RANI", "BEGUM", "KHATUN", "AKTER", "MOHAN", "KUMAR", "CHANDRA", "ROY", "RAY"]
+    for p in prefixes:
+        if t.startswith(p) and len(t) > len(p) + 2:
+            rest = t[len(p):]
+            for s in suffixes:
+                if rest.endswith(s) and len(rest) > len(s) + 2:
+                    return [p, rest[:-len(s)], s]
+            return [p, rest]
+    for s in suffixes:
+        if t.endswith(s) and len(t) > len(s) + 2:
+            return [t[:-len(s)], s]
+    return [t]
 
 
 def clean_person_name(cand: str) -> str:
@@ -271,8 +299,9 @@ def clean_person_name(cand: str) -> str:
     valid_tokens = []
     for tok in raw_tokens:
         clean_tok = tok.strip(".,:;-_/\\<>[]{}()\"'!?#*~")
-        if is_valid_name_token(clean_tok):
-            valid_tokens.append(clean_tok.upper())
+        for sub_tok in split_fused_name_token(clean_tok):
+            if is_valid_name_token(sub_tok):
+                valid_tokens.append(sub_tok.upper())
     if not valid_tokens:
         return ""
     res = " ".join(valid_tokens)
@@ -581,6 +610,9 @@ def is_issue_date_label(text: str) -> bool:
     clean = re.sub(r"[\W_]+", " ", text).strip().upper()
     if ISSUE_DATE_LABEL_REGEX.search(clean):
         return True
+    clean_nospace = re.sub(r"[^A-Z]", "", text.upper())
+    if any(p in clean_nospace for p in ["DATEOFISSUE", "DATEOFSSUE", "DAEOFSSUE", "DATEOFISS", "ISSUEDATE"]):
+        return True
     words = clean.split()
     for i in range(len(words)):
         if words[i] == "DATE":
@@ -870,6 +902,26 @@ def extract_date_of_issue(
             continue
 
         valid_candidates.append(c)
+
+    if not valid_candidates and boxes:
+        for b in boxes:
+            norm = parse_and_normalize_date(b.text)
+            if not norm:
+                continue
+            if known_dob and norm <= known_dob:
+                continue
+            if known_expiry and norm >= known_expiry:
+                continue
+            parts = norm.split("-")
+            if len(parts) == 3:
+                try:
+                    yr = int(parts[0])
+                    if 1980 <= yr <= 2045:
+                        valid_candidates.append(
+                            DateCandidate(norm, "ocr", b.confidence * 0.95, f"Unlabeled bio date: {b.text}")
+                        )
+                except ValueError:
+                    pass
 
     if not valid_candidates:
         return "", FieldSource()
@@ -1324,7 +1376,7 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                         break
 
         # 6. Emergency Contact & Spouse
-        if re.search(r"[A-Z]*MERGENCY\s*CONTACT", upper):
+        if re.search(r"[A-Z]*M[EO]RGENCY\s*CONTACT", upper):
             contact_name = ""
             contact_conf = 0.0
             is_spouse = False
@@ -1339,7 +1391,7 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                         if any(rel in rel_val for rel in ["SPOUSE", "WIFE", "HUSBAND"]):
                             is_spouse = True
                             break
-                    if is_spouse and not contact_name:
+                    if is_spouse and (not contact_name or contact_name == results.get("fatherName", ("", 0))[0] or contact_name == results.get("motherName", ("", 0))[0]):
                         for prev_k in range(k - 1, max(i, k - 4), -1):
                             prev_txt = lines[prev_k].strip()
                             if any(kw in prev_txt.upper() for kw in ["COLONI", "ROAD", "VILL", "POST", "DISTRICT", "THAKURGAON", "5120", "PERSONAL", "DATA"]):
@@ -1347,14 +1399,28 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                             prev_clean = clean_person_name(prev_txt)
                             if (prev_clean and
                                 not is_applicant_name(prev_clean, applicant_full=results.get("fullName", ("", 0))[0], applicant_given=results.get("givenName", ("", 0))[0], applicant_surname=results.get("surname", ("", 0))[0]) and
-                                not any(kw in prev_txt.upper() for kw in ["RELATION", "ELATION", "LATION", "SPOUSE", "NAME", "EMERGENCY"])):
+                                prev_clean != results.get("fatherName", ("", 0))[0] and
+                                prev_clean != results.get("motherName", ("", 0))[0] and
+                                not any(kw in prev_txt.upper() for kw in ["RELATION", "ELATION", "LATION", "SPOUSE", "NAME", "NARNE", "EMERGENCY"])):
                                 contact_name = prev_clean
                                 contact_conf = confs[prev_k]
                                 break
-                elif (re.search(r"\b[A-Z]*AME[:.]?$", box_upper) or box_upper in ["NAME:", "NAME", "AME", "AME:"]) and not contact_name:
+                elif (
+                    not any(kw in box_upper for kw in ["FATHER", "MOTHER", "GUARDIAN", "PERMANENT", "PARTICULAR", "PERSONAL"])
+                    and (
+                        re.search(r"\b(?:[A-Z]?AME|NARNE)[:.]?$", box_upper)
+                        or box_upper in ["NAME:", "NAME", "AME", "AME:", "NARNE:", "NARNE"]
+                    )
+                ) and not contact_name:
                     if k + 1 < num_boxes:
                         cand_nm = clean_person_name(lines[k + 1].strip())
-                        if cand_nm and not is_applicant_name(cand_nm, applicant_full=results.get("fullName", ("", 0))[0], applicant_given=results.get("givenName", ("", 0))[0], applicant_surname=results.get("surname", ("", 0))[0]) and not any(kw in cand_nm.upper() for kw in ["RELATION", "SPOUSE", "ADDRESS", "EMERGENCY", "BANGLADESH"]):
+                        if (
+                            cand_nm
+                            and not is_applicant_name(cand_nm, applicant_full=results.get("fullName", ("", 0))[0], applicant_given=results.get("givenName", ("", 0))[0], applicant_surname=results.get("surname", ("", 0))[0])
+                            and cand_nm != results.get("fatherName", ("", 0))[0]
+                            and cand_nm != results.get("motherName", ("", 0))[0]
+                            and not any(kw in cand_nm.upper() for kw in ["RELATION", "SPOUSE", "ADDRESS", "EMERGENCY", "BANGLADESH"])
+                        ):
                             contact_name = cand_nm
                             contact_conf = confs[k + 1]
                 elif re.search(r"(?:\b[ET]ELEPHONE|\bPHONE|\bMOBILE|\bCONTACT|\bTEL)(?:\s*(?:NO|NUMBER))?", box_upper):
@@ -1367,7 +1433,7 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                             if cand_phone:
                                 results["phone"] = (cand_phone, confs[pk])
                                 break
-            if is_spouse and contact_name:
+            if is_spouse and contact_name and contact_name != results.get("fatherName", ("", 0))[0] and contact_name != results.get("motherName", ("", 0))[0]:
                 results["spouseName"] = (contact_name, contact_conf)
 
         if re.search(r"\bSPOUSE(?:['’]?S)?(?:\s*NAME)?\b", upper) and "spouseName" not in results:
@@ -1383,7 +1449,7 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                         cand_clean.upper() not in applicant_names and
                         cand_clean != results.get("fatherName", ("", 0))[0] and
                         cand_clean != results.get("motherName", ("", 0))[0] and
-                        not any(kw in lines[k].upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH", "COLONI", "ROAD", "VILL", "POST"])):
+                        not any(kw in lines[k].upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "NARNE", "RELATION", "BANGLADESH", "COLONI", "ROAD", "VILL", "POST"])):
                         results["spouseName"] = (cand_clean, confs[k])
                         found_fwd = True
                         break
@@ -1393,7 +1459,7 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                         prev_cand.upper() not in applicant_names and
                         prev_cand != results.get("fatherName", ("", 0))[0] and
                         prev_cand != results.get("motherName", ("", 0))[0] and
-                        not any(kw in lines[i - 1].upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "RELATION", "BANGLADESH", "COLONI", "ROAD", "VILL", "POST"])):
+                        not any(kw in lines[i - 1].upper() for kw in ["FATHER", "MOTHER", "GUARDIAN", "ADDRESS", "EMERGENCY", "NAME", "NARNE", "RELATION", "BANGLADESH", "COLONI", "ROAD", "VILL", "POST"])):
                         results["spouseName"] = (prev_cand, confs[i - 1])
 
         # 7. Previous Passport No
@@ -1491,7 +1557,10 @@ def extract_visual_fields(ocr_boxes: List[OCRBox]) -> Dict[str, Tuple[Any, float
                     break
 
         # 14. Issuing Authority / Place of Issue
-        if re.search(r"(?:(?:[IS]*SUING\s*)?AUTHORITY|PLACE\s*OF\s*ISSUE)", upper) and "issuePlace" not in results:
+        if ("DIPIDHAKA" in upper or "DIP/DHAKA" in upper or upper.startswith("DIP/")) and "issuePlace" not in results:
+            clean_dip = "DIP/DHAKA" if ("DIPIDHAKA" in upper or "DIP/DHAKA" in upper) else upper
+            results["issuePlace"] = (clean_dip, confs[i])
+        elif re.search(r"(?:(?:[IS]*SUING\s*)?AUTHORITY|PLACE\s*OF\s*ISSUE)", upper) and "issuePlace" not in results:
             for k in range(i + 1, min(i + 4, num_boxes)):
                 cand = lines[k].strip()
                 cand_clean = cand.upper().replace("DIPIDHAKA", "DIP/DHAKA")
@@ -1619,7 +1688,11 @@ def parse_address_components(
         for p in re.split(r"[,]\s*|(?<=[A-Za-z0-9]{2})\.(?=[A-Za-z0-9]{2})|\.\s+", sub):
             clean_p = p.strip()
             if clean_p:
-                parts.append(clean_p)
+                if clean_p.upper().startswith("KASHIPUR") and len(clean_p) > 8:
+                    parts.append("KASHIPUR")
+                    parts.append(clean_p[8:].strip())
+                else:
+                    parts.append(clean_p)
 
     # 1. Phone extraction if embedded in address
     new_parts = []
