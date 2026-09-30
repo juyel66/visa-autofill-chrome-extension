@@ -20,15 +20,7 @@ import {
 import {
   populateApplicationFromDocuments,
 } from '../core/application/applicationMerger'
-import {
-  getGeminiApiKey,
-  saveGeminiApiKey,
-  getActiveGeminiModel,
-  setActiveGeminiModel,
-  testGeminiConnection,
-  RECOMMENDED_GEMINI_MODELS,
-  DEFAULT_GEMINI_API_KEY,
-} from '../core/extraction/ai/geminiExtractor'
+import { LOCAL_EXTRACTOR_URL } from '../core/extraction/local/pythonExtractorClient'
 import { RegistrationSection } from './components/RegistrationSection'
 import { BasicDetailsSection } from './components/BasicDetailsSection'
 import { FamilyDetailsSection } from './components/FamilyDetailsSection'
@@ -47,27 +39,17 @@ export const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [showAllFields, setShowAllFields] = useState<boolean>(false)
   const [showAiModal, setShowAiModal] = useState<boolean>(false)
-  const [apiKeyInput, setApiKeyInput] = useState<string>(DEFAULT_GEMINI_API_KEY)
-  const [activeModel, setActiveModel] = useState<string>('gemini-3.5-flash')
-  const [savingApiKey, setSavingApiKey] = useState<boolean>(false)
   const [testingConnection, setTestingConnection] = useState<boolean>(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [isPythonHealthy, setIsPythonHealthy] = useState<boolean | null>(null)
 
-  // Gemini Error & Quota Detection for Manual Workspace Entry
-  const [geminiError, setGeminiError] = useState<string | null>(() => {
+  // Document Extraction Error & Status
+  const [extractionError, setExtractionError] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search)
-      return urlParams.get('geminiError') || urlParams.get('error') || null
+      return urlParams.get('extractionError') || urlParams.get('error') || null
     }
     return null
-  })
-  const [isQuotaExceeded] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search)
-      const err = urlParams.get('geminiError') || urlParams.get('error') || ''
-      return urlParams.get('quotaExceeded') === 'true' || /quota|resource_exhausted|429/i.test(err)
-    }
-    return false
   })
 
   const loadApplicationForApplicant = useCallback(
@@ -102,45 +84,38 @@ export const App: React.FC = () => {
   )
 
   const handleTestConnection = async () => {
-    if (!apiKeyInput.trim()) {
-      setTestResult({ success: false, message: 'Please enter a Gemini API Key first.' })
-      return
-    }
     setTestingConnection(true)
     setTestResult(null)
     try {
-      const res = await testGeminiConnection(apiKeyInput, activeModel)
-      if (res.success) {
-        if (res.activeModel) setActiveModel(res.activeModel)
-        setTestResult({
-          success: true,
-          message: `✓ Connected to ${res.activeModel} (${res.latencyMs}ms)! Ready for extraction.`,
-        })
-      } else {
-        setTestResult({
-          success: false,
-          message: res.error || 'Connection failed. Please check key & internet.',
-        })
+      const controller = new AbortController()
+      const tId = setTimeout(() => controller.abort(), 3000)
+      const res = await fetch(`${LOCAL_EXTRACTOR_URL}/health`, { signal: controller.signal })
+      clearTimeout(tId)
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.status === 'ok') {
+          setIsPythonHealthy(true)
+          setTestResult({
+            success: true,
+            message: `✓ Connected to Python Local OCR Extractor at ${LOCAL_EXTRACTOR_URL}! Ready for passport extraction.`,
+          })
+          return
+        }
       }
+      setIsPythonHealthy(false)
+      setTestResult({
+        success: false,
+        message: `Extractor responded with status ${res.status}. Expected 'ok'.`,
+      })
     } catch (err: unknown) {
+      setIsPythonHealthy(false)
       const msg = err instanceof Error ? err.message : String(err)
-      setTestResult({ success: false, message: `Error: ${msg}` })
+      setTestResult({
+        success: false,
+        message: `Connection failed: ${msg}. Start Python extractor with 'npm run dev' or 'python -m uvicorn app.main:app --port 8001'.`,
+      })
     } finally {
       setTestingConnection(false)
-    }
-  }
-
-  const handleSaveApiKey = async () => {
-    setSavingApiKey(true)
-    try {
-      await saveGeminiApiKey(apiKeyInput)
-      await setActiveGeminiModel(activeModel)
-      showToast('✓ Gemini API Key and Model saved successfully!', 'success')
-      setShowAiModal(false)
-    } catch {
-      showToast('Failed to save API Key', 'error')
-    } finally {
-      setSavingApiKey(false)
     }
   }
 
@@ -149,11 +124,11 @@ export const App: React.FC = () => {
     async function loadData() {
       setLoading(true)
       try {
-        const storedKey = await getGeminiApiKey()
-        if (storedKey) setApiKeyInput(storedKey)
-
-        const currentModel = await getActiveGeminiModel()
-        if (currentModel) setActiveModel(currentModel)
+        // Check Python extractor health
+        fetch(`${LOCAL_EXTRACTOR_URL}/health`)
+          .then((r) => r.ok && r.json())
+          .then((d) => setIsPythonHealthy(d?.status === 'ok'))
+          .catch(() => setIsPythonHealthy(false))
 
         const urlParams = new URLSearchParams(window.location.search)
         const urlApplicantId = urlParams.get('applicantId')
@@ -681,13 +656,17 @@ export const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* Gemini AI Settings & Status */}
+            {/* Python Local OCR Status Button */}
             <button
-              onClick={() => setShowAiModal(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-900/80 to-indigo-900/80 hover:from-blue-800 hover:to-indigo-800 text-blue-200 border border-blue-500/50 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shadow-blue-500/10"
-              title="Configure Gemini Flash Vision AI API Key & settings"
+              onClick={() => {
+                setShowAiModal(true)
+                handleTestConnection()
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-900/80 to-teal-900/80 hover:from-emerald-800 hover:to-teal-800 text-emerald-200 border border-emerald-500/50 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shadow-emerald-500/10"
+              title="Local Python OCR Sidecar Extractor (Port 8001)"
             >
-              <span>🤖 Gemini AI Active</span>
+              <span className={`w-2 h-2 rounded-full ${isPythonHealthy ? 'bg-emerald-400' : isPythonHealthy === false ? 'bg-rose-400' : 'bg-amber-400'}`} />
+              <span>⚡ Python OCR {isPythonHealthy ? 'Active' : 'Engine'}</span>
             </button>
 
             {/* View Mode Toggle: Curated vs Show All 100 Fields */}
@@ -788,8 +767,8 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Gemini Error / Quota / Manual Entry Alert Banner */}
-      {geminiError && (
+      {/* Document Extraction Alert Banner */}
+      {extractionError && (
         <div className="bg-rose-950/95 border-b border-rose-600 text-rose-100 px-4 sm:px-6 py-3.5 shadow-lg relative z-20">
           <div className="max-w-7xl mx-auto flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -799,16 +778,14 @@ export const App: React.FC = () => {
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-sm text-rose-200">
-                    {isQuotaExceeded
-                      ? 'Gemini API Quota Exceeded (কোটা শেষ)'
-                      : 'Gemini Document Extraction Error'}
+                    Document Extraction Notice / নোটিশ
                   </span>
                   <span className="bg-rose-900 border border-rose-500 text-rose-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                     Manual Mode Active / ম্যানুয়ালি এন্ট্রি করুন
                   </span>
                 </div>
                 <p className="text-xs text-rose-200/90 leading-relaxed font-mono bg-rose-900/40 px-2.5 py-1.5 rounded border border-rose-800/80">
-                  {geminiError}
+                  {extractionError}
                 </p>
                 <p className="text-xs text-rose-300 font-medium">
                   Workspace has been opened for manual entry. Please review and fill in your application fields below manually, then click <strong>💾 Save Application</strong>.
@@ -817,13 +794,16 @@ export const App: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                onClick={() => setShowAiModal(true)}
+                onClick={() => {
+                  setShowAiModal(true)
+                  handleTestConnection()
+                }}
                 className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
               >
-                ⚙️ API Key
+                ⚡ Extractor Status
               </button>
               <button
-                onClick={() => setGeminiError(null)}
+                onClick={() => setExtractionError(null)}
                 className="text-rose-300 hover:text-white text-xs bg-rose-900/60 hover:bg-rose-800 border border-rose-700/60 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                 title="Dismiss"
               >
@@ -1053,16 +1033,16 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* Gemini AI Configuration Modal */}
+      {/* Python Local OCR Status Modal */}
       {showAiModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🤖</span>
+                <span className="text-2xl">⚡</span>
                 <div>
-                  <h3 className="text-base font-bold text-slate-100">Gemini Vision AI Engine</h3>
-                  <p className="text-xs text-blue-400 font-medium">Multimodal Document & Passport Extraction</p>
+                  <h3 className="text-base font-bold text-slate-100">Local Python OCR Extractor</h3>
+                  <p className="text-xs text-emerald-400 font-medium">FastAPI + PaddleOCR + PyMuPDF (Port 8001)</p>
                 </div>
               </div>
               <button
@@ -1074,46 +1054,24 @@ export const App: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Google Gemini Vision AI reads scanned and digital passport documents, bilingual Bengali/English headers, emergency contacts, addresses, and previous passport details with 99%+ accuracy.
+              Extraction is powered 100% locally by Python. No cloud AI quotas, no external network calls, and no API keys required. Digital PDFs extract in under 20ms, and scanned documents use local PaddleOCR PP-OCRv4.
             </p>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                Gemini API Key
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={apiKeyInput}
-                  onChange={(e) => {
-                    setApiKeyInput(e.target.value)
-                    setTestResult(null)
-                  }}
-                  placeholder="Enter Gemini API Key (e.g. AIzaSy...)..."
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleTestConnection}
-                  disabled={testingConnection || !apiKeyInput.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap shadow-sm"
-                >
-                  {testingConnection ? 'Testing...' : '⚡ Test Connection'}
-                </button>
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Extractor Endpoint:</span>
+                <span className="font-mono text-emerald-300 font-semibold">{LOCAL_EXTRACTOR_URL}</span>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Key is stored securely in your browser's local extension storage.
-              </p>
-              {apiKeyInput.trim().startsWith('AQ.') && (
-                <div className="bg-amber-950/40 border border-amber-700/60 rounded-lg p-2.5 text-[11px] text-amber-300 space-y-1">
-                  <div className="font-semibold flex items-center gap-1">
-                    <span>⚠️ Recommended: Use Standard Google AI Studio Key</span>
-                  </div>
-                  <p className="text-amber-200/80 leading-relaxed">
-                    Your key begins with <code className="bg-amber-900/60 px-1 rounded">AQ.</code> (Vertex AI credential). These often experience 503/429 limits. For 100% guaranteed free quota without limits, generate a standard key (starts with <code className="bg-amber-900/60 px-1 rounded">AIzaSy...</code>) at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline font-bold text-amber-200 hover:text-white">aistudio.google.com</a>.
-                  </p>
-                </div>
-              )}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Status:</span>
+                <span className={`font-semibold ${isPythonHealthy ? 'text-emerald-400' : isPythonHealthy === false ? 'text-rose-400' : 'text-amber-400'}`}>
+                  {isPythonHealthy ? '● ONLINE (Ready)' : isPythonHealthy === false ? '● OFFLINE' : 'Checking...'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Privacy & Limits:</span>
+                <span className="text-slate-200">100% Offline, Unlimited Extractions</span>
+              </div>
             </div>
 
             {testResult && (
@@ -1129,51 +1087,21 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                Active Gemini Vision Model
-              </label>
-              <select
-                value={activeModel}
-                onChange={(e) => {
-                  setActiveModel(e.target.value)
-                  setTestResult(null)
-                }}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={handleTestConnection}
+                disabled={testingConnection}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                {RECOMMENDED_GEMINI_MODELS.map((m) => (
-                  <option key={m} value={m}>
-                    {m} {m === 'gemini-3.5-flash' ? '(Recommended - Fastest & Stable)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {testingConnection ? 'Testing...' : '⚡ Test Connection'}
+              </button>
 
-            <div className="bg-blue-950/40 border border-blue-800/40 rounded-xl p-3 text-xs text-blue-300 space-y-1">
-              <div className="font-semibold flex items-center gap-1.5">
-                <span>⚡ Selected Engine:</span>
-                <span className="bg-blue-900 px-2 py-0.5 rounded text-[11px] text-blue-200 font-mono">
-                  {activeModel}
-                </span>
-              </div>
-              <p className="text-[11px] text-blue-300/80">
-                Primary multimodal PDF & document extractor with instant structured JSON. Auto-fallback to local MRZ and OCR if offline.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setShowAiModal(false)}
-                className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer"
+                className="px-5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveApiKey}
-                disabled={savingApiKey}
-                className="px-5 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                {savingApiKey ? 'Saving...' : '✓ Save Settings'}
+                Close
               </button>
             </div>
           </div>
