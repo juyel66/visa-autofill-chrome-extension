@@ -86,6 +86,15 @@ export interface PythonFieldSource {
   conflictDetails?: string
 }
 
+export interface PythonExtractionDiagnostics {
+  pdfTextFound: boolean
+  pdfTextChars: number
+  pageCount: number
+  ocrExecuted: boolean
+  ocrPageCount: number
+  extractionDurationMs: number
+}
+
 export interface PythonPassportExtractionResult {
   personal: PythonPersonalData
   passport: PythonPassportData
@@ -96,6 +105,7 @@ export interface PythonPassportExtractionResult {
   mrz: PythonMRZData
   fieldSources: Record<string, PythonFieldSource>
   processingTimeMs?: number
+  diagnostics?: PythonExtractionDiagnostics
 }
 
 // ============================================================================
@@ -744,10 +754,51 @@ export function payloadToBlob(input: string | Blob | File, defaultFileName = 'pa
   throw new PythonExtractorError('Invalid file payload: expected Data URL or Blob.', 'INVALID_FILE')
 }
 
+/**
+ * Computes a deterministic SHA-256 hex string from an ArrayBuffer or Uint8Array.
+ * Uses Web Crypto API in browser / modern Node, with a standard fallback.
+ */
+export async function computeSha256(data: ArrayBuffer | Uint8Array): Promise<string> {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.subtle) {
+    const bufferSource: BufferSource = bytes.buffer as ArrayBuffer
+    const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', bufferSource)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
+  try {
+    const mod = 'crypto'
+    const nodeCrypto = await import(/* @vite-ignore */ mod)
+    const hash = nodeCrypto.createHash('sha256')
+    hash.update(bytes)
+    return hash.digest('hex')
+  } catch {
+    let h1 = 0xdeadbeef
+    let h2 = 0x41c64e6d
+    for (let i = 0; i < bytes.length; i++) {
+      const ch = bytes[i]
+      h1 = Math.imul(h1 ^ ch, 2654435761)
+      h2 = Math.imul(h2 ^ ch, 1597334677)
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+    return `hash_${(h2 >>> 0).toString(16)}${(h1 >>> 0).toString(16)}_${bytes.length}`
+  }
+}
+
 const inFlightExtractions = new Map<string, Promise<PythonPassportExtractionResult>>()
+
+export function clearInFlightExtractions(): void {
+  inFlightExtractions.clear()
+}
+
+export function getInFlightExtractionsCount(): number {
+  return inFlightExtractions.size
+}
 
 /**
  * Calls the local Python extraction FastAPI service at POST /extract-passport.
+ * Uses SHA-256 of the actual file payload for thread-safe in-flight deduplication.
  */
 export async function extractPassportWithPython(
   fileInput: string | Blob | File,
@@ -776,7 +827,10 @@ export async function extractPassportWithPython(
     throw new PythonExtractorError('Uploaded document payload is empty.', 'INVALID_FILE')
   }
 
-  const dedupeKey = `${baseUrl}_${resolvedFileName}_${blob.size}`
+  const arrayBuffer = await blob.arrayBuffer()
+  const contentHash = await computeSha256(arrayBuffer)
+  const dedupeKey = `${baseUrl}_sha256_${contentHash}`
+
   const existingPromise = inFlightExtractions.get(dedupeKey)
   if (existingPromise) {
     return existingPromise
@@ -785,7 +839,8 @@ export async function extractPassportWithPython(
   const executionPromise = (async () => {
     const formData = new FormData()
     // Match FastAPI parameter: file: UploadFile = File(...)
-    formData.append('file', blob, resolvedFileName)
+    const filePayload = new Blob([arrayBuffer], { type: blob.type || 'application/pdf' })
+    formData.append('file', filePayload, resolvedFileName)
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => {
