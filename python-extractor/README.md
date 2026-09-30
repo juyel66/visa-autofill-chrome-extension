@@ -1,28 +1,53 @@
-# Local Python Passport OCR Proof of Concept
+# Local Python Passport OCR Extractor
 
-This service is an isolated, standalone proof-of-concept for extracting structured passport information locally using **PyMuPDF**, **PaddleOCR**, and a deterministic **ICAO Doc 9303 TD3 MRZ parser**.
-
-> **Note**: This is an isolated experiment on branch `experiment/python-local-ocr`. It does not modify, replace, or integrate with existing Gemini extraction pipelines, SavedApplication, or React/Chrome Extension components.
+The Local Python Passport Extractor is a production-hardened microservice powering passport extraction and autofill for the **Visa Autofill Chrome Extension**. It combines high-speed native PDF parsing via **PyMuPDF**, local deep-learning OCR via **PaddleOCR**, and a deterministic **ICAO Doc 9303 TD3 MRZ parser** to deliver fast, secure, and private document processing entirely on local hardware.
 
 ---
 
-## 1. Features
+## 1. System Architecture
 
-- **100% Local Processing**: No Gemini, OpenAI, or external cloud AI APIs.
-- **Smart PDF Inspection**: Uses PyMuPDF (`fitz`) to detect text layers, prioritize passport identity pages, and render high-resolution raster images for OCR.
-- **Robust Local OCR**: PaddleOCR (PP-OCRv4 mobile models) running locally on CPU with oneDNN and PIR safety handlers for Windows compatibility.
-- **Deterministic TD3 MRZ Engine**:
-  - Full support for 2-line, 44-character passport MRZ (ICAO Doc 9303).
-  - 7-3-1 weight check-digit verification for Document Number, Date of Birth, and Expiry Date.
-  - OCR fault tolerance (normalizes `<` substitutions, recovers missing delimiters, cleans character confusions).
-- **Deterministic Field Precedence**:
-  - Validated MRZ provides high-trust values for Document Number, Nationality, DOB, Gender, Expiry Date, and NID.
-  - Visual OCR extracts Place of Birth, Date of Issue, Issuing Authority/Place, and Permanent Address components.
-  - When MRZ is unavailable or invalid, visual OCR serves as the fallback.
-  - Strict compliance: Empty string `""` for unextracted fields; never invents missing data.
-- **Dual Interface**:
-  - **CLI**: Direct command-line extraction with execution time and confidence reporting.
-  - **FastAPI**: Microservice providing `GET /health` and `POST /extract-passport`.
+The extractor serves as the primary extraction engine for passport documents:
+
+```
+PDF upload
+  │
+  ▼
+Python FastAPI (http://127.0.0.1:8001/extract-passport)
+  │
+  ▼
+PyMuPDF Text Extraction (fast-path inspection in <15ms)
+  │
+  ├── [If text layer sufficient] ──► Skip OCR (0s OCR duration)
+  │
+  └── [If scanned / image-only] ──► Thread-Safe PaddleOCR Singleton (PP-OCRv4 CPU)
+                                            │
+                                            ▼
+                                  MRZ & OCR Fusion Engine
+                                  (ICAO 9303 7-3-1 check digit verification)
+                                            │
+                                            ▼
+                                  Extracted JSON & Diagnostics
+                                            │
+                                            ▼
+Chrome Extension Client (SHA-256 in-flight dedupe, finite timeout & error handling)
+  │
+  ▼
+SavedApplication Storage & Field Normalizer
+  │
+  ▼
+Full-Page Application Workspace (autofill, field review & manual edit persistence)
+```
+
+### Architectural Highlights
+
+1. **PDF Upload**: Handled via Chrome extension popup, dashboard, or documents view. The frontend enforces PDF-only validation for passport extraction.
+2. **FastAPI Microservice**: Exposes `GET /health` and `POST /extract-passport` with CORS configured for Chrome extension origins.
+3. **PyMuPDF Text Extraction**: Fast-path inspection detects whether a digital text layer exists. If core passport identity fields are present, extraction completes in <50ms without invoking OCR.
+4. **Thread-Safe OCR Singleton**: When a scanned document requires raster OCR, PaddleOCR is executed on the prioritized passport identity page. The singleton is protected by a thread-safe initialization lock (`threading.Lock`) with double-checked locking, preventing race conditions between background warmup and incoming requests.
+5. **MRZ / OCR Fusion**: Check digits for Document Number, Date of Birth, and Expiry Date are verified using ICAO 9303 weights (7-3-1). Verified MRZ takes deterministic precedence for identity particulars; visual text supplies address, place of issue, and issue date.
+6. **Extracted JSON & Diagnostics**: Returns standardized schemas with field-level confidence, source tracking (`mrz`, `ocr`, `pdf_text`, `derived`), and truthful extraction diagnostics (`pdfTextFound`, `pdfTextChars`, `pageCount`, `ocrExecuted`, `ocrPageCount`, `extractionDurationMs`).
+7. **Chrome Extension Integration**: `pythonExtractorClient.ts` performs content-based deduplication using SHA-256 hashes of the PDF payload. In-flight duplicate requests share the same promise without redundant network or CPU calls.
+8. **SavedApplication & Workspace**: Extracted fields are mapped into `SavedApplication` and synced with the active applicant profile, maintaining user-edited values and enabling seamless visa portal autofill.
 
 ---
 
@@ -32,21 +57,21 @@ This service is an isolated, standalone proof-of-concept for extracting structur
 python-extractor/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py          # FastAPI service with /health and /extract-passport
-│   ├── extractor.py     # End-to-end extraction pipeline and CLI entrypoint
-│   ├── pdf_processor.py # PyMuPDF text check, page scoring, and raster rendering
-│   ├── ocr.py           # PaddleOCR wrapper with CPU safety patches
-│   ├── mrz.py           # Deterministic TD3 MRZ parser and check digit validator
-│   └── schemas.py       # Pydantic schemas for structured extraction & field sources
+│   ├── main.py          # FastAPI service with /health, /extract-passport, and timeout safety
+│   ├── extractor.py     # End-to-end extraction pipeline, fast-path, and CLI entrypoint
+│   ├── pdf_processor.py # PyMuPDF inspection, page prioritization, and image rendering
+│   ├── ocr.py           # Thread-safe PaddleOCR singleton wrapper with CPU oneDNN handlers
+│   ├── mrz.py           # Deterministic ICAO Doc 9303 TD3 MRZ parser & check digit validator
+│   └── schemas.py       # Pydantic schemas for structured extraction, field sources & diagnostics
 ├── tests/
 │   ├── __init__.py
-│   ├── test_api.py           # FastAPI endpoint tests
-│   ├── test_extractor.py     # Normalization and end-to-end extraction tests
+│   ├── test_api.py           # FastAPI endpoint tests (/health, /extract-passport)
+│   ├── test_extractor.py     # End-to-end extraction and normalization tests
 │   ├── test_mrz.py           # Check digit calculations and TD3 parsing tests
 │   ├── test_pdf_processor.py # PDF inspection, rendering, and malformed file tests
-│   └── test_schemas.py       # Pydantic schema default value and serialization tests
-├── requirements.txt     # Locked dependencies
-└── README.md            # Documentation and accuracy report
+│   └── test_schemas.py       # Schema validation and serialization tests
+├── requirements.txt     # UTF-8 encoded dependency specifications
+└── README.md            # Architecture and operational documentation
 ```
 
 ---
@@ -54,96 +79,153 @@ python-extractor/
 ## 3. Setup and Installation
 
 ### Prerequisites
-- Python 3.10 or 3.11 (Managed automatically via `uv`)
+- Python 3.11 (Recommended: managed via `uv` or standard Python)
+- Windows / macOS / Linux
 
-### Environment Initialization
+### 1. Create Virtual Environment
+Using `uv` (recommended):
 ```bash
 cd python-extractor
 uv venv .venv --python 3.11
 ```
 
-### Install Dependencies
+Or using standard Python:
 ```bash
+cd python-extractor
+python -m venv .venv
+```
+
+### 2. Install Dependencies
+Using `uv`:
+```bash
+uv pip install -r requirements.txt
+```
+
+Or using pip:
+```bash
+# Windows
 .\.venv\Scripts\python -m pip install -r requirements.txt
+
+# Linux / macOS
+./.venv/bin/python -m pip install -r requirements.txt
 ```
 
 ---
 
-## 4. Usage
+## 4. Running the Service
 
-### Command-Line Interface (CLI)
-Run extraction on a passport PDF:
+### A. Automatic Auto-Start (Recommended)
+From the extension root repository:
+```bash
+npm run dev
+```
+The unified development runner (`scripts/dev.mjs`):
+1. Probes `http://127.0.0.1:8001/health`.
+2. If already running, reuses the existing Python instance.
+3. If not running, launches `python-extractor/.venv/Scripts/python.exe -m uvicorn app.main:app --port 8001 --host 127.0.0.1`.
+4. Starts Vite dev server concurrently.
+5. On shutdown (`Ctrl+C`), terminates the Python server only if it was started by the runner.
+
+To run only the Python service via npm:
+```bash
+npm run dev:python
+```
+
+### B. Manual Server Start
 ```bash
 cd python-extractor
-.\.venv\Scripts\python -m app.extractor "../tests/fixtures/Josoda passport.pdf"
+
+# Windows
+.\.venv\Scripts\python -m uvicorn app.main:app --port 8001 --host 127.0.0.1 --reload
+
+# Linux / macOS
+./.venv/bin/python -m uvicorn app.main:app --port 8001 --host 127.0.0.1 --reload
 ```
 
-For JSON output:
-```bash
-.\.venv\Scripts\python -m app.extractor "../tests/fixtures/Josoda passport.pdf" --json
-```
+---
 
-### FastAPI Microservice
-Start the local server on port 8001:
-```bash
-cd python-extractor
-.\.venv\Scripts\python -m uvicorn app.main:app --reload --port 8001
-```
+## 5. API Reference
 
-#### Endpoints:
-- `GET /health`
-  ```bash
-  curl http://127.0.0.1:8001/health
-  # Response: {"status": "ok"}
+### Health Check
+- **Endpoint**: `GET /health`
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "ok"
+  }
   ```
 
-- `POST /extract-passport`
-  ```bash
-  curl -X POST "http://127.0.0.1:8001/extract-passport" \
-       -H "accept: application/json" \
-       -H "Content-Type: multipart/form-data" \
-       -F "file=@../tests/fixtures/Josoda passport.pdf"
+### Passport Extraction
+- **Endpoint**: `POST /extract-passport`
+- **Content-Type**: `multipart/form-data`
+- **Parameters**: `file` (UploadFile, PDF only)
+- **Response**: `200 OK`
+  ```json
+  {
+    "personal": {
+      "surname": "RAY",
+      "givenName": "SHREE JOTIMOY",
+      "fullName": "SHREE JOTIMOY RAY",
+      "dateOfBirth": "1993-09-18",
+      "gender": "male",
+      "nationality": "BANGLADESH",
+      "placeOfBirth": "THAKURGAON",
+      "countryOfBirth": "",
+      "nid": "8235626051"
+    },
+    "passport": {
+      "number": "A21496961",
+      "issueDate": "2026-01-20",
+      "expiryDate": "2031-01-19",
+      "issuePlace": "DIP/DHAKA",
+      "issuingCountry": "BANGLADESH"
+    },
+    "address": {
+      "line1": "KASHIPUR",
+      "line2": "RANISANKAIL, MUZAHIDABAD COLONI",
+      "city": "THAKURGAON",
+      "district": "THAKURGAON",
+      "postalCode": "5120",
+      "country": "BANGLADESH"
+    },
+    "mrz": {
+      "detected": true,
+      "valid": true,
+      "rawLines": [
+        "PBGDRAY<<SHREE<JOTIMOY<<<<<<<<<<<<<<<<<<<<<<",
+        "A214969610BGD9309186M31011938235626051<<<<48"
+      ],
+      "confidence": 0.95
+    },
+    "diagnostics": {
+      "pdfTextFound": true,
+      "pdfTextChars": 450,
+      "pageCount": 1,
+      "ocrExecuted": false,
+      "ocrPageCount": 0,
+      "extractionDurationMs": 42.5
+    }
+  }
   ```
 
+### Timeout & Error Safety
+- **Non-PDF Files**: Returns `400 Bad Request` with `"Invalid file format. Only PDF files are supported."`
+- **Empty Files**: Returns `400 Bad Request` with `"Uploaded file is empty."`
+- **Timeout**: Enforces a 120-second backend safety timeout returning `504 Gateway Timeout` with `"Passport extraction timed out after 120 seconds on server."`
+
 ---
 
-## 5. Running the Test Suite
+## 6. Running Tests
 
-Run all unit and integration tests with `pytest`:
+### Python Test Suite
 ```bash
-cd python-extractor
-.\.venv\Scripts\pytest -v
+# Run all Python unit and API tests
+.\.venv\Scripts\python -m pytest python-extractor/tests/test_schemas.py python-extractor/tests/test_mrz.py python-extractor/tests/test_pdf_processor.py python-extractor/tests/test_api.py -v
 ```
 
-All 24 tests cover:
-- PDF page inspection & scoring
-- Text layer detection vs scanned image detection
-- Malformed PDF error handling
-- ICAO 9303 7-3-1 check digit validation
-- TD3 MRZ parsing with valid and invalid check digits
-- Date parsing & century resolution
-- Pydantic schema default values (`""` for missing fields)
-- FastAPI `/health` and `/extract-passport` validation
-- Full end-to-end extraction against real passport fixture
-
----
-
-## 6. Real Passport Benchmark Result (`tests/fixtures/Josoda passport.pdf`)
-
-| Field | Extracted Value | Source | Confidence | Status |
-|---|---|---|---|---|
-| **Surname** | `RAY` | OCR / MRZ | 1.00 | Exact Match |
-| **Given Name** | `SHREEJOTIMOY` | OCR / MRZ | 1.00 | Exact Match |
-| **Date of Birth** | `1993-09-18` | MRZ | 0.95 | Exact Match |
-| **Gender** | `male` | MRZ | 0.95 | Exact Match |
-| **Nationality** | `BANGLADESHI` | OCR | 1.00 | Exact Match |
-| **Place of Birth** | `THAKURGAON` | OCR | 1.00 | Exact Match |
-| **Country of Birth** | `""` | None | - | Correct (Omitted) |
-| **NID / Personal No** | `8235626051` | OCR / MRZ | 1.00 | Exact Match (10-digit smart NID) |
-| **Passport Number** | `A21496961` | MRZ | 0.95 | Exact Match |
-| **Issue Date** | `2026-01-20` | OCR | 0.99 | Exact Match |
-| **Expiry Date** | `2031-01-19` | MRZ | 0.95 | Exact Match |
-| **Issue Place** | `DIP/DHAKA` | OCR | 0.99 | Exact Match |
-| **Issuing Country** | `BGD` | MRZ | 0.95 | Exact Match |
-| **MRZ Status** | `detected: true`, `valid: true` | MRZ | 0.95 | Verified (All check digits pass) |
-| **Address** | Line 1: `KASHIPUR`, District: `THAKURGAON`, Postal Code: `5120` | OCR | 0.96 | Structured Address |
+### TypeScript Client Tests
+```bash
+# Run TypeScript client and integration tests
+npx tsx -r ./tests/setup.ts src/core/extraction/local/__tests__/pythonExtractorClient.test.ts
+npm test
+```
