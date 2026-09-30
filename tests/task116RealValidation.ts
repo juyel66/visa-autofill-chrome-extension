@@ -111,7 +111,7 @@ async function runTask116Validation() {
   assert(pipelineResult.hasExtractedFields, 'pipelineResult.hasExtractedFields must be true')
   assert(pipelineResult.sourceTypes.includes('ocr'), 'sourceTypes must include "ocr"')
   assert(pipelineResult.sourceTypes.includes('mrz'), 'sourceTypes must include "mrz"')
-  assert(!pipelineResult.sourceTypes.includes('ai'), 'Gemini AI must NOT be invoked on success')
+  assert(!pipelineResult.sourceTypes.includes('ai'), 'Cloud AI must NOT be invoked on success')
   assert(!pipelineResult.extractionError, 'No extraction error should be present')
 
   const extractedData = pipelineResult.extractedData!
@@ -451,9 +451,9 @@ async function runTask116Validation() {
   const liveHealth = await fetch(`${LOCAL_EXTRACTOR_URL}/health`)
   assert(liveHealth.ok, 'Live service is responsive on port 8001')
   assert.strictEqual(pipelineResult.sourceTypes.includes('ocr'), true, 'Python OCR was called and succeeded')
-  assert.strictEqual(pipelineResult.sourceTypes.includes('ai'), false, 'Gemini was NOT called')
+  assert.strictEqual(pipelineResult.sourceTypes.includes('ai'), false, 'Cloud AI was NOT called')
   assert.strictEqual(savedApp.fields['appl.surname']?.value, 'RAY', 'SavedApplication received the Python result')
-  console.log('  ✓ Python is called, extraction succeeds, Gemini is NOT called, SavedApplication receives Python result.')
+  console.log('  ✓ Python is called, extraction succeeds, Cloud AI is NOT called, SavedApplication receives Python result.')
 
   // =========================================================================
   // STEP 9: DUPLICATE REQUEST TEST
@@ -464,14 +464,13 @@ async function runTask116Validation() {
   console.log('  ✓ Exactly 1 extraction call made per document upload operation. No duplicate requests!')
 
   // =========================================================================
-  // STEP 10: GEMINI SAFETY CHECK
+  // STEP 10: EXTRACTION PIPELINE SAFETY CHECK
   // =========================================================================
-  console.log('\n--- 10. GEMINI SAFETY CHECK ---')
+  console.log('\n--- 10. EXTRACTION PIPELINE SAFETY CHECK ---')
   const pipelineCode = fs.readFileSync('src/core/extraction/pipeline.ts', 'utf8')
-  assert(pipelineCode.includes('extractApplicantDataWithGemini'), 'Gemini code intact in pipeline')
   assert(pipelineCode.includes('extractPassportWithPython'), 'Python client used in pipeline')
-  assert(fs.existsSync('src/core/extraction/ai/geminiExtractor.ts'), 'Gemini extractor source file intact')
-  console.log('  ✓ Gemini extractor intact in codebase, but NOT called in Python extraction flow.')
+  assert(!fs.existsSync('src/core/extraction/ai/geminiExtractor.ts'), 'Gemini extractor removed from codebase')
+  console.log('  ✓ Gemini extractor successfully purged; Python extractor is the sole active engine.')
 
   // =========================================================================
   // STEP 11: PORTAL AUTOFILL REGRESSION

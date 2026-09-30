@@ -123,7 +123,7 @@ async function execute() {
     console.error('Failures:', task081Res.failures)
   }
 
-  console.log('--- RUNNING TASK 079: DYNAMIC GEMINI EXTRACTION & ISOLATION TESTS ---')
+  console.log('--- RUNNING TASK 079: DYNAMIC EXTRACTION & ISOLATION TESTS ---')
   const task079Res = await runTask079DynamicExtractionTests()
   console.log(`Passed: ${task079Res.passed}, Count: ${task079Res.totalSubtests}`)
   if (!task079Res.passed) {
