@@ -764,8 +764,8 @@ export async function runEndToEndWorkflowTests(): Promise<WorkflowTestResult> {
     'K: Page 4 (Visa Details) autofills travel, history, and sponsor references'
   )
   assert(
-    !vRefuseFlag1.checked && !vRefuseFlag2.checked,
-    'K2: Page 4 (Visa Details) refusal disclosures remain manual and untouched'
+    !vRefuseFlag1.checked && vRefuseFlag2.checked,
+    'K2: Page 4 (Visa Details) refusal disclosures default to No'
   )
 
   // =========================================================================
