@@ -336,6 +336,7 @@ export const PORTAL_PURPOSE_OF_VISIT_OPTIONS: PortalSelectOption[] = [
   { value: 'MED_SELF', label: 'FOR MEDICAL TREATMENT OF SELF' },
   { value: 'MED_ATTENDANT', label: 'FOR ACCOMPANYING PATIENT AS ATTENDANT' },
   { value: 'BUSINESS', label: 'BUSINESS VISIT' },
+  { value: 'FOR ALL BUSINESS ACTIVITIES [OTHER THAN THOSE COVERED BY B-2, B-3 AND B-4 VISAS', label: 'FOR ALL BUSINESS ACTIVITIES [OTHER THAN THOSE COVERED BY B-2, B-3 AND B-4 VISAS' },
   { value: 'TO SET UP INDUSTRIAL/BUSINESS VENTURE', label: 'TO SET UP INDUSTRIAL / BUSINESS VENTURE' },
   { value: 'ATTEND TECHNICAL MEETINGS/DISCUSSIONS', label: 'ATTEND TECHNICAL MEETINGS / DISCUSSIONS' },
   { value: 'CONFERENCE', label: 'TO ATTEND CONFERENCE / SEMINAR / WORKSHOP' },
@@ -420,6 +421,7 @@ export const PORTAL_OCCUPATION_OPTIONS: PortalSelectOption[] = [
   { value: 'SELF EMPLOYED/ FREELANCER', label: 'SELF EMPLOYED / FREELANCER' },
   { value: 'TRADER', label: 'TRADER' },
   { value: 'HOUSEWIFE', label: 'HOUSEWIFE' },
+  { value: 'HOUSE WIFE', label: 'HOUSE WIFE' },
   { value: 'STUDENT', label: 'STUDENT' },
   { value: 'DOCTOR', label: 'DOCTOR' },
   { value: 'ENGINEER', label: 'ENGINEER' },
@@ -443,6 +445,79 @@ export const PORTAL_OCCUPATION_OPTIONS: PortalSelectOption[] = [
   { value: 'WRITER', label: 'WRITER' },
   { value: 'RETIRED', label: 'RETIRED' },
   { value: 'OTHERS', label: 'OTHERS' },
+]
+
+/**
+ * 10a. Specify below occupation details of options (for HOUSE WIFE, STUDENT, MINOR)
+ */
+export const PORTAL_OCCUPATION_DETAILS_OF_OPTIONS: PortalSelectOption[] = [
+  { value: 'HUSBAND', label: 'HUSBAND' },
+  { value: 'FATHER', label: 'FATHER' },
+  { value: 'MOTHER', label: 'MOTHER' },
+  { value: 'BROTHER', label: 'BROTHER' },
+  { value: 'SPOUSE', label: 'SPOUSE' },
+  { value: 'GUARDIAN', label: 'GUARDIAN' },
+  { value: 'SON', label: 'SON' },
+  { value: 'OTHER', label: 'OTHER' },
+]
+
+/**
+ * 10b. Visa Type Options
+ */
+export const PORTAL_VISA_TYPE_OPTIONS: PortalSelectOption[] = [
+  { value: 'BUSINESS VISA', label: 'BUSINESS VISA' },
+  { value: 'TOURIST VISA', label: 'TOURIST VISA' },
+  { value: 'MEDICAL VISA', label: 'MEDICAL VISA' },
+  { value: 'ENTRY VISA', label: 'ENTRY VISA' },
+  { value: 'STUDENT VISA', label: 'STUDENT VISA' },
+  { value: 'EMPLOYMENT VISA', label: 'EMPLOYMENT VISA' },
+  { value: 'CONFERENCE VISA', label: 'CONFERENCE VISA' },
+  { value: 'JOURNALIST VISA', label: 'JOURNALIST VISA' },
+  { value: 'TRANSIT VISA', label: 'TRANSIT VISA' },
+  { value: 'MISSIONARY VISA', label: 'MISSIONARY VISA' },
+]
+
+/**
+ * 10c. Indian States / UTs Options for References in India
+ */
+export const PORTAL_INDIAN_STATES_OPTIONS: PortalSelectOption[] = [
+  { value: 'ANDAMAN AND NICOBAR', label: 'ANDAMAN AND NICOBAR' },
+  { value: 'ANDHRA PRADESH', label: 'ANDHRA PRADESH' },
+  { value: 'ARUNACHAL PRADESH', label: 'ARUNACHAL PRADESH' },
+  { value: 'ASSAM', label: 'ASSAM' },
+  { value: 'BIHAR', label: 'BIHAR' },
+  { value: 'CHANDIGARH', label: 'CHANDIGARH' },
+  { value: 'CHHATTISGARH', label: 'CHHATTISGARH' },
+  { value: 'DADRA AND NAGAR HAVELI', label: 'DADRA AND NAGAR HAVELI' },
+  { value: 'DAMAN AND DIU', label: 'DAMAN AND DIU' },
+  { value: 'DELHI', label: 'DELHI' },
+  { value: 'GOA', label: 'GOA' },
+  { value: 'GUJARAT', label: 'GUJARAT' },
+  { value: 'HARYANA', label: 'HARYANA' },
+  { value: 'HIMACHAL PRADESH', label: 'HIMACHAL PRADESH' },
+  { value: 'JAMMU AND KASHMIR', label: 'JAMMU AND KASHMIR' },
+  { value: 'JHARKHAND', label: 'JHARKHAND' },
+  { value: 'KARNATAKA', label: 'KARNATAKA' },
+  { value: 'KERALA', label: 'KERALA' },
+  { value: 'LADAKH', label: 'LADAKH' },
+  { value: 'LAKSHADWEEP', label: 'LAKSHADWEEP' },
+  { value: 'MADHYA PRADESH', label: 'MADHYA PRADESH' },
+  { value: 'MAHARASHTRA', label: 'MAHARASHTRA' },
+  { value: 'MANIPUR', label: 'MANIPUR' },
+  { value: 'MEGHALAYA', label: 'MEGHALAYA' },
+  { value: 'MIZORAM', label: 'MIZORAM' },
+  { value: 'NAGALAND', label: 'NAGALAND' },
+  { value: 'ODISHA', label: 'ODISHA' },
+  { value: 'PUDUCHERRY', label: 'PUDUCHERRY' },
+  { value: 'PUNJAB', label: 'PUNJAB' },
+  { value: 'RAJASTHAN', label: 'RAJASTHAN' },
+  { value: 'SIKKIM', label: 'SIKKIM' },
+  { value: 'TAMIL NADU', label: 'TAMIL NADU' },
+  { value: 'TELANGANA', label: 'TELANGANA' },
+  { value: 'TRIPURA', label: 'TRIPURA' },
+  { value: 'UTTAR PRADESH', label: 'UTTAR PRADESH' },
+  { value: 'UTTARAKHAND', label: 'UTTARAKHAND' },
+  { value: 'WEST BENGAL', label: 'WEST BENGAL' },
 ]
 
 /**
@@ -494,4 +569,11 @@ export const PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS: PortalSelectOption[] = [
   { value: 'BY ROAD SONAHAT', label: 'BY ROAD SONAHAT' },
   { value: 'BY ROAD SRIMANTPUR', label: 'BY ROAD SRIMANTPUR' },
   { value: 'BY ROAD SUTERKANDI', label: 'BY ROAD SUTERKANDI' },
+  { value: 'HARIDASPUR', label: 'HARIDASPUR' },
+  { value: 'CHENNAI', label: 'CHENNAI' },
+  { value: 'DELHI', label: 'DELHI' },
+  { value: 'KOLKATA', label: 'KOLKATA' },
+  { value: 'MUMBAI', label: 'MUMBAI' },
+  { value: 'GEEDE', label: 'GEEDE' },
+  { value: 'CHANGRA BANDHA', label: 'CHANGRA BANDHA' },
 ]
