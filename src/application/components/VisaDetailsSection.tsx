@@ -3,6 +3,8 @@ import type { SavedApplication, ApplicationFieldValue } from '../../core/applica
 import {
   PORTAL_PURPOSE_OF_VISIT_OPTIONS,
   PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS,
+  PORTAL_VISA_TYPE_OPTIONS,
+  PORTAL_INDIAN_STATES_OPTIONS,
 } from '../../countries/india/options/registrationOptions'
 
 export interface VisaDetailsSectionProps {
@@ -38,9 +40,20 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
 
   const tempAppId = application?.applicantId
     ? `APPL-${application.applicantId.substring(0, 8).toUpperCase()}`
-    : '4XA4AXX5YTV4RFB'
+    : '32XAAA2XFBGQENP'
 
-  const hasVisitedIndiaBefore = getVal('old_visa_flag').toLowerCase() === 'yes'
+  // Default flags to 'No' unless explicitly 'Yes'
+  const oldVisaFlagVal = getVal('old_visa_flag')
+  const hasVisitedIndiaBefore = oldVisaFlagVal.toLowerCase() === 'yes'
+
+  const refuseFlagVal = getVal('refuse_flag')
+  const hasPermissionRefused = refuseFlagVal.toLowerCase() === 'yes'
+
+  const saarcFlagVal = getVal('saarc_flag')
+  const hasVisitedSaarc = saarcFlagVal.toLowerCase() === 'yes'
+
+  const visaType = getVal('visa_type') || 'BUSINESS VISA'
+  const isBusinessVisa = visaType.toUpperCase().includes('BUSINESS') || Boolean(getVal('comp_name'))
 
   const renderBadge = (fieldVal?: ApplicationFieldValue) => {
     if (!renderSourceBadge) return null
@@ -99,37 +112,178 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
         </div>
       </div>
 
-      {/* 2. Top Title Bar */}
+      {/* 2. Top Title Bar (Exact match to Screenshot 2) */}
       <div className="bg-[#b388b3] text-white px-4 py-1.5 flex items-center justify-between shadow-xs font-semibold text-sm">
-        <span className="font-bold tracking-wide">Visa Details & References Form</span>
+        <span className="font-bold tracking-wide">Visa Details Form</span>
         <span className="text-xs cursor-pointer hover:underline" title="Portal Page 4 of 4">🏠</span>
       </div>
 
-      {/* 3. Top Info Bar */}
-      <div className="bg-[#f0e6f0] border-b border-[#d8c0d8] px-4 py-2 text-xs text-[#333333]">
-        <span className="text-[11px] font-semibold text-[#2b542c]">
-          Temporary Application ID : <strong className="text-[#b91c1c] tracking-wider">{tempAppId}</strong>
-        </span>
+      {/* 3. Top Info Bar (Exact match to Screenshot 2) */}
+      <div className="bg-[#f0e6f0] border-b border-[#d8c0d8] px-4 py-2 text-xs text-[#333333] space-y-1">
+        <div className="text-[11px] font-semibold text-[#2b542c]">
+          Please note down the Temporary Application ID :{' '}
+          <strong className="text-[#b91c1c] tracking-wider">{tempAppId}</strong>
+        </div>
+        <p className="text-[10.5px] text-slate-600">
+          Your Information will be saved if you click save button or continue to next page. If you exit without doing either of that, your information will be lost.
+        </p>
       </div>
 
       <div className="p-4 sm:p-6 space-y-6">
         {/* ========================================================================= */}
-        {/* SUBSECTION 1: Visa Details & Travel Information */}
+        {/* SECTION 1: Details of Visa Sought (Exact match to Screenshot 2) */}
         {/* ========================================================================= */}
         <div id="sec-visaDetails" className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs scroll-mt-28">
           <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
-            Visa Details & Travel Information
+            Details of Visa Sought
           </div>
 
           <div className="p-4 space-y-3.5 text-xs">
-            {/* Visiting India for */}
+            {/* Type of Visa */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
-                Visiting India for <span className="text-red-600 font-bold">*</span>
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Type of Visa <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('purpose')}
+                  value={visaType}
+                  onChange={(e) => onFieldChange('visa_type', e.target.value)}
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#7c3aed]"
+                >
+                  <option value="">Select visa type</option>
+                  {PORTAL_VISA_TYPE_OPTIONS.map((v) => (
+                    <option key={v.value} value={v.value}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+                {renderBadge(fields['visa_type'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">visa type you are applying for</div>
+            </div>
+
+            {/* Name of Company in India / Street */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Name of the Company in India/Street <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={getVal('comp_name')}
+                  onChange={(e) => onFieldChange('comp_name', e.target.value.toUpperCase())}
+                  placeholder="NAME OF THE COMPANY IN INDIA / STREET"
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                />
+                {renderBadge(fields['comp_name'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-red-600 font-medium pl-1">Details required</div>
+            </div>
+
+            {/* Company Address */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Address <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={getVal('comp_address')}
+                  onChange={(e) => onFieldChange('comp_address', e.target.value.toUpperCase())}
+                  placeholder="COMPANY ADDRESS IN INDIA"
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                />
+                {renderBadge(fields['comp_address'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Address</div>
+            </div>
+
+            {/* Company Phone */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Phone <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={getVal('comp_phone')}
+                  onChange={(e) => onFieldChange('comp_phone', e.target.value)}
+                  placeholder="COMPANY PHONE NUMBER"
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                />
+                {renderBadge(fields['comp_phone'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Phone</div>
+            </div>
+
+            {/* Company Email */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Email <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-1.5">
+                <input
+                  type="email"
+                  value={getVal('comp_email')}
+                  onChange={(e) => onFieldChange('comp_email', e.target.value)}
+                  placeholder="COMPANY EMAIL ADDRESS"
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                />
+                {renderBadge(fields['comp_email'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Email</div>
+            </div>
+
+            {/* Duration of Visa (In Month ) */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Duration of Visa (In Month ) <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={getVal('duration') !== '' ? getVal('duration') : '0'}
+                  onChange={(e) => onFieldChange('duration', e.target.value)}
+                  placeholder="0"
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                />
+                {renderBadge(fields['duration'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Duration of Visa (In Month )</div>
+            </div>
+
+            {/* No. of Entries */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                No. of Entries <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-1.5">
+                <select
+                  value={getVal('visa_entry_id') || 'SINGLE'}
+                  onChange={(e) => onFieldChange('visa_entry_id', e.target.value)}
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                >
+                  <option value="SINGLE">SINGLE</option>
+                  <option value="DOUBLE">DOUBLE</option>
+                  <option value="TRIPLE">TRIPLE</option>
+                  <option value="MULTIPLE">MULTIPLE</option>
+                </select>
+                {renderBadge(fields['visa_entry_id'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">No of Entries</div>
+            </div>
+
+            {/* Purpose of Visit */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Purpose of Visit <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-1.5">
+                <select
+                  value={
+                    getVal('purpose') ||
+                    'FOR ALL BUSINESS ACTIVITIES [OTHER THAN THOSE COVERED BY B-2, B-3 AND B-4 VISAS'
+                  }
                   onChange={(e) => onFieldChange('purpose', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#7c3aed]"
                 >
@@ -142,57 +296,18 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 </select>
                 {renderBadge(fields['purpose'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Purpose of Visit</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Purpose of visit</div>
             </div>
 
-            {/* Duration of Visa */}
+            {/* Expected Date of journey */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
-                Duration of Visa (in Months) <span className="text-red-600 font-bold">*</span>
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Expected Date of journey <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
-                  value={getVal('duration') || '12'}
-                  onChange={(e) => onFieldChange('duration', e.target.value)}
-                  placeholder="DURATION (e.g. 12)"
-                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
-                />
-                {renderBadge(fields['duration'])}
-              </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">in Months (e.g. 12)</div>
-            </div>
-
-            {/* No of Entries */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
-                No. of Entries <span className="text-red-600 font-bold">*</span>
-              </label>
-              <div className="sm:col-span-5 flex items-center gap-1.5">
-                <select
-                  value={getVal('visa_entry_id') || 'Multiple'}
-                  onChange={(e) => onFieldChange('visa_entry_id', e.target.value)}
-                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
-                >
-                  <option value="Single">Single</option>
-                  <option value="Double">Double</option>
-                  <option value="Triple">Triple</option>
-                  <option value="Multiple">Multiple</option>
-                </select>
-                {renderBadge(fields['visa_entry_id'])}
-              </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">No. of Entries</div>
-            </div>
-
-            {/* Expected Date of Journey */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
-                Expected Date of Journey <span className="text-red-600 font-bold">*</span>
-              </label>
-              <div className="sm:col-span-5 flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={getVal('journeydate') || getVal('appl.journeydate')}
+                  value={getVal('journeydate') || getVal('appl.journeydate') || '20/02/2027'}
                   onChange={(e) => {
                     onFieldChange('journeydate', e.target.value)
                     onFieldChange('appl.journeydate', e.target.value)
@@ -202,21 +317,32 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 />
                 {renderBadge(fields['journeydate'] || fields['appl.journeydate'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">in DD/MM/YYYY format</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">(Visa validity will start from the Visa Issue Date)</div>
             </div>
 
-            {/* Port of Arrival */}
+            {/* Port of Arrival in India */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                 Port of Arrival in India <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('entrypoint') || 'BY AIR/ HARIDASPUR'}
+                  value={(() => {
+                    const raw = getVal('entrypoint') || 'HARIDASPUR'
+                    const opt = PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS.find(
+                      (p) => p.value === raw || p.value.toUpperCase() === raw.toUpperCase() || p.label.toUpperCase() === raw.toUpperCase()
+                    )
+                    return opt ? opt.value : raw
+                  })()}
                   onChange={(e) => {
                     const val = e.target.value
+                    const prevVal = getVal('entrypoint')
                     onFieldChange('entrypoint', val)
-                    onFieldChange('exitpoint', val)
+                    onFieldChange('appl.entrypoint', val)
+                    if (!getVal('exitpoint') || getVal('exitpoint') === prevVal) {
+                      onFieldChange('exitpoint', val)
+                      onFieldChange('appl.exitpoint', val)
+                    }
                   }}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#7c3aed]"
                 >
@@ -229,18 +355,27 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 </select>
                 {renderBadge(fields['entrypoint'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Port of Arrival</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Port of arrival in India</div>
             </div>
 
-            {/* Port of Exit */}
+            {/* Expected Port of Exit from India */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                 Expected Port of Exit from India <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('exitpoint') || getVal('entrypoint') || 'BY AIR/ HARIDASPUR'}
-                  onChange={(e) => onFieldChange('exitpoint', e.target.value)}
+                  value={(() => {
+                    const raw = getVal('exitpoint') || getVal('entrypoint') || 'HARIDASPUR'
+                    const opt = PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS.find(
+                      (p) => p.value === raw || p.value.toUpperCase() === raw.toUpperCase() || p.label.toUpperCase() === raw.toUpperCase()
+                    )
+                    return opt ? opt.value : raw
+                  })()}
+                  onChange={(e) => {
+                    onFieldChange('exitpoint', e.target.value)
+                    onFieldChange('appl.exitpoint', e.target.value)
+                  }}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#7c3aed]"
                 >
                   <option value="">Select exit point</option>
@@ -252,45 +387,350 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 </select>
                 {renderBadge(fields['exitpoint'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Port of Exit</div>
-            </div>
-
-            {/* Countries Visited */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
-                Countries Visited in last 10 years
-              </label>
-              <div className="sm:col-span-5 flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={getVal('country_visited')}
-                  onChange={(e) => onFieldChange('country_visited', e.target.value.toUpperCase())}
-                  placeholder="e.g. INDIA, NEPAL, BHUTAN"
-                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
-                />
-                {renderBadge(fields['country_visited'])}
-              </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Countries Visited</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Expected Port of Exit from India</div>
             </div>
           </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* SUBSECTION 2: References */}
+        {/* SECTION 2: Previous Visa/Currently valid Visa Details (Exact match to Screenshot 3) */}
+        {/* ========================================================================= */}
+        <div id="sec-previousVisitVisa" className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs scroll-mt-28">
+          <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
+            Previous Visa/Currently valid Visa Details
+          </div>
+
+          <div className="p-4 space-y-3.5 text-xs">
+            {/* Have you ever visited India before? (Default No) */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Have you ever visited India before? <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-4">
+                <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="old_visa_flag"
+                    checked={hasVisitedIndiaBefore}
+                    onChange={() => onFieldChange('old_visa_flag', 'Yes')}
+                    className="text-purple-600"
+                  />
+                  Yes
+                </label>
+                <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="old_visa_flag"
+                    checked={!hasVisitedIndiaBefore}
+                    onChange={() => onFieldChange('old_visa_flag', 'No')}
+                    className="text-purple-600"
+                  />
+                  / No
+                </label>
+                {renderBadge(fields['old_visa_flag'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">If yes,give details</div>
+            </div>
+
+            {/* Conditionally expanded Previous Visit Fields (When Yes) */}
+            {hasVisitedIndiaBefore && (
+              <div className="bg-[#f9f2f9] border border-[#d8c0d8] rounded p-3.5 space-y-3">
+                {/* Address (3 Lines) */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2 pt-1">
+                    Address <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5 space-y-1.5">
+                    <input
+                      type="text"
+                      value={getVal('prv_visit_add1')}
+                      onChange={(e) => onFieldChange('prv_visit_add1', e.target.value.toUpperCase())}
+                      placeholder="ENTER ADDRESS LINE 1 OF STAY"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    />
+                    <input
+                      type="text"
+                      value={getVal('prv_visit_add2')}
+                      onChange={(e) => onFieldChange('prv_visit_add2', e.target.value.toUpperCase())}
+                      placeholder="ENTER ADDRESS LINE 2 OF STAY"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    />
+                    <input
+                      type="text"
+                      value={getVal('prv_visit_add3')}
+                      onChange={(e) => onFieldChange('prv_visit_add3', e.target.value.toUpperCase())}
+                      placeholder="ENTER ADDRESS LINE 3 OF STAY"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1 pt-1">
+                    Enter the address of stay during your last visit
+                  </div>
+                </div>
+
+                {/* Cities previously visited in India */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2 pt-1">
+                    Cities previously visited in India <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5">
+                    <textarea
+                      rows={2}
+                      value={getVal('cities_visited')}
+                      onChange={(e) => onFieldChange('cities_visited', e.target.value.toUpperCase())}
+                      placeholder="KOLKATA, DELHI, CHENNAI"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1 pt-1">
+                    Cities in India visited (comma separated)
+                  </div>
+                </div>
+
+                {/* Last Indian Visa No */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                    Last Indian Visa No/Currently valid Indian Visa No. <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5">
+                    <input
+                      type="text"
+                      value={getVal('old_visa_no')}
+                      onChange={(e) => onFieldChange('old_visa_no', e.target.value.toUpperCase())}
+                      placeholder="VISA NUMBER"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs font-semibold"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">
+                    Last Indian Visa no / Currently valid Visa no
+                  </div>
+                </div>
+
+                {/* Type of Visa */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                    Type of Visa <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5">
+                    <select
+                      value={getVal('old_visa_type_id')}
+                      onChange={(e) => onFieldChange('old_visa_type_id', e.target.value)}
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    >
+                      <option value="">Select visa type</option>
+                      {PORTAL_VISA_TYPE_OPTIONS.map((v) => (
+                        <option key={v.value} value={v.value}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Type of Visa</div>
+                </div>
+
+                {/* Place of Issue */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                    Place of Issue <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5">
+                    <input
+                      type="text"
+                      value={getVal('oldvisaissueplace')}
+                      onChange={(e) => onFieldChange('oldvisaissueplace', e.target.value.toUpperCase())}
+                      placeholder="DHAKA / RAJSHAHI"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Place of Issue</div>
+                </div>
+
+                {/* Date of Issue */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                    Date of Issue <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5">
+                    <input
+                      type="text"
+                      value={getVal('oldvisaissuedate')}
+                      onChange={(e) => onFieldChange('oldvisaissuedate', e.target.value)}
+                      placeholder="DD/MM/YYYY"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Date of Issue in (DD/MM/YYYY) format</div>
+                </div>
+              </div>
+            )}
+
+            {/* Has permission to visit or to extend stay in India previously been refused? (Default No) */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Has permission to visit or to extend stay in India previously been refused?
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-4">
+                <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="refuse_flag"
+                    checked={hasPermissionRefused}
+                    onChange={() => {
+                      onFieldChange('refuse_flag', 'Yes')
+                      onFieldChange('appl.refuse_flag', 'Yes')
+                    }}
+                    className="text-purple-600"
+                  />
+                  Yes
+                </label>
+                <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="refuse_flag"
+                    checked={!hasPermissionRefused}
+                    onChange={() => {
+                      onFieldChange('refuse_flag', 'No')
+                      onFieldChange('appl.refuse_flag', 'No')
+                    }}
+                    className="text-purple-600"
+                  />
+                  / No
+                </label>
+                {renderBadge(fields['refuse_flag'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Refuse Details Yes /No</div>
+            </div>
+
+            {/* Conditionally expanded refusal details */}
+            {hasPermissionRefused && (
+              <div className="bg-[#fdf2f2] border border-[#fca5a5] rounded p-3 space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2 pt-1">
+                    If so, when and by whom (Mention Control No. and date also) <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5">
+                    <textarea
+                      rows={2}
+                      value={getVal('refuse_details')}
+                      onChange={(e) => onFieldChange('refuse_details', e.target.value.toUpperCase())}
+                      placeholder="DETAILS OF REFUSAL, CONTROL NO AND DATE"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1 pt-1">
+                    If so, when and by whom (mention Control no and date)
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* SECTION 3: Other Information (Exact match to Screenshot 4) */}
         {/* ========================================================================= */}
         <div className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs">
           <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
-            References
+            Other Information
+          </div>
+
+          <div className="p-4 space-y-3.5 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2 pt-1">
+                Countries Visited in Last 10 years
+              </label>
+              <div className="sm:col-span-5 flex items-start gap-1.5">
+                <textarea
+                  rows={2}
+                  value={getVal('country_visited') || 'NA'}
+                  onChange={(e) => onFieldChange('country_visited', e.target.value.toUpperCase())}
+                  placeholder="NA or comma separated countries"
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                />
+                {renderBadge(fields['country_visited'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1 pt-1">Countries Visited in Last 10 years</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* SECTION 4: SAARC Country Visit Details (Exact match to Screenshot 4) */}
+        {/* ========================================================================= */}
+        <div className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs">
+          <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
+            SAARC Country Visit Details
+          </div>
+
+          <div className="p-4 space-y-3.5 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2 text-[11px]">
+                Have you visited SAARC countries (except your own country) during last 3 years?
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-4">
+                <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="saarc_flag"
+                    checked={hasVisitedSaarc}
+                    onChange={() => onFieldChange('saarc_flag', 'Yes')}
+                    className="text-purple-600"
+                  />
+                  Yes
+                </label>
+                <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="saarc_flag"
+                    checked={!hasVisitedSaarc}
+                    onChange={() => onFieldChange('saarc_flag', 'No')}
+                    className="text-purple-600"
+                  />
+                  / No
+                </label>
+                {renderBadge(fields['saarc_flag'])}
+              </div>
+              <div className="sm:col-span-3 text-[10px] text-slate-500 pl-1 leading-tight">
+                Have you visited "South Asian Association for Regional Cooperation" (SAARC) countries (except your own country) during last 3 years? Yes /No
+              </div>
+            </div>
+
+            {hasVisitedSaarc && (
+              <div className="bg-[#f9f2f9] border border-[#d8c0d8] rounded p-3 space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2 pt-1">
+                    Details of SAARC Countries Visited <span className="text-red-600 font-bold">*</span>
+                  </label>
+                  <div className="sm:col-span-5">
+                    <textarea
+                      rows={2}
+                      value={getVal('saarc_details')}
+                      onChange={(e) => onFieldChange('saarc_details', e.target.value.toUpperCase())}
+                      placeholder="NAME OF SAARC COUNTRY, YEAR, NO OF VISITS"
+                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1 pt-1">
+                    Country, year, and visits details
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* SECTION 5: Reference (Exact match to Screenshot 4) */}
+        {/* ========================================================================= */}
+        <div className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs">
+          <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
+            Reference
           </div>
 
           <div className="p-4 space-y-4 text-xs">
-            {/* Reference in India */}
-            <div className="font-bold text-[#c2410c] text-xs border-b border-slate-200 pb-1">
-              Reference Name in India
-            </div>
-
+            {/* Reference Name in India */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                 Reference Name in India <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
@@ -298,17 +738,18 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   type="text"
                   value={getVal('nameofsponsor_ind')}
                   onChange={(e) => onFieldChange('nameofsponsor_ind', e.target.value.toUpperCase())}
-                  placeholder="NAME OF HOTEL / SPONSOR / PERSON"
+                  placeholder="REFERENCE NAME IN INDIA"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderBadge(fields['nameofsponsor_ind'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Reference Name</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Reference Name in India</div>
             </div>
 
+            {/* Address in India */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
-                Address Line 1 <span className="text-red-600 font-bold">*</span>
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Address <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
@@ -320,11 +761,53 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 />
                 {renderBadge(fields['add1ofsponsor_ind'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Address in India</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Address</div>
             </div>
 
+            {/* State in India */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                State <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-1.5">
+                <select
+                  value={getVal('stateofsponsor_ind')}
+                  onChange={(e) => onFieldChange('stateofsponsor_ind', e.target.value)}
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                >
+                  <option value="">Select state</option>
+                  {PORTAL_INDIAN_STATES_OPTIONS.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                {renderBadge(fields['stateofsponsor_ind'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Select state</div>
+            </div>
+
+            {/* District in India */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                District <span className="text-red-600 font-bold">*</span>
+              </label>
+              <div className="sm:col-span-5 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={getVal('districtofsponsor_ind')}
+                  onChange={(e) => onFieldChange('districtofsponsor_ind', e.target.value.toUpperCase())}
+                  placeholder="Select District"
+                  className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
+                />
+                {renderBadge(fields['districtofsponsor_ind'])}
+              </div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Select District</div>
+            </div>
+
+            {/* Phone in India */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                 Phone <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
@@ -332,22 +815,18 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   type="text"
                   value={getVal('phoneofsponsor_ind')}
                   onChange={(e) => onFieldChange('phoneofsponsor_ind', e.target.value)}
-                  placeholder="PHONE NO IN INDIA"
+                  placeholder="+915214587424"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderBadge(fields['phoneofsponsor_ind'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Phone in India</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Phone no</div>
             </div>
 
-            {/* Reference in Bangladesh / Home Country */}
-            <div className="font-bold text-[#c2410c] text-xs border-b border-slate-200 pb-1 pt-3">
-              Reference Name in Home Country (Bangladesh)
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
-                Reference Name in Home Country <span className="text-red-600 font-bold">*</span>
+            {/* Reference Name in BANGLADESH */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center pt-2 border-t border-slate-200">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Reference Name in BANGLADESH <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
@@ -359,12 +838,13 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 />
                 {renderBadge(fields['nameofsponsor_msn'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Home Country Reference</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Reference Name in BANGLADESH</div>
             </div>
 
+            {/* Address in BANGLADESH */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
-                Address Line 1 <span className="text-red-600 font-bold">*</span>
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
+                Address <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
@@ -376,11 +856,12 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 />
                 {renderBadge(fields['add1ofsponsor_msn'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Address in Home Country</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Address</div>
             </div>
 
+            {/* Phone in BANGLADESH */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
+              <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                 Phone <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
@@ -388,138 +869,18 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   type="text"
                   value={getVal('phoneofsponsor_msn')}
                   onChange={(e) => onFieldChange('phoneofsponsor_msn', e.target.value)}
-                  placeholder="PHONE NO IN BANGLADESH"
+                  placeholder="01747498166"
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 />
                 {renderBadge(fields['phoneofsponsor_msn'])}
               </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Phone in Home Country</div>
+              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Phone no</div>
             </div>
           </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* SUBSECTION 3: Previous Visit / Visa Details */}
-        {/* ========================================================================= */}
-        <div id="sec-previousVisitVisa" className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs scroll-mt-28">
-          <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
-            Previous Visit / Visa Details
-          </div>
-
-          <div className="p-4 space-y-3.5 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
-              <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
-                Have you ever visited India before?
-              </label>
-              <div className="sm:col-span-5 flex items-center gap-4">
-                <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
-                  <input
-                    type="radio"
-                    name="old_visa_radio"
-                    checked={hasVisitedIndiaBefore}
-                    onChange={() => onFieldChange('old_visa_flag', 'Yes')}
-                    className="text-purple-600"
-                  />
-                  Yes
-                </label>
-                <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
-                  <input
-                    type="radio"
-                    name="old_visa_radio"
-                    checked={!hasVisitedIndiaBefore}
-                    onChange={() => onFieldChange('old_visa_flag', 'No')}
-                    className="text-purple-600"
-                  />
-                  No
-                </label>
-                {renderBadge(fields['old_visa_flag'])}
-              </div>
-              <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Prior Visit Disclosure</div>
-            </div>
-
-            {hasVisitedIndiaBefore && (
-              <div className="bg-[#f3e8f3] border border-[#d8c0d8] rounded p-3 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
-                    Address where stayed *
-                  </label>
-                  <div className="sm:col-span-5">
-                    <input
-                      type="text"
-                      value={getVal('prv_visit_add1')}
-                      onChange={(e) => onFieldChange('prv_visit_add1', e.target.value.toUpperCase())}
-                      placeholder="ADDRESS WHERE STAYED"
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
-                    Previous Visa Number *
-                  </label>
-                  <div className="sm:col-span-5">
-                    <input
-                      type="text"
-                      value={getVal('old_visa_no')}
-                      onChange={(e) => onFieldChange('old_visa_no', e.target.value.toUpperCase())}
-                      placeholder="VISA NUMBER"
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs font-semibold"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
-                    Type of Visa *
-                  </label>
-                  <div className="sm:col-span-5">
-                    <input
-                      type="text"
-                      value={getVal('old_visa_type_id')}
-                      onChange={(e) => onFieldChange('old_visa_type_id', e.target.value.toUpperCase())}
-                      placeholder="TOURIST / MEDICAL"
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
-                    Place of Issue *
-                  </label>
-                  <div className="sm:col-span-5">
-                    <input
-                      type="text"
-                      value={getVal('oldvisaissueplace')}
-                      onChange={(e) => onFieldChange('oldvisaissueplace', e.target.value.toUpperCase())}
-                      placeholder="DHAKA / RAJSHAHI"
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                  <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
-                    Date of Issue *
-                  </label>
-                  <div className="sm:col-span-5">
-                    <input
-                      type="text"
-                      value={getVal('oldvisaissuedate')}
-                      onChange={(e) => onFieldChange('oldvisaissuedate', e.target.value)}
-                      placeholder="DD/MM/YYYY"
-                      className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* SUBSECTION 4: Photograph Upload & Preview */}
+        {/* SECTION 6: Photograph Upload & Preview */}
         {/* ========================================================================= */}
         <div id="sec-photoUpload" className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs scroll-mt-28">
           <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
@@ -575,7 +936,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
           * Mandatory Fields
         </div>
 
-        {/* Bottom Action Buttons (Image 5 faithful) */}
+        {/* Bottom Action Buttons (Exact match to Screenshots 3 & 4) */}
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           {onPreviousPage && (
             <button
