@@ -419,6 +419,15 @@ export const BANGLADESH_FAMILY_DETAILS_FIXTURE_HTML = `
       <option value="SERVICE">SERVICE</option>
       <option value="WORKER">WORKER</option>
     </select>
+    <select id="occ_flag" name="appl.occ_flag">
+      <option value="">Select......</option>
+      <option value="HUSBAND">HUSBAND</option>
+      <option value="FATHER">FATHER</option>
+      <option value="MOTHER">MOTHER</option>
+      <option value="BROTHER">BROTHER</option>
+      <option value="SPOUSE">SPOUSE</option>
+      <option value="OTHER">OTHER</option>
+    </select>
     <input type="text" id="empname" name="appl.empname" value="" />
     <input type="text" id="empdesignation" name="appl.empdesignation" value="" />
     <input type="text" id="empaddress" name="appl.empaddress" value="" />
@@ -456,6 +465,16 @@ export const BANGLADESH_VISA_DETAILS_FIXTURE_HTML = `
       <option value="Double">Double</option>
       <option value="Multiple">Multiple</option>
     </select>
+    <select id="purpose" name="appl.purpose">
+      <option value="">Select Purpose...</option>
+      <option value="FOR ALL BUSINESS ACTIVITIES [OTHER THAN THOSE COVERED BY B-2, B-3 AND B-4 VISAS">FOR ALL BUSINESS ACTIVITIES [OTHER THAN THOSE COVERED BY B-2, B-3 AND B-4 VISAS</option>
+      <option value="BUSINESS">BUSINESS</option>
+      <option value="TOURISM">TOURISM</option>
+    </select>
+    <input type="text" id="comp_name" name="appl.comp_name" value="" />
+    <input type="text" id="comp_address" name="appl.comp_address" value="" />
+    <input type="text" id="comp_phone" name="appl.comp_phone" value="" />
+    <input type="text" id="comp_email" name="appl.comp_email" value="" />
     <input type="text" id="jouryney_id" name="appl.journeydate" placeholder="DD/MM/YYYY" value="" />
     <select id="entrypoint" name="appl.entrypoint">
       <option value="">Select Entry Port...</option>
@@ -484,6 +503,7 @@ export const BANGLADESH_VISA_DETAILS_FIXTURE_HTML = `
     <input type="text" id="prv_visit_add1" name="appl.prv_visit_add1" value="" />
     <input type="text" id="prv_visit_add2" name="appl.prv_visit_add2" value="" />
     <input type="text" id="prv_visit_add3" name="appl.prv_visit_add3" value="" />
+    <textarea id="cities_visited" name="appl.cities_visited"></textarea>
     <input type="text" id="old_visa_no" name="appl.old_visa_no" value="" />
     <select id="old_visa_type_id" name="appl.old_visa_type_id">
       <option value="">Select Old Visa Type...</option>
@@ -504,11 +524,20 @@ export const BANGLADESH_VISA_DETAILS_FIXTURE_HTML = `
     <input type="text" id="country_visited" name="appl.country_visited" value="" />
     <input type="radio" id="saarc_flag1" name="appl.saarc_flag" value="Y" />
     <input type="radio" id="saarc_flag2" name="appl.saarc_flag" value="N" />
+    <textarea id="saarc_details" name="appl.saarc_details"></textarea>
 
     <!-- References -->
     <input type="text" id="nameofsponsor_ind" name="appl.nameofsponsor_ind" value="" />
     <input type="text" id="add1ofsponsor_ind" name="appl.add1ofsponsor_ind" value="" />
     <input type="text" id="add2ofsponsor_ind" name="appl.add2ofsponsor_ind" value="" />
+    <select id="stateofsponsor_ind" name="appl.stateofsponsor_ind">
+      <option value="">Select state</option>
+      <option value="WEST BENGAL">WEST BENGAL</option>
+    </select>
+    <select id="districtofsponsor_ind" name="appl.districtofsponsor_ind">
+      <option value="">Select District</option>
+      <option value="KOLKATA">KOLKATA</option>
+    </select>
     <input type="text" id="phoneofsponsor_ind" name="appl.phoneofsponsor_ind" value="" />
     <input type="text" id="nameofsponsor_msn" name="appl.nameofsponsor_msn" value="" />
     <input type="text" id="add1ofsponsor_msn" name="appl.add1ofsponsor_msn" value="" />
