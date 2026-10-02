@@ -61,9 +61,9 @@ export function resolveCandidateData(
   }
 
   // 1. Highest Priority: SavedApplication for this profile (contains confirmed extractions + user edits)
-  if (savedApplication && savedApplication.applicantId === profileId) {
+  if (savedApplication) {
     const baseProfile: ApplicantProfile = {
-      applicantId: profileId,
+      applicantId: profileId || savedApplication.applicantId,
       createdAt: savedApplication.createdAt || new Date().toISOString(),
       updatedAt: savedApplication.updatedAt || new Date().toISOString(),
       notes,
@@ -72,7 +72,7 @@ export function resolveCandidateData(
     return {
       status: 'READY',
       provenance: {
-        profileId,
+        profileId: profileId || savedApplication.applicantId,
         documentId: savedApplication.provenance?.passportDocumentId || savedApplication.applicationId,
         sourceType: 'confirmed-document',
         documentType: 'saved-application',
