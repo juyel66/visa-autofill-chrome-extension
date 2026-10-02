@@ -43,7 +43,17 @@ export async function getSavedApplications(): Promise<SavedApplication[]> {
 export async function getSavedApplicationByApplicantId(applicantId: string): Promise<SavedApplication | null> {
   if (!applicantId) return null
   const applications = await getSavedApplications()
-  return applications.find((a) => a.applicantId === applicantId) || null
+  return (
+    applications.find((a) => a.applicantId === applicantId) ||
+    applications.find(
+      (a) =>
+        a.fields?.['comp_name']?.value ||
+        a.fields?.['appl.comp_name']?.value ||
+        a.fields?.['travel.businessCompanyName']?.value
+    ) ||
+    applications[0] ||
+    null
+  )
 }
 
 export async function saveApplication(app: SavedApplication): Promise<void> {
