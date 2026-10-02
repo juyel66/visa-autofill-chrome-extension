@@ -134,6 +134,7 @@ export const BANGLADESH_BASIC_DETAILS_MAPPINGS: IndiaVisaFieldMapping[] = [
     status: 'verified',
     required: true,
     page: 'BASIC_DETAILS',
+    transform: 'selectOptionMatch',
   },
   {
     id: 'bd_basic_identity_marks',
