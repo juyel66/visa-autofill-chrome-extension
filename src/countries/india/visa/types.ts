@@ -148,6 +148,10 @@ export interface VisaDetails {
   portOfExit: string
   placesToBeVisited: string
   purposeOfVisit: string
+  companyNameInIndia?: string
+  companyAddressInIndia?: string
+  companyPhoneInIndia?: string
+  companyEmailInIndia?: string
 }
 
 export interface PreviousVisitDetails {
