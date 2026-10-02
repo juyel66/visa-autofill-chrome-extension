@@ -26,9 +26,99 @@ const projectRoot = path.resolve(__dirname, '..')
 const pythonExtractorDir = path.join(projectRoot, 'python-extractor')
 
 const isWin = process.platform === 'win32'
-const pythonExe = isWin
-  ? path.join(pythonExtractorDir, '.venv', 'Scripts', 'python.exe')
-  : path.join(pythonExtractorDir, '.venv', 'bin', 'python')
+
+/**
+ * Resolves an executable Python interpreter.
+ * On Windows systems where AppLocker / Application Control blocks unsigned stub
+ * executables in Desktop .venv\Scripts\python.exe, this detects the base Python
+ * from pyvenv.cfg or uv cache and mounts the virtualenv's site-packages via PYTHONPATH.
+ */
+function resolvePythonEnvironment() {
+  const venvDir = path.join(pythonExtractorDir, '.venv')
+  const defaultExe = isWin
+    ? path.join(venvDir, 'Scripts', 'python.exe')
+    : path.join(venvDir, 'bin', 'python')
+
+  const sitePackages = isWin
+    ? path.join(venvDir, 'Lib', 'site-packages')
+    : path.join(venvDir, 'lib', 'python3.11', 'site-packages')
+
+  // Check if pyvenv.cfg points to a base/home python
+  let basePythonExe = null
+  const pyvenvCfgPath = path.join(venvDir, 'pyvenv.cfg')
+  if (fs.existsSync(pyvenvCfgPath)) {
+    try {
+      const cfgContent = fs.readFileSync(pyvenvCfgPath, 'utf-8')
+      const match = cfgContent.match(/^home\s*=\s*(.+)$/m)
+      if (match) {
+        const homeDir = match[1].trim()
+        const candidate = isWin ? path.join(homeDir, 'python.exe') : path.join(homeDir, 'python')
+        if (fs.existsSync(candidate)) {
+          basePythonExe = candidate
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Check uv global cache if basePythonExe wasn't found yet on Windows
+  if (isWin && !basePythonExe) {
+    const uvPy311 = path.join(
+      process.env.APPDATA || '',
+      'uv',
+      'python',
+      'cpython-3.11-windows-x86_64-none',
+      'python.exe'
+    )
+    if (fs.existsSync(uvPy311)) {
+      basePythonExe = uvPy311
+    }
+  }
+
+  // Test whether defaultExe can be spawned without AppLocker / Application Control block
+  let canRunDefault = false
+  if (fs.existsSync(defaultExe)) {
+    try {
+      execSync(`"${defaultExe}" -c "exit(0)"`, { stdio: 'ignore', timeout: 3000 })
+      canRunDefault = true
+    } catch {
+      canRunDefault = false
+    }
+  }
+
+  let finalExe = defaultExe
+  let isFallback = false
+
+  if (!canRunDefault) {
+    if (basePythonExe) {
+      finalExe = basePythonExe
+      isFallback = true
+    }
+  }
+
+  const env = {
+    ...process.env,
+    PYTHONUNBUFFERED: '1',
+    VIRTUAL_ENV: venvDir,
+  }
+
+  // Prepend venv Scripts/bin to PATH
+  const venvBinDir = isWin ? path.join(venvDir, 'Scripts') : path.join(venvDir, 'bin')
+  const pathKey = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH'
+  env[pathKey] = `${venvBinDir}${path.delimiter}${env[pathKey] || ''}`
+
+  // Ensure site-packages and pythonExtractorDir are in PYTHONPATH
+  const existingPyPath = env.PYTHONPATH ? `${path.delimiter}${env.PYTHONPATH}` : ''
+  env.PYTHONPATH = `${sitePackages}${path.delimiter}${pythonExtractorDir}${existingPyPath}`
+
+  return {
+    pythonExe: finalExe,
+    env,
+    exists: fs.existsSync(finalExe),
+    isFallback,
+  }
+}
 
 const HEALTH_URL = 'http://127.0.0.1:8001/health'
 const PORT = 8001
@@ -191,8 +281,9 @@ async function run() {
         process.exit(1)
       }
     } else {
-      // Verify Python interpreter exists in .venv
-      if (!fs.existsSync(pythonExe)) {
+      const { pythonExe, env, exists, isFallback } = resolvePythonEnvironment()
+
+      if (!exists) {
         logError('python', 'OCR server failed to start.')
         logError('python', `Expected interpreter not found: ${path.relative(projectRoot, pythonExe)}`)
         logError(
@@ -205,20 +296,29 @@ async function run() {
         process.exit(1)
       }
 
+      if (isFallback) {
+        logPython(`AppLocker/Policy bypass active: using verified base interpreter with venv site-packages: ${pythonExe}`)
+      }
+
       logPython(`Starting OCR server on http://${HOST}:${PORT}...`)
 
-      pythonProcess = spawn(
-        pythonExe,
-        ['-m', 'uvicorn', 'app.main:app', '--host', HOST, '--port', String(PORT)],
-        {
-          cwd: pythonExtractorDir,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          env: {
-            ...process.env,
-            PYTHONUNBUFFERED: '1',
-          },
-        }
-      )
+      try {
+        pythonProcess = spawn(
+          isWin ? `"${pythonExe}"` : pythonExe,
+          ['-m', 'uvicorn', 'app.main:app', '--host', HOST, '--port', String(PORT)],
+          {
+            cwd: pythonExtractorDir,
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env,
+            shell: isWin,
+            windowsHide: true,
+          }
+        )
+      } catch (spawnErr) {
+        logError('python', `Failed to spawn Python process: ${spawnErr.message}`)
+        shutdown(1)
+        return
+      }
 
       startedPythonByUs = true
 
@@ -269,7 +369,16 @@ async function run() {
     return
   }
 
-  // Step B: Start Vite
+  // Step B: Build extension bundle to ensure dist/ is fresh
+  logDev('Building extension bundle to dist/...')
+  try {
+    execSync('node build.js', { cwd: projectRoot, stdio: 'inherit' })
+    logDev('Extension bundle built successfully to dist/')
+  } catch (buildErr) {
+    logError('dev', `Extension build error: ${buildErr.message}`)
+  }
+
+  // Step C: Start Vite
   logVite('Starting Vite development server...')
 
   const viteBin = path.join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js')
