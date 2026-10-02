@@ -528,6 +528,356 @@ export function resolveApplicantValue(
     return 'No'
   }
 
+  // Previous Visa Flag (Defaults to 'No' unless explicitly true/Yes)
+  if (
+    path === 'previousVisa.hasPreviousVisa' ||
+    path === 'appl.old_visa_flag' ||
+    path === 'old_visa_flag'
+  ) {
+    if (
+      applicant.previousVisa?.hasPreviousVisa === true ||
+      (applicant.previousVisa?.hasPreviousVisa as unknown) === 'Yes' ||
+      (applicant.previousVisa?.hasPreviousVisa as unknown) === 'Y' ||
+      (applicant.previousVisa?.hasPreviousVisa as unknown) === 'true'
+    ) {
+      return 'Yes'
+    }
+    return 'No'
+  }
+
+  // Refuse Flag (Defaults to 'No' unless explicitly true/Yes)
+  if (
+    path === 'previousVisa.hasRefusal' ||
+    path === 'appl.refuse_flag' ||
+    path === 'refuse_flag'
+  ) {
+    if (
+      applicant.previousVisa?.hasRefusal === true ||
+      (applicant.previousVisa?.hasRefusal as unknown) === 'Yes' ||
+      (applicant.previousVisa?.hasRefusal as unknown) === 'Y' ||
+      (applicant.previousVisa?.hasRefusal as unknown) === 'true'
+    ) {
+      return 'Yes'
+    }
+    return 'No'
+  }
+
+  // SAARC Visit Flag (Defaults to 'No' unless explicitly true/Yes)
+  if (
+    path === 'travel.visitedSaarc' ||
+    path === 'appl.saarc_flag' ||
+    path === 'saarc_flag'
+  ) {
+    if (
+      applicant.travel?.visitedSaarc === true ||
+      (applicant.travel?.visitedSaarc as unknown) === 'Yes' ||
+      (applicant.travel?.visitedSaarc as unknown) === 'Y' ||
+      (applicant.travel?.visitedSaarc as unknown) === 'true'
+    ) {
+      return 'Yes'
+    }
+    return 'No'
+  }
+
+  // Specify below occupation details of (occ_flag)
+  if (
+    path === 'employment.dependentRelation' ||
+    path === 'appl.occ_flag' ||
+    path === 'occ_flag' ||
+    path === 'occ_details_of' ||
+    path === 'appl.occ_details_of'
+  ) {
+    if (applicant.employment?.dependentRelation && applicant.employment.dependentRelation.trim() !== '') {
+      return applicant.employment.dependentRelation.trim().toUpperCase()
+    }
+    // Fallback based on marital status
+    const marital = applicant.personalInfo?.maritalStatus?.toLowerCase()
+    if (applicant.employment?.presentOccupation?.toUpperCase().includes('HOUSE')) {
+      return marital === 'married' ? 'HUSBAND' : 'FATHER'
+    }
+    if (applicant.employment?.presentOccupation?.toUpperCase() === 'STUDENT') {
+      return 'FATHER'
+    }
+    return undefined
+  }
+
+  const extractFieldValue = (field: any): string | undefined => {
+    if (field === null || field === undefined) return undefined
+    if (typeof field === 'string' && field.trim() !== '') return field.trim()
+    if (typeof field === 'number' || typeof field === 'boolean') return String(field).trim()
+    if (typeof field === 'object') {
+      const v = field.value
+      if (v !== null && v !== undefined && String(v).trim() !== '') {
+        return String(v).trim()
+      }
+    }
+    return undefined
+  }
+
+  // Religion
+  if (
+    path === 'personalInfo.religion' ||
+    path === 'appl.religion' ||
+    path === 'religion' ||
+    path === 'basic_religion'
+  ) {
+    if (applicant.personalInfo?.religion && applicant.personalInfo.religion.trim() !== '') {
+      return applicant.personalInfo.religion.trim().toUpperCase()
+    }
+    if ((applicant as any).religion && String((applicant as any).religion).trim() !== '') {
+      return String((applicant as any).religion).trim().toUpperCase()
+    }
+    if ((applicant as any)['appl.religion'] && String((applicant as any)['appl.religion']).trim() !== '') {
+      return String((applicant as any)['appl.religion']).trim().toUpperCase()
+    }
+    const rawFields = (applicant as any).fields
+    if (rawFields && typeof rawFields === 'object') {
+      const val =
+        extractFieldValue(rawFields['appl.religion']) ??
+        extractFieldValue(rawFields['religion']) ??
+        extractFieldValue(rawFields['personalInfo.religion'])
+      if (val) return val.toUpperCase()
+    }
+  }
+
+  // Business Company in India details
+  if (
+    path === 'travel.businessCompanyName' ||
+    path === 'appl.comp_name' ||
+    path === 'comp_name' ||
+    path === 'business_company_name' ||
+    path === 'appl.business_company_name' ||
+    path === 'appl.ind_comp_name'
+  ) {
+    if (applicant.travel?.businessCompanyName && applicant.travel.businessCompanyName.trim() !== '') {
+      return applicant.travel.businessCompanyName.trim().toUpperCase()
+    }
+    if ((applicant as any).comp_name && String((applicant as any).comp_name).trim() !== '') {
+      return String((applicant as any).comp_name).trim().toUpperCase()
+    }
+    if ((applicant as any)['appl.comp_name'] && String((applicant as any)['appl.comp_name']).trim() !== '') {
+      return String((applicant as any)['appl.comp_name']).trim().toUpperCase()
+    }
+    if ((applicant as any).travel?.comp_name && String((applicant as any).travel.comp_name).trim() !== '') {
+      return String((applicant as any).travel.comp_name).trim().toUpperCase()
+    }
+    const rawFields = (applicant as any).fields
+    if (rawFields && typeof rawFields === 'object') {
+      const fieldVal =
+        extractFieldValue(rawFields['comp_name']) ??
+        extractFieldValue(rawFields['appl.comp_name']) ??
+        extractFieldValue(rawFields['travel.businessCompanyName']) ??
+        extractFieldValue(rawFields['businessCompanyName']) ??
+        extractFieldValue(rawFields['appl.business_company_name']) ??
+        extractFieldValue(rawFields['appl.ind_comp_name'])
+      if (fieldVal) {
+        return fieldVal.toUpperCase()
+      }
+    }
+  }
+
+  if (
+    path === 'travel.businessCompanyAddress' ||
+    path === 'appl.comp_address' ||
+    path === 'comp_address' ||
+    path === 'business_address' ||
+    path === 'appl.business_address' ||
+    path === 'appl.ind_comp_address'
+  ) {
+    if (applicant.travel?.businessCompanyAddress && applicant.travel.businessCompanyAddress.trim() !== '') {
+      return applicant.travel.businessCompanyAddress.trim().toUpperCase()
+    }
+    if ((applicant as any).comp_address && String((applicant as any).comp_address).trim() !== '') {
+      return String((applicant as any).comp_address).trim().toUpperCase()
+    }
+    if ((applicant as any)['appl.comp_address'] && String((applicant as any)['appl.comp_address']).trim() !== '') {
+      return String((applicant as any)['appl.comp_address']).trim().toUpperCase()
+    }
+    if ((applicant as any).travel?.comp_address && String((applicant as any).travel.comp_address).trim() !== '') {
+      return String((applicant as any).travel.comp_address).trim().toUpperCase()
+    }
+    const rawFields = (applicant as any).fields
+    if (rawFields && typeof rawFields === 'object') {
+      const fieldVal =
+        extractFieldValue(rawFields['comp_address']) ??
+        extractFieldValue(rawFields['appl.comp_address']) ??
+        extractFieldValue(rawFields['travel.businessCompanyAddress']) ??
+        extractFieldValue(rawFields['businessCompanyAddress']) ??
+        extractFieldValue(rawFields['appl.business_address']) ??
+        extractFieldValue(rawFields['appl.ind_comp_address'])
+      if (fieldVal) {
+        return fieldVal.toUpperCase()
+      }
+    }
+  }
+
+  if (
+    path === 'travel.businessCompanyPhone' ||
+    path === 'appl.comp_phone' ||
+    path === 'comp_phone' ||
+    path === 'business_phone' ||
+    path === 'appl.business_phone' ||
+    path === 'appl.ind_comp_phone'
+  ) {
+    if (applicant.travel?.businessCompanyPhone && applicant.travel.businessCompanyPhone.trim() !== '') {
+      return applicant.travel.businessCompanyPhone.trim()
+    }
+    if ((applicant as any).comp_phone && String((applicant as any).comp_phone).trim() !== '') {
+      return String((applicant as any).comp_phone).trim()
+    }
+    if ((applicant as any)['appl.comp_phone'] && String((applicant as any)['appl.comp_phone']).trim() !== '') {
+      return String((applicant as any)['appl.comp_phone']).trim()
+    }
+    if ((applicant as any).travel?.comp_phone && String((applicant as any).travel.comp_phone).trim() !== '') {
+      return String((applicant as any).travel.comp_phone).trim()
+    }
+    const rawFields = (applicant as any).fields
+    if (rawFields && typeof rawFields === 'object') {
+      const fieldVal =
+        extractFieldValue(rawFields['comp_phone']) ??
+        extractFieldValue(rawFields['appl.comp_phone']) ??
+        extractFieldValue(rawFields['travel.businessCompanyPhone']) ??
+        extractFieldValue(rawFields['businessCompanyPhone']) ??
+        extractFieldValue(rawFields['appl.business_phone']) ??
+        extractFieldValue(rawFields['appl.ind_comp_phone'])
+      if (fieldVal) {
+        return fieldVal
+      }
+    }
+  }
+
+  if (
+    path === 'travel.businessCompanyEmail' ||
+    path === 'appl.comp_email' ||
+    path === 'comp_email' ||
+    path === 'business_email' ||
+    path === 'appl.business_email' ||
+    path === 'appl.ind_comp_email'
+  ) {
+    if (applicant.travel?.businessCompanyEmail && applicant.travel.businessCompanyEmail.trim() !== '') {
+      return applicant.travel.businessCompanyEmail.trim()
+    }
+    if ((applicant as any).comp_email && String((applicant as any).comp_email).trim() !== '') {
+      return String((applicant as any).comp_email).trim()
+    }
+    if ((applicant as any)['appl.comp_email'] && String((applicant as any)['appl.comp_email']).trim() !== '') {
+      return String((applicant as any)['appl.comp_email']).trim()
+    }
+    if ((applicant as any).travel?.comp_email && String((applicant as any).travel.comp_email).trim() !== '') {
+      return String((applicant as any).travel.comp_email).trim()
+    }
+    const rawFields = (applicant as any).fields
+    if (rawFields && typeof rawFields === 'object') {
+      const fieldVal =
+        extractFieldValue(rawFields['comp_email']) ??
+        extractFieldValue(rawFields['appl.comp_email']) ??
+        extractFieldValue(rawFields['travel.businessCompanyEmail']) ??
+        extractFieldValue(rawFields['businessCompanyEmail']) ??
+        extractFieldValue(rawFields['appl.business_email']) ??
+        extractFieldValue(rawFields['appl.ind_comp_email'])
+      if (fieldVal) {
+        return fieldVal
+      }
+    }
+  }
+
+  // Cities Visited in India
+  if (path === 'previousVisa.citiesVisited' || path === 'appl.cities_visited' || path === 'cities_visited') {
+    if (applicant.previousVisa?.citiesVisited && applicant.previousVisa.citiesVisited.trim() !== '') {
+      return applicant.previousVisa.citiesVisited.trim().toUpperCase()
+    }
+    if (applicant.previousVisa?.visitedAddress3 && applicant.previousVisa.visitedAddress3.trim() !== '') {
+      return applicant.previousVisa.visitedAddress3.trim().toUpperCase()
+    }
+  }
+
+  // Sponsor State / District in India
+  if (path === 'reference.state' || path === 'appl.stateofsponsor_ind' || path === 'stateofsponsor_ind' || path === 'sponsor_state') {
+    if (applicant.reference?.state && applicant.reference.state.trim() !== '') {
+      return applicant.reference.state.trim()
+    }
+  }
+
+  if (path === 'reference.district' || path === 'appl.districtofsponsor_ind' || path === 'districtofsponsor_ind' || path === 'sponsor_district') {
+    if (applicant.reference?.district && applicant.reference.district.trim() !== '') {
+      return applicant.reference.district.trim().toUpperCase()
+    }
+  }
+
+  // Port of Arrival in India
+  if (
+    path === 'travel.entryPoint' ||
+    path === 'appl.entrypoint' ||
+    path === 'entrypoint' ||
+    path === 'entry_point' ||
+    path === 'visa_entrypoint'
+  ) {
+    const rawTravel = applicant.travel as Record<string, any> | undefined
+    if (rawTravel) {
+      const ep = rawTravel.entryPoint ?? rawTravel.entrypoint ?? rawTravel.entry_point
+      if (typeof ep === 'string' && ep.trim() !== '') return ep.trim()
+      if (ep && typeof ep === 'object' && typeof ep.value === 'string' && ep.value.trim() !== '') {
+        return ep.value.trim()
+      }
+      // Fallback to exitPoint if entryPoint is not set
+      const xp = rawTravel.exitPoint ?? rawTravel.exitpoint ?? rawTravel.exit_point
+      if (typeof xp === 'string' && xp.trim() !== '') return xp.trim()
+      if (xp && typeof xp === 'object' && typeof xp.value === 'string' && xp.value.trim() !== '') {
+        return xp.value.trim()
+      }
+    }
+    const fields = (applicant as any).fields
+    if (fields && typeof fields === 'object') {
+      const fieldVal =
+        fields['entrypoint']?.value ??
+        fields['appl.entrypoint']?.value ??
+        fields['visa_entrypoint']?.value ??
+        fields['travel.entryPoint']?.value
+      if (typeof fieldVal === 'string' && fieldVal.trim() !== '') return fieldVal.trim()
+      const xpVal = fields['exitpoint']?.value ?? fields['appl.exitpoint']?.value
+      if (typeof xpVal === 'string' && xpVal.trim() !== '') return xpVal.trim()
+    }
+    return 'HARIDASPUR'
+  }
+
+  // Expected Port of Exit from India
+  if (
+    path === 'travel.exitPoint' ||
+    path === 'appl.exitpoint' ||
+    path === 'exitpoint' ||
+    path === 'exitpointprc' ||
+    path === 'exit_point' ||
+    path === 'visa_exitpoint'
+  ) {
+    const rawTravel = applicant.travel as Record<string, any> | undefined
+    if (rawTravel) {
+      const xp = rawTravel.exitPoint ?? rawTravel.exitpoint ?? rawTravel.exit_point
+      if (typeof xp === 'string' && xp.trim() !== '') return xp.trim()
+      if (xp && typeof xp === 'object' && typeof xp.value === 'string' && xp.value.trim() !== '') {
+        return xp.value.trim()
+      }
+      // Fallback to entryPoint if exitPoint is not set
+      const ep = rawTravel.entryPoint ?? rawTravel.entrypoint ?? rawTravel.entry_point
+      if (typeof ep === 'string' && ep.trim() !== '') return ep.trim()
+      if (ep && typeof ep === 'object' && typeof ep.value === 'string' && ep.value.trim() !== '') {
+        return ep.value.trim()
+      }
+    }
+    const fields = (applicant as any).fields
+    if (fields && typeof fields === 'object') {
+      const fieldVal =
+        fields['exitpoint']?.value ??
+        fields['appl.exitpoint']?.value ??
+        fields['exitpointprc']?.value ??
+        fields['visa_exitpoint']?.value ??
+        fields['travel.exitPoint']?.value
+      if (typeof fieldVal === 'string' && fieldVal.trim() !== '') return fieldVal.trim()
+      const epVal = fields['entrypoint']?.value ?? fields['appl.entrypoint']?.value
+      if (typeof epVal === 'string' && epVal.trim() !== '') return epVal.trim()
+    }
+    return 'HARIDASPUR'
+  }
+
   const parts = path.split('.')
   let current: unknown = applicant
 
