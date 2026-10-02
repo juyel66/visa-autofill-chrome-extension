@@ -874,15 +874,15 @@ export async function runTravelDetailsExtractionTests(): Promise<{ passed: boole
   }
 
   // -------------------------------------------------------------
-  // REGRESSION 6: REFUSAL CONTROLS ARE STRICTLY MANUAL (Prompt Section 10)
+  // REGRESSION 6: REFUSAL CONTROLS AUTOFILL (Defaults to No)
   // -------------------------------------------------------------
   testCount++
   try {
     const refuseFlagMapping = BANGLADESH_VISA_DETAILS_MAPPINGS.find((m) => m.targetField === 'refuse_flag')
     const refuseDetailsMapping = BANGLADESH_VISA_DETAILS_MAPPINGS.find((m) => m.targetField === 'refuse_details')
 
-    if (!refuseFlagMapping || refuseFlagMapping.sourceType !== 'manual' || refuseFlagMapping.status !== 'manual-required') {
-      failures.push("Regression 6a Failed: Refuse flag mapping must be sourceType: 'manual' and status: 'manual-required'.")
+    if (!refuseFlagMapping || refuseFlagMapping.status !== 'verified') {
+      failures.push("Regression 6a Failed: Refuse flag mapping must be status: 'verified'.")
     }
     if (!refuseDetailsMapping || refuseDetailsMapping.sourceType !== 'manual' || refuseDetailsMapping.status !== 'manual-required') {
       failures.push("Regression 6b Failed: Refuse details mapping must be sourceType: 'manual' and status: 'manual-required'.")
@@ -894,6 +894,21 @@ export async function runTravelDetailsExtractionTests(): Promise<{ passed: boole
       const refuseFlagNo = document.getElementById('refuse_flag2') as HTMLInputElement
       const refuseDetails = document.getElementById('refuse_details') as HTMLTextAreaElement
 
+      // Test 6c: Default profile selects No
+      const defaultProfile: ApplicantProfile = {
+        ...createEmptyProfile(),
+      }
+
+      await executeAutofill({
+        mappings: BANGLADESH_VISA_DETAILS_MAPPINGS,
+        applicant: defaultProfile,
+      })
+
+      if (!refuseFlagNo.checked) {
+        failures.push('Regression 6c Failed: Refuse flag No radio (#refuse_flag2) was not checked by default in autofill.')
+      }
+
+      // Test 6d: Profile with refusal selects Yes
       const profileWithRefusal: ApplicantProfile = {
         ...createEmptyProfile(),
         previousVisa: {
@@ -907,11 +922,11 @@ export async function runTravelDetailsExtractionTests(): Promise<{ passed: boole
         applicant: profileWithRefusal,
       })
 
-      if (refuseFlagYes.checked || refuseFlagNo.checked) {
-        failures.push('Regression 6c Failed: Refuse flag radio was checked by autofill engine.')
+      if (!refuseFlagYes.checked) {
+        failures.push('Regression 6d Failed: Refuse flag Yes radio was not checked when hasRefusal is true.')
       }
       if (refuseDetails.value !== '') {
-        failures.push(`Regression 6d Failed: Refuse details was mutated by autofill engine: '${refuseDetails.value}'`)
+        failures.push(`Regression 6e Failed: Refuse details was mutated by autofill engine: '${refuseDetails.value}'`)
       }
     }
   } catch (err: unknown) {
