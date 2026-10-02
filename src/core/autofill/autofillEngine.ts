@@ -58,7 +58,7 @@ export function isControlCompatible(element: HTMLElement, mapping: FieldMapping)
   const inputType = mapping.inputType
 
   if (element instanceof HTMLSelectElement || element.tagName === 'SELECT') {
-    return inputType === 'select'
+    return inputType === 'select' || inputType === 'text' || inputType === 'unknown'
   }
 
   if (element instanceof HTMLInputElement || element.tagName === 'INPUT') {
@@ -72,11 +72,11 @@ export function isControlCompatible(element: HTMLElement, mapping: FieldMapping)
     if (type === 'date') {
       return inputType === 'date' || inputType === 'text'
     }
-    return inputType === 'text' || inputType === 'date' || inputType === 'unknown'
+    return inputType === 'text' || inputType === 'select' || inputType === 'date' || inputType === 'unknown'
   }
 
   if (element instanceof HTMLTextAreaElement || element.tagName === 'TEXTAREA') {
-    return inputType === 'text' || inputType === 'textarea'
+    return inputType === 'text' || inputType === 'textarea' || inputType === 'unknown'
   }
 
   return true
@@ -315,6 +315,15 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
           element instanceof HTMLButtonElement
         ) {
           if (element.disabled) {
+            if (mapping.required === false) {
+              fieldResult = {
+                fieldId: mapping.id,
+                status: 'skipped',
+                reason: 'Field is conditionally disabled on the portal.',
+                attempts,
+              }
+              break
+            }
             fieldResult = {
               fieldId: mapping.id,
               status: 'failed',
@@ -328,6 +337,15 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
 
         if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
           if (element.readOnly) {
+            if (mapping.required === false) {
+              fieldResult = {
+                fieldId: mapping.id,
+                status: 'skipped',
+                reason: 'Field is conditionally read-only on the portal.',
+                attempts,
+              }
+              break
+            }
             fieldResult = {
               fieldId: mapping.id,
               status: 'failed',
@@ -341,6 +359,21 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
 
         // Resolve Value
         let resolvedValue = resolveApplicantValue(applicant, mapping.sourceField)
+        if ((resolvedValue === undefined || resolvedValue === '') && mapping.targetField) {
+          resolvedValue = resolveApplicantValue(applicant, mapping.targetField)
+        }
+        if ((resolvedValue === undefined || resolvedValue === '') && (applicant as any).fields) {
+          const raw =
+            (applicant as any).fields[mapping.targetField] ??
+            (applicant as any).fields[mapping.sourceField] ??
+            (applicant as any).fields[`appl.${mapping.targetField}`]
+          if (raw !== undefined && raw !== null) {
+            const rawVal = typeof raw === 'object' && raw.value !== undefined ? raw.value : raw
+            if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
+              resolvedValue = String(rawVal).trim()
+            }
+          }
+        }
         const valuePresent = Boolean(resolvedValue !== undefined && resolvedValue !== '')
         console.log(`[Autofill Diagnostic] Field: ${mapping.id} (${mapping.targetField}) | source=SavedApplication, valuePresent=${valuePresent}`)
 
