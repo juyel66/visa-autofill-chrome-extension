@@ -1,7 +1,12 @@
 import { dispatchFieldEvents, setNativeInputValue } from './eventDispatcher'
 import { verifyDomValue } from './domVerifier'
 import { normalizeDateForControl } from './dateNormalizer'
-import { findMatchingSelectOption, selectOptionAndDispatchEvents } from './selectResolver'
+import {
+  findMatchingSelectOption,
+  selectOptionAndDispatchEvents,
+  resolvePortFallbackOption,
+  resolvePurposeFallbackOption,
+} from './selectResolver'
 import type { AutofillFieldResult, AutofillPolicy, FieldMapping } from './types'
 
 export { findMatchingSelectOption, selectOptionAndDispatchEvents } from './selectResolver'
@@ -11,6 +16,44 @@ function safeCssEscape(val: string): string {
     return CSS.escape(val)
   }
   return val.replace(/([#;?%&,.+*~':"!^$[\]()=>|/\\@])/g, '\\$1')
+}
+
+export function getOptionForSelect(
+  sel: HTMLSelectElement,
+  strValue: string,
+  mapping: FieldMapping
+): { matchedOption: HTMLOptionElement | null; ambiguous: boolean } {
+  let { option: matchedOption, ambiguous } = findMatchingSelectOption(sel, strValue)
+
+  // Port fallback
+  if (
+    (!matchedOption || ambiguous) &&
+    (mapping.targetField === 'entrypoint' ||
+      mapping.targetField === 'exitpoint' ||
+      mapping.targetField === 'entry_point' ||
+      mapping.targetField === 'exit_point' ||
+      mapping.id.includes('entrypoint') ||
+      mapping.id.includes('exitpoint') ||
+      mapping.id.includes('port'))
+  ) {
+    const fallback = resolvePortFallbackOption(sel, strValue)
+    if (fallback) {
+      return { matchedOption: fallback, ambiguous: false }
+    }
+  }
+
+  // Purpose fallback
+  if (
+    (!matchedOption || ambiguous) &&
+    (mapping.targetField === 'purpose' || mapping.id.includes('purpose'))
+  ) {
+    const fallback = resolvePurposeFallbackOption(sel, strValue)
+    if (fallback) {
+      return { matchedOption: fallback, ambiguous: false }
+    }
+  }
+
+  return { matchedOption, ambiguous }
 }
 
 /**
@@ -34,6 +77,13 @@ export function fillField(
     (typeof HTMLButtonElement !== 'undefined' && element instanceof HTMLButtonElement)
   ) {
     if (element.disabled) {
+      if (mapping.required === false) {
+        return {
+          fieldId,
+          status: 'skipped',
+          reason: 'Field is conditionally disabled by the portal.',
+        }
+      }
       return {
         fieldId,
         status: 'failed',
@@ -48,6 +98,13 @@ export function fillField(
     (typeof HTMLTextAreaElement !== 'undefined' && element instanceof HTMLTextAreaElement)
   ) {
     if (element.readOnly) {
+      if (mapping.required === false) {
+        return {
+          fieldId,
+          status: 'skipped',
+          reason: 'Field is conditionally read-only on the portal.',
+        }
+      }
       return {
         fieldId,
         status: 'failed',
@@ -133,7 +190,7 @@ export function fillField(
     }
   } else if (element instanceof HTMLSelectElement || element.tagName === 'SELECT') {
     const sel = element as HTMLSelectElement
-    const { option: matchedOption, ambiguous } = findMatchingSelectOption(sel, strValue)
+    const { matchedOption, ambiguous } = getOptionForSelect(sel, strValue, mapping)
 
     if (ambiguous) {
       return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Ambiguous select choices' }
@@ -172,7 +229,7 @@ export function fillField(
     // A. Select dropdown
     if (element instanceof HTMLSelectElement || element.tagName === 'SELECT') {
       const sel = element as HTMLSelectElement
-      const { option: matchedOption, ambiguous } = findMatchingSelectOption(sel, strValue)
+      const { matchedOption, ambiguous } = getOptionForSelect(sel, strValue, mapping)
 
       if (ambiguous) {
         return { fieldId, status: 'failed', failureType: 'ambiguous-target', reason: 'Ambiguous select choices' }
@@ -239,6 +296,26 @@ export function fillField(
       ) {
         document.querySelectorAll<HTMLInputElement>(
           '#prev_org1, #prev_org2, input[name="appl.prev_org"], input[name="prev_org"]'
+        ).forEach((r) => radioElementsSet.add(r))
+      }
+
+      if (
+        mapping.targetField === 'refuse_flag' ||
+        mapping.sourceField === 'previousVisa.hasRefusal' ||
+        mapping.id.includes('refuse')
+      ) {
+        document.querySelectorAll<HTMLInputElement>(
+          '#refuse_flag1, #refuse_flag2, input[name="appl.refuse_flag"], input[name="refuse_flag"]'
+        ).forEach((r) => radioElementsSet.add(r))
+      }
+
+      if (
+        mapping.targetField === 'old_visa_flag' ||
+        mapping.sourceField === 'previousVisa.hasPreviousVisa' ||
+        mapping.id.includes('old_visa')
+      ) {
+        document.querySelectorAll<HTMLInputElement>(
+          '#old_visa_flag1, #old_visa_flag2, input[name="appl.old_visa_flag"], input[name="old_visa_flag"]'
         ).forEach((r) => radioElementsSet.add(r))
       }
 
@@ -361,7 +438,28 @@ export function fillField(
       }
     }
 
+    if (
+      mapping.targetField === 'entrypoint' ||
+      mapping.targetField === 'exitpoint' ||
+      mapping.targetField === 'entry_point' ||
+      mapping.targetField === 'exit_point' ||
+      mapping.id.includes('entrypoint') ||
+      mapping.id.includes('exitpoint')
+    ) {
+      if (valueToSet.includes('/')) {
+        const parts = valueToSet.split('/').map((s) => s.trim()).filter(Boolean)
+        const specificPart = parts.find((p) => {
+          const l = p.toLowerCase()
+          return !l.startsWith('by air') && !l.startsWith('by road') && !l.startsWith('by rail')
+        })
+        if (specificPart) {
+          valueToSet = specificPart
+        }
+      }
+    }
+
     setNativeInputValue(element, valueToSet)
+    dispatchFieldEvents(element)
 
     const verifyRes = verifyDomValue(element, mapping, valueToSet)
     if (!verifyRes.verified) {
