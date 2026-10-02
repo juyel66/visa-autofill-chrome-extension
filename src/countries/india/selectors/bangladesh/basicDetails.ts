@@ -82,7 +82,9 @@ export const BANGLADESH_BASIC_DETAILS_SELECTORS: BangladeshBasicDetailsSelectors
   religion: [
     { strategy: 'id', value: 'religion' },
     { strategy: 'name', value: 'appl.religion' },
+    { strategy: 'name', value: 'religion' },
     { strategy: 'css', value: 'select[name="appl.religion"], select#religion' },
+    { strategy: 'css', value: 'select[name*="religion" i], select[id*="religion" i]' },
   ],
   visibleIdentificationMarks: [
     { strategy: 'id', value: 'identity_marks' },
