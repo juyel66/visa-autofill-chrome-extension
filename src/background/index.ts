@@ -101,6 +101,129 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       return true
     }
 
+    if (message.type === 'HEALTH_CHECK_PYTHON') {
+      const baseUrl = (message.baseUrl || 'http://127.0.0.1:8001').replace(/\/$/, '')
+      ;(async () => {
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 2000)
+          const res = await fetch(`${baseUrl}/health`, { signal: ctrl.signal })
+          clearTimeout(timer)
+          if (res.ok) {
+            const data = await res.json().catch(() => null)
+            sendResponse({
+              status: 'success',
+              data: { type: 'PYTHON_HEALTH_RESPONSE', healthy: data?.status === 'ok' },
+            })
+            return
+          }
+          sendResponse({
+            status: 'success',
+            data: { type: 'PYTHON_HEALTH_RESPONSE', healthy: false },
+          })
+        } catch {
+          sendResponse({
+            status: 'success',
+            data: { type: 'PYTHON_HEALTH_RESPONSE', healthy: false },
+          })
+        }
+      })()
+      return true
+    }
+
+    if (message.type === 'EXTRACT_PASSPORT_PYTHON') {
+      const baseUrl = (message.baseUrl || 'http://127.0.0.1:8001').replace(/\/$/, '')
+      const altBaseUrl = baseUrl.includes('127.0.0.1')
+        ? baseUrl.replace('127.0.0.1', 'localhost')
+        : baseUrl.replace('localhost', '127.0.0.1')
+      const { fileDataUrl, fileName } = message
+      ;(async () => {
+        try {
+          let blob: Blob
+          try {
+            const fetchRes = await fetch(fileDataUrl)
+            blob = await fetchRes.blob()
+          } catch {
+            const commaIndex = fileDataUrl.indexOf(',')
+            const header = commaIndex !== -1 ? fileDataUrl.slice(0, commaIndex) : 'data:application/pdf;base64'
+            const rawBase64 = commaIndex !== -1 ? fileDataUrl.slice(commaIndex + 1) : fileDataUrl
+            const cleanBase64 = rawBase64.replace(/\s+/g, '')
+            const mimeMatch = header.match(/:(.*?);/)
+            const mime = mimeMatch ? mimeMatch[1] : 'application/pdf'
+            const binary = atob(cleanBase64)
+            const bytes = new Uint8Array(binary.length)
+            for (let i = 0; i < binary.length; i++) {
+              bytes[i] = binary.charCodeAt(i)
+            }
+            blob = new Blob([bytes], { type: mime })
+          }
+
+          const formData = new FormData()
+          formData.append('file', blob, fileName || 'passport.pdf')
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 45000)
+
+          let response: Response | null = null
+          try {
+            response = await fetch(`${baseUrl}/extract-passport`, {
+              method: 'POST',
+              body: formData,
+              signal: controller.signal,
+            })
+          } catch (firstErr) {
+            // Fallback attempt to altBaseUrl (localhost vs 127.0.0.1)
+            try {
+              const fallbackFormData = new FormData()
+              fallbackFormData.append('file', blob, fileName || 'passport.pdf')
+              response = await fetch(`${altBaseUrl}/extract-passport`, {
+                method: 'POST',
+                body: fallbackFormData,
+                signal: controller.signal,
+              })
+            } catch {
+              throw firstErr
+            }
+          } finally {
+            clearTimeout(timeoutId)
+          }
+
+          if (!response || !response.ok) {
+            let errorDetail = ''
+            if (response) {
+              try {
+                const errorJson = await response.json()
+                errorDetail = errorJson.detail || JSON.stringify(errorJson)
+              } catch {
+                errorDetail = await response.text()
+              }
+            }
+            sendResponse({
+              status: 'error',
+              error: `Python OCR service returned HTTP ${response?.status || 'network error'}: ${errorDetail || response?.statusText || 'Connection failed'}`,
+            })
+            return
+          }
+
+          const parsed = await response.json()
+          sendResponse({
+            status: 'success',
+            data: {
+              type: 'PYTHON_EXTRACTION_COMPLETED',
+              result: parsed,
+            },
+          })
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err)
+          sendResponse({
+            status: 'error',
+            error: msg,
+          })
+        }
+      })()
+      return true
+    }
+
     if (message.type === 'GET_WORKFLOW_STATE') {
       sendResponse({
         status: 'success',
