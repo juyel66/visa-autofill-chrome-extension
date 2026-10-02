@@ -212,7 +212,18 @@ export function populateApplicationFromDocuments(options: {
       manualVal !== '' &&
       (typeof manualVal !== 'string' || manualVal.trim() !== '')
 
-    const preserveManualEdit = hasManualEditFlag && hasNonEmptyManualVal
+    const isCompanyField =
+      key === 'comp_name' ||
+      key === 'appl.comp_name' ||
+      key === 'comp_address' ||
+      key === 'appl.comp_address' ||
+      key === 'comp_phone' ||
+      key === 'appl.comp_phone' ||
+      key === 'comp_email' ||
+      key === 'appl.comp_email'
+
+    const preserveCompanyValue = isCompanyField && hasNonEmptyManualVal
+    const preserveManualEdit = (hasManualEditFlag || preserveCompanyValue) && hasNonEmptyManualVal
 
     if (preserveManualEdit && existingField) {
       fields[key] = {
@@ -1113,6 +1124,157 @@ export function populateApplicationFromDocuments(options: {
         resolvedValue = activeProfile.family?.hasPakistanRelation === true ? 'Yes' : 'No'
         source = 'derived'
         docId = activeDocId
+      } else if (
+        (key === 'old_visa_flag' || key === 'appl.old_visa_flag') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.previousVisa?.hasPreviousVisa === true ? 'Yes' : 'No'
+        source = 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'refuse_flag' || key === 'appl.refuse_flag') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.previousVisa?.hasRefusal === true ? 'Yes' : 'No'
+        source = 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'saarc_flag' || key === 'appl.saarc_flag') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.travel?.visitedSaarc === true ? 'Yes' : 'No'
+        source = 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'country_visited' || key === 'appl.country_visited') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.travel?.countriesVisited || 'NA'
+        source = 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'occ_flag' || key === 'appl.occ_flag' || key === 'occ_details_of') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.employment?.dependentRelation || ''
+        if (resolvedValue) {
+          source = activeProfile.employment?.dependentRelation ? activeSource : 'derived'
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'comp_name' || key === 'appl.comp_name') &&
+        !resolvedValue
+      ) {
+        resolvedValue =
+          activeProfile.travel?.businessCompanyName ||
+          (existingApp?.fields['comp_name']?.value ? String(existingApp.fields['comp_name'].value) : '') ||
+          (existingApp?.fields['appl.comp_name']?.value ? String(existingApp.fields['appl.comp_name'].value) : '') ||
+          ''
+        if (resolvedValue) {
+          source = activeProfile.travel?.businessCompanyName ? activeSource : 'manual'
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'comp_address' || key === 'appl.comp_address') &&
+        !resolvedValue
+      ) {
+        resolvedValue =
+          activeProfile.travel?.businessCompanyAddress ||
+          (existingApp?.fields['comp_address']?.value ? String(existingApp.fields['comp_address'].value) : '') ||
+          (existingApp?.fields['appl.comp_address']?.value ? String(existingApp.fields['appl.comp_address'].value) : '') ||
+          ''
+        if (resolvedValue) {
+          source = activeProfile.travel?.businessCompanyAddress ? activeSource : 'manual'
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'comp_phone' || key === 'appl.comp_phone') &&
+        !resolvedValue
+      ) {
+        resolvedValue =
+          activeProfile.travel?.businessCompanyPhone ||
+          (existingApp?.fields['comp_phone']?.value ? String(existingApp.fields['comp_phone'].value) : '') ||
+          (existingApp?.fields['appl.comp_phone']?.value ? String(existingApp.fields['appl.comp_phone'].value) : '') ||
+          ''
+        if (resolvedValue) {
+          source = activeProfile.travel?.businessCompanyPhone ? activeSource : 'manual'
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'comp_email' || key === 'appl.comp_email') &&
+        !resolvedValue
+      ) {
+        resolvedValue =
+          activeProfile.travel?.businessCompanyEmail ||
+          (existingApp?.fields['comp_email']?.value ? String(existingApp.fields['comp_email'].value) : '') ||
+          (existingApp?.fields['appl.comp_email']?.value ? String(existingApp.fields['appl.comp_email'].value) : '') ||
+          ''
+        if (resolvedValue) {
+          source = activeProfile.travel?.businessCompanyEmail ? activeSource : 'manual'
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'cities_visited' || key === 'appl.cities_visited') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.previousVisa?.citiesVisited || ''
+        if (resolvedValue) {
+          source = activeSource
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'refuse_details' || key === 'appl.refuse_details') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.previousVisa?.refusalDetails || ''
+        if (resolvedValue) {
+          source = activeSource
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'stateofsponsor_ind' || key === 'appl.stateofsponsor_ind') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.reference?.state || ''
+        if (resolvedValue) {
+          source = activeSource
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'districtofsponsor_ind' || key === 'appl.districtofsponsor_ind') &&
+        !resolvedValue
+      ) {
+        resolvedValue = activeProfile.reference?.district || ''
+        if (resolvedValue) {
+          source = activeSource
+          docId = activeDocId
+        }
+      } else if (
+        (key === 'entrypoint' || key === 'appl.entrypoint') &&
+        !resolvedValue
+      ) {
+        resolvedValue =
+          activeProfile.travel?.entryPoint ||
+          activeProfile.travel?.exitPoint ||
+          (existingApp?.fields['entrypoint']?.value ? String(existingApp.fields['entrypoint'].value) : undefined) ||
+          (existingApp?.fields['appl.entrypoint']?.value ? String(existingApp.fields['appl.entrypoint'].value) : undefined) ||
+          (existingApp?.fields['exitpoint']?.value ? String(existingApp.fields['exitpoint'].value) : undefined) ||
+          'HARIDASPUR'
+        source = activeProfile.travel?.entryPoint ? activeSource : 'derived'
+        docId = activeDocId
+      } else if (
+        (key === 'exitpoint' || key === 'appl.exitpoint') &&
+        !resolvedValue
+      ) {
+        resolvedValue =
+          activeProfile.travel?.exitPoint ||
+          activeProfile.travel?.entryPoint ||
+          (existingApp?.fields['exitpoint']?.value ? String(existingApp.fields['exitpoint'].value) : undefined) ||
+          (existingApp?.fields['appl.exitpoint']?.value ? String(existingApp.fields['appl.exitpoint'].value) : undefined) ||
+          (existingApp?.fields['entrypoint']?.value ? String(existingApp.fields['entrypoint'].value) : undefined) ||
+          'HARIDASPUR'
+        source = activeProfile.travel?.exitPoint ? activeSource : 'derived'
+        docId = activeDocId
       }
     }
 
@@ -1339,6 +1501,19 @@ export function populateApplicationFromDocuments(options: {
     }
   }
 
+  // Bidirectional sync for entrypoint and exitpoint so both are always autofillable
+  if (fields['entrypoint']?.value && (!fields['exitpoint']?.value || fields['exitpoint'].value === '')) {
+    fields['exitpoint'] = {
+      ...fields['entrypoint'],
+      isUserEdited: false,
+    }
+  } else if (fields['exitpoint']?.value && (!fields['entrypoint']?.value || fields['entrypoint'].value === '')) {
+    fields['entrypoint'] = {
+      ...fields['exitpoint'],
+      isUserEdited: false,
+    }
+  }
+
   const now = new Date().toISOString()
   const religionField = fields['appl.religion']
   const religionMetadata = {
@@ -1431,9 +1606,19 @@ export function createBlankApplicationWithDefaults(options: {
       key === 'prev_org' ||
       key === 'appl.prev_org' ||
       key === 'old_visa_flag' ||
-      key === 'appl.old_visa_flag'
+      key === 'appl.old_visa_flag' ||
+      key === 'refuse_flag' ||
+      key === 'appl.refuse_flag'
     ) {
       val = 'No'
+      isDerived = true
+    } else if (
+      key === 'entrypoint' ||
+      key === 'appl.entrypoint' ||
+      key === 'exitpoint' ||
+      key === 'appl.exitpoint'
+    ) {
+      val = 'HARIDASPUR'
       isDerived = true
     } else if (key === 'appl.visual_mark' || key === 'visual_mark') {
       val = 'NA'
@@ -1543,7 +1728,7 @@ export function convertSavedApplicationToApplicantProfile(
       townCityOfBirth: getFieldStr('appl.placbrth'),
       countryOfBirth: getFieldStr('appl.country_of_birth'),
       nationalIdNumber: getFieldStr('appl.nic_no'),
-      religion: getFieldStr('appl.religion'),
+      religion: getFieldStr('appl.religion') || getFieldStr('religion') || getFieldStr('personalInfo.religion'),
       visibleIdentificationMarks: getFieldStr('appl.visual_mark'),
       educationalQualification: getFieldStr('appl.edu_id'),
       nationality: getFieldStr('appl.nationality') || getFieldStr('nationality'),
@@ -1630,6 +1815,7 @@ export function convertSavedApplicationToApplicantProfile(
 
     employment: {
       presentOccupation: getFieldStr('occupation'),
+      dependentRelation: getFieldStr('occ_flag') || getFieldStr('appl.occ_flag') || getFieldStr('occ_details_of'),
       employerName: getFieldStr('empname'),
       designationRank: getFieldStr('empdesignation'),
       employerAddress: getFieldStr('empaddress'),
@@ -1643,14 +1829,37 @@ export function convertSavedApplicationToApplicantProfile(
     },
 
     travel: {
+      visaType: getFieldStr('visa_type') || getFieldStr('appl.visa_type'),
       duration: getFieldStr('duration'),
       visaEntryType: getFieldStr('visa_entry_id'),
       purposeOfVisit: getFieldStr('purpose') || getFieldStr('appl.purpose') || getFieldStr('travel.purposeOfVisit'),
       intendedArrivalDate: getFieldDate('journeydate') || getFieldDate('appl.journeydate') || getFieldStr('journeydate') || getFieldStr('appl.journeydate'),
-      entryPoint: getFieldStr('entrypoint'),
-      exitPoint: getFieldStr('exitpoint'),
+      entryPoint:
+        getFieldStr('entrypoint') ||
+        getFieldStr('appl.entrypoint') ||
+        getFieldStr('travel.entryPoint') ||
+        getFieldStr('entry_point') ||
+        getFieldStr('visa_entrypoint') ||
+        getFieldStr('exitpoint') ||
+        getFieldStr('appl.exitpoint') ||
+        'HARIDASPUR',
+      exitPoint:
+        getFieldStr('exitpoint') ||
+        getFieldStr('appl.exitpoint') ||
+        getFieldStr('travel.exitPoint') ||
+        getFieldStr('exitpointprc') ||
+        getFieldStr('exit_point') ||
+        getFieldStr('visa_exitpoint') ||
+        getFieldStr('entrypoint') ||
+        getFieldStr('appl.entrypoint') ||
+        'HARIDASPUR',
       countriesVisited: getFieldStr('country_visited'),
       visitedSaarc: getFieldBool('saarc_flag'),
+      saarcDetails: getFieldStr('saarc_details') || getFieldStr('appl.saarc_details'),
+      businessCompanyName: getFieldStr('comp_name') || getFieldStr('appl.comp_name') || getFieldStr('travel.businessCompanyName') || getFieldStr('business_company_name'),
+      businessCompanyAddress: getFieldStr('comp_address') || getFieldStr('appl.comp_address') || getFieldStr('travel.businessCompanyAddress') || getFieldStr('business_address'),
+      businessCompanyPhone: getFieldStr('comp_phone') || getFieldStr('appl.comp_phone') || getFieldStr('travel.businessCompanyPhone') || getFieldStr('business_phone'),
+      businessCompanyEmail: getFieldStr('comp_email') || getFieldStr('appl.comp_email') || getFieldStr('travel.businessCompanyEmail') || getFieldStr('business_email'),
     },
 
     previousVisa: {
@@ -1658,16 +1867,21 @@ export function convertSavedApplicationToApplicantProfile(
       visitedAddress1: getFieldStr('prv_visit_add1'),
       visitedAddress2: getFieldStr('prv_visit_add2'),
       visitedAddress3: getFieldStr('prv_visit_add3'),
+      citiesVisited: getFieldStr('cities_visited') || getFieldStr('prv_visit_cities'),
       visaNumber: getFieldStr('old_visa_no'),
       visaType: getFieldStr('old_visa_type_id'),
       placeOfIssue: getFieldStr('oldvisaissueplace'),
       dateOfIssue: getFieldDate('oldvisaissuedate'),
+      hasRefusal: getFieldBool('refuse_flag') ?? false,
+      refusalDetails: getFieldStr('refuse_details'),
     },
 
     reference: {
       name: getFieldStr('nameofsponsor_ind'),
       addressLine1: getFieldStr('add1ofsponsor_ind'),
       addressLine2: getFieldStr('add2ofsponsor_ind'),
+      state: getFieldStr('stateofsponsor_ind') || getFieldStr('sponsor_state'),
+      district: getFieldStr('districtofsponsor_ind') || getFieldStr('sponsor_district'),
       phone: getFieldStr('phoneofsponsor_ind'),
     },
 
@@ -1711,6 +1925,9 @@ export function convertSavedApplicationToApplicantProfile(
   if (mission) {
     profile.notes = `${profile.notes ? profile.notes + '\n' : ''}Indian Mission: ${mission}`
   }
+
+  // Attach savedApp.fields directly so valueResolver can cross-query any application field
+  ;(profile as any).fields = savedApp.fields
 
   return profile
 }
