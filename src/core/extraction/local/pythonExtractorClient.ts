@@ -9,9 +9,9 @@ import { parseDateString, formatToIsoDate } from '../../autofill/dateNormalizer'
 export const LOCAL_EXTRACTOR_URL = 'http://127.0.0.1:8001'
 
 /**
- * Timeout in milliseconds. CPU OCR with PyMuPDF & PaddleOCR can take 40-100 seconds on CPU.
+ * Timeout in milliseconds for local extraction requests.
  */
-export const DEFAULT_EXTRACTION_TIMEOUT_MS = 150000
+export const DEFAULT_EXTRACTION_TIMEOUT_MS = 45000
 
 // ============================================================================
 // PYTHON SERVICE TYPINGS (Matching python-extractor/app/schemas.py)
@@ -729,6 +729,7 @@ export interface PythonExtractorOptions {
   baseUrl?: string
   timeoutMs?: number
   onProgress?: (progress: { percent: number; text: string }) => void
+  skipHealthCheck?: boolean
 }
 
 /**
@@ -757,34 +758,29 @@ export function payloadToBlob(input: string | Blob | File, defaultFileName = 'pa
 
 /**
  * Computes a deterministic SHA-256 hex string from an ArrayBuffer or Uint8Array.
- * Uses Web Crypto API in browser / modern Node, with a standard fallback.
+ * Uses Web Crypto API in browser / modern Node, with a safe, synchronous fallback.
  */
 export async function computeSha256(data: ArrayBuffer | Uint8Array): Promise<string> {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
   if (typeof globalThis !== 'undefined' && globalThis.crypto?.subtle) {
-    const bufferSource: BufferSource = bytes.buffer as ArrayBuffer
-    const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', bufferSource)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
-  }
-  try {
-    const mod = 'crypto'
-    const nodeCrypto = await import(/* @vite-ignore */ mod)
-    const hash = nodeCrypto.createHash('sha256')
-    hash.update(bytes)
-    return hash.digest('hex')
-  } catch {
-    let h1 = 0xdeadbeef
-    let h2 = 0x41c64e6d
-    for (let i = 0; i < bytes.length; i++) {
-      const ch = bytes[i]
-      h1 = Math.imul(h1 ^ ch, 2654435761)
-      h2 = Math.imul(h2 ^ ch, 1597334677)
+    try {
+      const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+    } catch {
+      // fallback below
     }
-    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
-    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
-    return `hash_${(h2 >>> 0).toString(16)}${(h1 >>> 0).toString(16)}_${bytes.length}`
   }
+  let h1 = 0xdeadbeef
+  let h2 = 0x41c64e6d
+  for (let i = 0; i < bytes.length; i++) {
+    const ch = bytes[i]
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return `hash_${(h2 >>> 0).toString(16)}${(h1 >>> 0).toString(16)}_${bytes.length}`
 }
 
 const inFlightExtractions = new Map<string, Promise<PythonPassportExtractionResult>>()
@@ -797,9 +793,96 @@ export function getInFlightExtractionsCount(): number {
   return inFlightExtractions.size
 }
 
+async function checkHealthViaBackground(baseUrl: string): Promise<boolean> {
+  if (typeof chrome === 'undefined' || typeof chrome.runtime?.sendMessage !== 'function') return false
+  return new Promise((resolve) => {
+    let settled = false
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true
+        resolve(false)
+      }
+    }, 1500)
+
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: 'HEALTH_CHECK_PYTHON',
+          baseUrl,
+        },
+        (response) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          if (chrome.runtime?.lastError || !response || response.status !== 'success') {
+            resolve(false)
+            return
+          }
+          resolve(Boolean(response.data?.healthy))
+        }
+      )
+    } catch {
+      if (!settled) {
+        settled = true
+        clearTimeout(timer)
+        resolve(false)
+      }
+    }
+  })
+}
+
+async function delegateExtractionToBackground(
+  fileDataUrl: string,
+  fileName: string,
+  baseUrl: string
+): Promise<PythonPassportExtractionResult> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true
+        reject(new PythonExtractorError('Extraction timed out waiting for background worker. Please check terminal where "npm run dev" is running.', 'TIMEOUT'))
+      }
+    }, 48000)
+
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: 'EXTRACT_PASSPORT_PYTHON',
+          fileDataUrl,
+          fileName,
+          baseUrl,
+        },
+        (response) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          const lastError = chrome.runtime?.lastError
+          if (lastError) {
+            reject(new PythonExtractorError(`Background worker error: ${lastError.message}`, 'EXTRACTION_FAILED'))
+            return
+          }
+          if (!response || response.status === 'error') {
+            reject(new PythonExtractorError(response?.error || 'Extraction failed via background worker', 'EXTRACTION_FAILED'))
+            return
+          }
+          resolve(response.data?.result as PythonPassportExtractionResult)
+        }
+      )
+    } catch (err: unknown) {
+      if (!settled) {
+        settled = true
+        clearTimeout(timer)
+        reject(err)
+      }
+    }
+  })
+}
+
 /**
  * Calls the local Python extraction FastAPI service at POST /extract-passport.
- * Uses SHA-256 of the actual file payload for thread-safe in-flight deduplication.
+ * Features fast health pre-check (<1.5s), direct fetch, and background worker fallback
+ * to completely eliminate Private Network Access (PNA) and CORS blocks.
  */
 export async function extractPassportWithPython(
   fileInput: string | Blob | File,
@@ -807,15 +890,22 @@ export async function extractPassportWithPython(
   options?: PythonExtractorOptions
 ): Promise<PythonPassportExtractionResult> {
   const baseUrl = (options?.baseUrl || LOCAL_EXTRACTOR_URL).replace(/\/$/, '')
+  const altBaseUrl = baseUrl.includes('127.0.0.1')
+    ? baseUrl.replace('127.0.0.1', 'localhost')
+    : baseUrl.replace('localhost', '127.0.0.1')
   const timeoutMs = options?.timeoutMs ?? DEFAULT_EXTRACTION_TIMEOUT_MS
   const onProgress = options?.onProgress
 
-  onProgress?.({ percent: 15, text: 'Preparing passport document for local Python OCR...' })
+  onProgress?.({ percent: 15, text: 'Checking local OCR server on port 8001...' })
 
   let blob: Blob
   let resolvedFileName: string
+  let originalDataUrl: string | undefined
 
   try {
+    if (typeof fileInput === 'string' && fileInput.startsWith('data:')) {
+      originalDataUrl = fileInput
+    }
     const converted = payloadToBlob(fileInput, fileName)
     blob = converted.blob
     resolvedFileName = converted.fileName
@@ -828,18 +918,61 @@ export async function extractPassportWithPython(
     throw new PythonExtractorError('Uploaded document payload is empty.', 'INVALID_FILE')
   }
 
+  // 1. Fast pre-flight health check (max 1.5s) to detect offline server immediately in Chrome extension
+  if (typeof chrome !== 'undefined' && chrome.runtime?.id && !options?.skipHealthCheck) {
+    let serverReachable = false
+    try {
+      const healthCtrl = new AbortController()
+      const healthTimer = setTimeout(() => healthCtrl.abort(), 1500)
+      const healthRes = await fetch(`${baseUrl}/health`, { signal: healthCtrl.signal }).catch(() => null)
+      clearTimeout(healthTimer)
+      if (healthRes && healthRes.ok) {
+        serverReachable = true
+      }
+    } catch {
+      serverReachable = false
+    }
+
+    if (!serverReachable) {
+      // Check alternative host (localhost vs 127.0.0.1)
+      try {
+        const altCtrl = new AbortController()
+        const altTimer = setTimeout(() => altCtrl.abort(), 1200)
+        const altRes = await fetch(`${altBaseUrl}/health`, { signal: altCtrl.signal }).catch(() => null)
+        clearTimeout(altTimer)
+        if (altRes && altRes.ok) {
+          serverReachable = true
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!serverReachable) {
+      // Check if background service worker can reach it (PNA / CORS bypass)
+      serverReachable = await checkHealthViaBackground(baseUrl)
+    }
+
+    if (!serverReachable) {
+      throw new PythonExtractorError(
+        'Local Python OCR server is not running on port 8001. Please run "npm run dev" in terminal.',
+        'UNAVAILABLE'
+      )
+    }
+  }
+
   const arrayBuffer = await blob.arrayBuffer()
   const contentHash = await computeSha256(arrayBuffer)
   const dedupeKey = `${baseUrl}_sha256_${contentHash}`
 
   const existingPromise = inFlightExtractions.get(dedupeKey)
   if (existingPromise) {
+    onProgress?.({ percent: 35, text: 'Executing local Python OCR & MRZ parser...' })
     return existingPromise
   }
 
   const executionPromise = (async () => {
     const formData = new FormData()
-    // Match FastAPI parameter: file: UploadFile = File(...)
     const filePayload = new Blob([arrayBuffer], { type: blob.type || 'application/pdf' })
     formData.append('file', filePayload, resolvedFileName)
 
@@ -851,40 +984,65 @@ export async function extractPassportWithPython(
     onProgress?.({ percent: 35, text: 'Executing local Python OCR & MRZ parser...' })
 
     try {
-      // Note: Do NOT set Content-Type header when sending FormData! fetch sets boundary automatically.
-      const response = await fetch(`${baseUrl}/extract-passport`, {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-      })
+      let parsed: PythonPassportExtractionResult | null = null
 
-      if (!response.ok) {
-        let errorDetail = ''
-        try {
-          const errorJson = await response.json()
-          errorDetail = errorJson.detail || JSON.stringify(errorJson)
-        } catch {
-          errorDetail = await response.text()
-        }
-        throw new PythonExtractorError(
-          `Python extraction service returned HTTP ${response.status}: ${errorDetail || response.statusText}`,
-          'HTTP_ERROR',
-          response.status
-        )
-      }
-
-      let jsonResult: unknown
       try {
-        jsonResult = await response.json()
-      } catch {
-        throw new PythonExtractorError(
-          'Invalid JSON response returned by local Python extractor.',
-          'INVALID_RESPONSE'
-        )
+        const response = await fetch(`${baseUrl}/extract-passport`, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        })
+
+        if (!response.ok) {
+          let errorDetail = ''
+          try {
+            const errorJson = await response.json()
+            errorDetail = errorJson.detail || JSON.stringify(errorJson)
+          } catch {
+            errorDetail = await response.text()
+          }
+          throw new PythonExtractorError(
+            `Python extraction service returned HTTP ${response.status}: ${errorDetail || response.statusText}`,
+            'HTTP_ERROR',
+            response.status
+          )
+        }
+
+        const jsonResult = await response.json()
+        parsed = jsonResult as PythonPassportExtractionResult
+      } catch (fetchErr: unknown) {
+        if (fetchErr instanceof PythonExtractorError && fetchErr.code === 'HTTP_ERROR') {
+          throw fetchErr
+        }
+        // Direct fetch failed (e.g. Chrome PNA block, CORS, or connection issue)
+        // If we have Data URL and background worker, delegate to background service worker!
+        if (originalDataUrl && typeof chrome !== 'undefined' && typeof chrome.runtime?.sendMessage === 'function') {
+          try {
+            parsed = await delegateExtractionToBackground(originalDataUrl, resolvedFileName, baseUrl)
+          } catch (bgErr) {
+            throw bgErr
+          }
+        } else {
+          // If in web context, attempt fallback to altBaseUrl (localhost vs 127.0.0.1) before failing
+          try {
+            const altFormData = new FormData()
+            altFormData.append('file', new Blob([arrayBuffer], { type: blob.type || 'application/pdf' }), resolvedFileName)
+            const altRes = await fetch(`${altBaseUrl}/extract-passport`, {
+              method: 'POST',
+              body: altFormData,
+              signal: controller.signal,
+            })
+            if (altRes.ok) {
+              parsed = (await altRes.json()) as PythonPassportExtractionResult
+            } else {
+              throw fetchErr
+            }
+          } catch {
+            throw fetchErr
+          }
+        }
       }
 
-      // Validate essential structure
-      const parsed = jsonResult as PythonPassportExtractionResult
       if (!parsed || typeof parsed !== 'object' || !parsed.personal || !parsed.passport) {
         throw new PythonExtractorError(
           'Python extractor returned incomplete response schema: missing personal or passport data.',
