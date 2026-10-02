@@ -170,6 +170,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }
 
   const [diagnostic, setDiagnostic] = useState<ExtractionDiagnostic | null>(null)
+  const [extractingStatus, setExtractingStatus] = useState<string>('Extracting...')
 
   // 3. Document Upload & Extraction Handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetType: string) => {
@@ -194,6 +195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     setErrorMessage(null)
     setIsExtracting(true)
+    setExtractingStatus('Reading document...')
 
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -218,11 +220,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
         extractedDataConfirmed: false,
       }
 
-      const pipelineResult = await processUploadedDocumentPayload(
+      setExtractingStatus('Connecting to OCR extractor...')
+      const timeoutMs = 65000
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error('Extraction timed out. Local Python OCR service took too long to respond. Please check if Python server is running on port 8001.'))
+        }, timeoutMs)
+      })
+
+      const pipelinePromise = processUploadedDocumentPayload(
         dataUrl,
         file.name,
-        file.type
+        file.type,
+        {
+          onProgress: (p) => {
+            if (p.text) {
+              setExtractingStatus(p.text)
+            }
+          },
+        }
       )
+
+      let pipelineResult: Awaited<ReturnType<typeof processUploadedDocumentPayload>>
+      try {
+        pipelineResult = await Promise.race([pipelinePromise, timeoutPromise])
+      } finally {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle)
+        }
+      }
 
       const extractedApplicant = pipelineResult.hasExtractedFields ? pipelineResult.extractedData : null
       const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
@@ -446,6 +473,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     } finally {
       isExtractingRef.current = false
       setIsExtracting(false)
+      setExtractingStatus('Extracting...')
       if (e.target) {
         e.target.value = ''
       }
@@ -477,9 +505,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setErrorMessage(null)
 
     try {
+      let currentApp = savedApplication
+      if (!currentApp) {
+        currentApp = await getSavedApplicationByApplicantId(selectedApplicant.applicantId)
+      }
+
+      const getVal = (k: string) => {
+        const f = currentApp?.fields?.[k]
+        if (!f) return undefined
+        const v = typeof f === 'object' && f !== null ? (f as any).value : f
+        return v !== undefined && v !== null && String(v).trim() !== '' ? String(v).trim() : undefined
+      }
+
+      const applicantToAutofill: ApplicantProfile = {
+        ...selectedApplicant,
+        travel: {
+          ...(selectedApplicant.travel || {}),
+          businessCompanyName:
+            getVal('comp_name') ||
+            getVal('appl.comp_name') ||
+            selectedApplicant.travel?.businessCompanyName,
+          businessCompanyAddress:
+            getVal('comp_address') ||
+            getVal('appl.comp_address') ||
+            selectedApplicant.travel?.businessCompanyAddress,
+          businessCompanyPhone:
+            getVal('comp_phone') ||
+            getVal('appl.comp_phone') ||
+            selectedApplicant.travel?.businessCompanyPhone,
+          businessCompanyEmail:
+            getVal('comp_email') ||
+            getVal('appl.comp_email') ||
+            selectedApplicant.travel?.businessCompanyEmail,
+        },
+      }
+      ;(applicantToAutofill as any).fields = currentApp?.fields
+
       const response = await sendToBackground<AutofillResponsePayload>({
         type: 'EXECUTE_AUTOFILL',
-        applicant: selectedApplicant,
+        applicant: applicantToAutofill,
       })
 
       if (response && response.status === 'success' && response.data?.result) {
@@ -729,8 +793,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 pt-1">
-                      <label className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 font-medium py-1.5 px-3 rounded text-xs cursor-pointer text-center transition-colors">
-                        Replace File
+                      <label className={`flex-1 ${isExtracting ? 'bg-slate-900 text-slate-400 cursor-wait' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer'} border border-slate-600 font-medium py-1.5 px-3 rounded text-xs text-center transition-colors`}>
+                        {isExtracting ? (
+                          <span className="flex items-center justify-center gap-1.5 truncate">
+                            <svg className="animate-spin h-3.5 w-3.5 text-blue-400 inline-block" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span className="truncate">{extractingStatus}</span>
+                          </span>
+                        ) : (
+                          'Replace File'
+                        )}
                         <input
                           type="file"
                           accept={activeTab === 'passport' ? '.pdf,application/pdf' : '.pdf,image/*'}
@@ -748,8 +822,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         ? 'Upload primary passport PDF to extract personal identity data.'
                         : 'Upload previous India visa/visit/history document (optional).'}
                     </p>
-                    <label className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded-md text-xs text-center cursor-pointer transition-colors shadow">
-                      {isExtracting ? 'Extracting...' : '📄 Upload Document'}
+                    <label className={`block w-full ${isExtracting ? 'bg-blue-700 cursor-wait animate-pulse' : 'bg-blue-600 hover:bg-blue-500 cursor-pointer'} text-white font-bold py-1.5 px-3 rounded-md text-xs text-center transition-colors shadow`}>
+                      {isExtracting ? (
+                        <span className="flex items-center justify-center gap-1.5 truncate">
+                          <svg className="animate-spin h-3.5 w-3.5 text-white inline-block" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span className="truncate">{extractingStatus}</span>
+                        </span>
+                      ) : (
+                        '📄 Upload Document'
+                      )}
                       <input
                         type="file"
                         accept={activeTab === 'passport' ? '.pdf,application/pdf' : '.pdf,image/*'}
