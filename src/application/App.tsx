@@ -260,14 +260,91 @@ export const App: React.FC = () => {
       } else if (key === 'permanent_state_province' || key === 'perm_add3') {
         updatedFields['permanent_district'] = { ...updatedField }
         updatedManualEdits['permanent_district'] = true
+      } else if (key === 'entrypoint') {
+        updatedFields['appl.entrypoint'] = { ...updatedField }
+        updatedManualEdits['appl.entrypoint'] = true
+        if (!prevApp.fields['exitpoint']?.value) {
+          updatedFields['exitpoint'] = { ...updatedField }
+          updatedFields['appl.exitpoint'] = { ...updatedField }
+          updatedManualEdits['exitpoint'] = true
+          updatedManualEdits['appl.exitpoint'] = true
+        }
+      } else if (key === 'appl.entrypoint') {
+        updatedFields['entrypoint'] = { ...updatedField }
+        updatedManualEdits['entrypoint'] = true
+      } else if (key === 'exitpoint') {
+        updatedFields['appl.exitpoint'] = { ...updatedField }
+        updatedManualEdits['appl.exitpoint'] = true
+      } else if (key === 'appl.exitpoint') {
+        updatedFields['exitpoint'] = { ...updatedField }
+        updatedManualEdits['exitpoint'] = true
+      } else if (key === 'refuse_flag') {
+        updatedFields['appl.refuse_flag'] = { ...updatedField }
+        updatedManualEdits['appl.refuse_flag'] = true
+      } else if (key === 'appl.refuse_flag') {
+        updatedFields['refuse_flag'] = { ...updatedField }
+        updatedManualEdits['refuse_flag'] = true
+      } else if (key === 'comp_name') {
+        updatedFields['appl.comp_name'] = { ...updatedField }
+        updatedManualEdits['appl.comp_name'] = true
+      } else if (key === 'appl.comp_name') {
+        updatedFields['comp_name'] = { ...updatedField }
+        updatedManualEdits['comp_name'] = true
+      } else if (key === 'comp_address') {
+        updatedFields['appl.comp_address'] = { ...updatedField }
+        updatedManualEdits['appl.comp_address'] = true
+      } else if (key === 'appl.comp_address') {
+        updatedFields['comp_address'] = { ...updatedField }
+        updatedManualEdits['comp_address'] = true
+      } else if (key === 'comp_phone') {
+        updatedFields['appl.comp_phone'] = { ...updatedField }
+        updatedManualEdits['appl.comp_phone'] = true
+      } else if (key === 'appl.comp_phone') {
+        updatedFields['comp_phone'] = { ...updatedField }
+        updatedManualEdits['comp_phone'] = true
+      } else if (key === 'comp_email') {
+        updatedFields['appl.comp_email'] = { ...updatedField }
+        updatedManualEdits['appl.comp_email'] = true
+      } else if (key === 'appl.comp_email') {
+        updatedFields['comp_email'] = { ...updatedField }
+        updatedManualEdits['comp_email'] = true
+      } else if (key === 'religion') {
+        updatedFields['appl.religion'] = { ...updatedField }
+        updatedManualEdits['appl.religion'] = true
+      } else if (key === 'appl.religion') {
+        updatedFields['religion'] = { ...updatedField }
+        updatedManualEdits['religion'] = true
+      } else if (key === 'visa_type') {
+        updatedFields['appl.visatype'] = { ...updatedField }
+        updatedFields['appl.visa_type'] = { ...updatedField }
+        updatedManualEdits['appl.visatype'] = true
+        updatedManualEdits['appl.visa_type'] = true
       }
 
-      return {
+      const nextApp: SavedApplication = {
         ...prevApp,
         fields: updatedFields,
         manualEdits: updatedManualEdits,
         status: 'ready_for_autofill',
       }
+      saveApplication(nextApp).catch((err) => console.warn('Workspace auto-save error:', err))
+
+      // Keep active ApplicantProfile synchronized with business company fields
+      const activeProf = applicants.find((a) => a.applicantId === applicantId) || applicants[0]
+      if (activeProf) {
+        if (!activeProf.travel) activeProf.travel = {}
+        const nameVal = String(updatedFields['comp_name']?.value || updatedFields['appl.comp_name']?.value || '')
+        const addrVal = String(updatedFields['comp_address']?.value || updatedFields['appl.comp_address']?.value || '')
+        const phoneVal = String(updatedFields['comp_phone']?.value || updatedFields['appl.comp_phone']?.value || '')
+        const emailVal = String(updatedFields['comp_email']?.value || updatedFields['appl.comp_email']?.value || '')
+        if (nameVal) activeProf.travel.businessCompanyName = nameVal
+        if (addrVal) activeProf.travel.businessCompanyAddress = addrVal
+        if (phoneVal) activeProf.travel.businessCompanyPhone = phoneVal
+        if (emailVal) activeProf.travel.businessCompanyEmail = emailVal
+        saveApplicant(activeProf).catch(() => {})
+      }
+
+      return nextApp
     })
   }
 
@@ -433,6 +510,21 @@ export const App: React.FC = () => {
         },
       }
       await saveApplication(toSave)
+
+      const activeProf = applicants.find((a) => a.applicantId === applicantId) || applicants[0]
+      if (activeProf) {
+        if (!activeProf.travel) activeProf.travel = {}
+        const nameVal = String(toSave.fields['comp_name']?.value || toSave.fields['appl.comp_name']?.value || '')
+        const addrVal = String(toSave.fields['comp_address']?.value || toSave.fields['appl.comp_address']?.value || '')
+        const phoneVal = String(toSave.fields['comp_phone']?.value || toSave.fields['appl.comp_phone']?.value || '')
+        const emailVal = String(toSave.fields['comp_email']?.value || toSave.fields['appl.comp_email']?.value || '')
+        if (nameVal) activeProf.travel.businessCompanyName = nameVal
+        if (addrVal) activeProf.travel.businessCompanyAddress = addrVal
+        if (phoneVal) activeProf.travel.businessCompanyPhone = phoneVal
+        if (emailVal) activeProf.travel.businessCompanyEmail = emailVal
+        await saveApplicant(activeProf).catch(() => {})
+      }
+
       setApplication(toSave)
       showToast('✓ Application saved successfully! All 100 fields ready for portal autofill.', 'success')
     } catch (err) {
