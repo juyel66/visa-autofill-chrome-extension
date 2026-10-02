@@ -27,6 +27,8 @@ export type ExtensionMessageType =
   | 'ATTACH_DOCUMENT'
   | 'EXECUTE_UNDO'
   | 'CHECK_ATTACHMENTS'
+  | 'EXTRACT_PASSPORT_PYTHON'
+  | 'HEALTH_CHECK_PYTHON'
 
 export type PingBackgroundMessage = {
   type: 'PING_BACKGROUND'
@@ -80,6 +82,18 @@ export type CheckAttachmentsMessage = {
   requirements: { id: string; targetSelector?: FieldSelector }[]
 }
 
+export type ExtractPassportPythonMessage = {
+  type: 'EXTRACT_PASSPORT_PYTHON'
+  fileDataUrl: string
+  fileName: string
+  baseUrl?: string
+}
+
+export type HealthCheckPythonMessage = {
+  type: 'HEALTH_CHECK_PYTHON'
+  baseUrl?: string
+}
+
 export type ExtensionMessage =
   | PingBackgroundMessage
   | PingContentMessage
@@ -92,6 +106,18 @@ export type ExtensionMessage =
   | AttachDocumentMessage
   | ExecuteUndoMessage
   | CheckAttachmentsMessage
+  | ExtractPassportPythonMessage
+  | HealthCheckPythonMessage
+
+export type PythonExtractionResponsePayload = {
+  type: 'PYTHON_EXTRACTION_COMPLETED'
+  result: unknown
+}
+
+export type PythonHealthResponsePayload = {
+  type: 'PYTHON_HEALTH_RESPONSE'
+  healthy: boolean
+}
 
 export type BackgroundPongPayload = {
   type: 'BACKGROUND_PONG'
