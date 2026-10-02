@@ -253,7 +253,16 @@ chrome.runtime.onMessage.addListener(
         .then((res) => {
           const documents = (res.visa_autofill_documents || []) as DocumentRecord[]
           const savedApplications = (res.visa_autofill_saved_applications || []) as SavedApplication[]
-          const savedApp = savedApplications.find((a) => a.applicantId === applicantId)
+          let savedApp = savedApplications.find((a) => a.applicantId === applicantId)
+          if (!savedApp && savedApplications.length > 0) {
+            savedApp =
+              savedApplications.find(
+                (a) =>
+                  a.fields?.['comp_name']?.value ||
+                  a.fields?.['appl.comp_name']?.value ||
+                  a.fields?.['travel.businessCompanyName']?.value
+              ) || savedApplications[0]
+          }
 
           const candRes = resolveCandidateData({
             profileId: applicantId,
@@ -273,6 +282,52 @@ chrome.runtime.onMessage.addListener(
           }
 
           const tempProfile = candRes.applicant
+
+          // Ensure all workspace fields from savedApp and message.applicant are accessible to valueResolver
+          ;(tempProfile as any).fields = {
+            ...(savedApp?.fields || {}),
+            ...((message.applicant as any)?.fields || {}),
+          }
+
+          if (!tempProfile.travel) {
+            tempProfile.travel = {} as any
+          }
+
+          const getRawCompanyVal = (k: string) => {
+            const f = (tempProfile as any).fields?.[k]
+            if (!f) return undefined
+            const v = typeof f === 'object' && f !== null ? (f as any).value : f
+            return v !== undefined && v !== null && String(v).trim() !== '' ? String(v).trim() : undefined
+          }
+
+          if (!tempProfile.travel.businessCompanyName) {
+            tempProfile.travel.businessCompanyName =
+              getRawCompanyVal('comp_name') ||
+              getRawCompanyVal('appl.comp_name') ||
+              getRawCompanyVal('travel.businessCompanyName') ||
+              message.applicant.travel?.businessCompanyName
+          }
+          if (!tempProfile.travel.businessCompanyAddress) {
+            tempProfile.travel.businessCompanyAddress =
+              getRawCompanyVal('comp_address') ||
+              getRawCompanyVal('appl.comp_address') ||
+              getRawCompanyVal('travel.businessCompanyAddress') ||
+              message.applicant.travel?.businessCompanyAddress
+          }
+          if (!tempProfile.travel.businessCompanyPhone) {
+            tempProfile.travel.businessCompanyPhone =
+              getRawCompanyVal('comp_phone') ||
+              getRawCompanyVal('appl.comp_phone') ||
+              getRawCompanyVal('travel.businessCompanyPhone') ||
+              message.applicant.travel?.businessCompanyPhone
+          }
+          if (!tempProfile.travel.businessCompanyEmail) {
+            tempProfile.travel.businessCompanyEmail =
+              getRawCompanyVal('comp_email') ||
+              getRawCompanyVal('appl.comp_email') ||
+              getRawCompanyVal('travel.businessCompanyEmail') ||
+              message.applicant.travel?.businessCompanyEmail
+          }
 
           const validation = validateApplicant(tempProfile)
           if (!validation.valid) {
