@@ -40,6 +40,7 @@ export interface BangladeshFamilyDetailsSelectors {
   grandparentFlag: IndiaFieldSelector[]
   grandparentDetails: IndiaFieldSelector[]
   occupation: IndiaFieldSelector[]
+  occupationDetailsOf: IndiaFieldSelector[]
   employerName: IndiaFieldSelector[]
   employerDesignation: IndiaFieldSelector[]
   employerAddress: IndiaFieldSelector[]
@@ -270,6 +271,14 @@ export const BANGLADESH_FAMILY_DETAILS_SELECTORS: BangladeshFamilyDetailsSelecto
     { strategy: 'name', value: 'appl.occupation' },
     { strategy: 'name', value: 'present_occupation' },
     { strategy: 'css', value: 'select[name="appl.occupation"], select#occupation' },
+  ],
+  occupationDetailsOf: [
+    { strategy: 'id', value: 'occ_flag' },
+    { strategy: 'name', value: 'appl.occ_flag' },
+    { strategy: 'id', value: 'occ_details_of' },
+    { strategy: 'name', value: 'appl.occ_details_of' },
+    { strategy: 'name', value: 'appl.rel_occ' },
+    { strategy: 'css', value: 'select[name="appl.occ_flag"], select#occ_flag, select[name="appl.occ_details_of"], select#occ_details_of, select[name="appl.rel_occ"]' },
   ],
   employerName: [
     { strategy: 'id', value: 'empname' },
