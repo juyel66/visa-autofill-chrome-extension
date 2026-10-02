@@ -45,6 +45,16 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
   const isMarried = maritalStatus.toLowerCase() === 'married'
   const hasPakistanAncestry = getVal('grandparent_flag').toLowerCase() === 'yes'
   const hasMilitaryService = getVal('prev_org').toLowerCase() === 'yes'
+  const currOccupation = getVal('occupation').trim().toUpperCase()
+  const isHousewife = currOccupation === 'HOUSE WIFE' || currOccupation === 'HOUSEWIFE'
+  const isStudent = currOccupation === 'STUDENT'
+  const isDependentOccupation =
+    isHousewife ||
+    isStudent ||
+    currOccupation === 'UN-EMPLOYED' ||
+    currOccupation === 'UNEMPLOYED' ||
+    currOccupation === 'MINOR' ||
+    Boolean(getVal('occ_flag'))
 
   return (
     <div className="w-full bg-[#f6f6f6] rounded-xl border border-[#d1d5db] shadow-md overflow-hidden text-[#222222] font-sans">
@@ -818,6 +828,52 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">If Others, please specify</div>
             </div>
+
+            {/* Specify below occupation details of (for HOUSE WIFE, STUDENT, etc.) */}
+            {isDependentOccupation && (
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#fdf4f4] py-1 px-1 rounded border border-[#fecaca]">
+                <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
+                  Specify below occupation details of <span className="text-red-600 font-bold">*</span>
+                </label>
+                <div className="sm:col-span-5 flex items-center gap-1.5">
+                  <select
+                    id="occ_flag"
+                    value={getVal('occ_flag')}
+                    onChange={(e) => onFieldChange('occ_flag', e.target.value)}
+                    className={`w-full bg-white border ${
+                      !getVal('occ_flag') ? 'border-red-500' : 'border-[#a0aec0]'
+                    } rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]`}
+                  >
+                    <option value="">Select......</option>
+                    {isHousewife ? (
+                      <>
+                        <option value="HUSBAND">HUSBAND</option>
+                        <option value="FATHER">FATHER</option>
+                        <option value="MOTHER">MOTHER</option>
+                        <option value="BROTHER">BROTHER</option>
+                        <option value="SPOUSE">SPOUSE</option>
+                        <option value="SON">SON</option>
+                        <option value="OTHER">OTHER</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="FATHER">FATHER</option>
+                        <option value="MOTHER">MOTHER</option>
+                        <option value="BROTHER">BROTHER</option>
+                        <option value="GUARDIAN">GUARDIAN</option>
+                        <option value="HUSBAND">HUSBAND</option>
+                        <option value="SPOUSE">SPOUSE</option>
+                        <option value="OTHER">OTHER</option>
+                      </>
+                    )}
+                  </select>
+                  {renderSourceBadge(fields['occ_flag'])}
+                </div>
+                <div className="sm:col-span-3 text-[11px] font-medium text-red-600 pl-1">
+                  {!getVal('occ_flag') ? 'Please select a value' : 'Occupation Supporter'}
+                </div>
+              </div>
+            )}
 
             {/* Employer Name */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
