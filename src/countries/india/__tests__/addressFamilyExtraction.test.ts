@@ -1017,8 +1017,8 @@ export async function runAddressFamilyExtractionTests(): Promise<AddressFamilyEx
     const uniqueMappingIds = new Set(familyMappings.map((m) => m.id))
     const uniqueTargetFields = new Set(familyMappings.map((m) => m.targetField))
 
-    // Exactly 39 logical field mappings on Family Details
-    if (familyMappings.length !== 39 || uniqueMappingIds.size !== 39 || uniqueTargetFields.size !== 39) {
+    // Logical field mappings on Family Details
+    if (familyMappings.length !== 44 || uniqueMappingIds.size !== 44 || uniqueTargetFields.size !== 44) {
       failures.push(
         `Test 30 Failed: Family Details mappings count mismatch. Length=${familyMappings.length}, uniqueIds=${uniqueMappingIds.size}, uniqueTargets=${uniqueTargetFields.size}`
       )
