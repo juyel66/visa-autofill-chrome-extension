@@ -73,6 +73,7 @@ export interface EmploymentDetails {
   militaryDesignation?: string
   militaryPlaceOfPosting?: string
   militaryRank?: string
+  dependentRelation?: string
 }
 
 export interface TravelDetails {
@@ -88,6 +89,12 @@ export interface TravelDetails {
   exitPoint?: string
   countriesVisited?: string
   visitedSaarc?: boolean
+  visaType?: string
+  businessCompanyName?: string
+  businessCompanyAddress?: string
+  businessCompanyPhone?: string
+  businessCompanyEmail?: string
+  saarcDetails?: string
 }
 
 export interface PreviousVisaDetails {
@@ -99,6 +106,7 @@ export interface PreviousVisaDetails {
   visitedAddress1?: string
   visitedAddress2?: string
   visitedAddress3?: string
+  citiesVisited?: string
   hasRefusal?: boolean
   refusalDetails?: string
   countriesVisited?: string
@@ -120,6 +128,8 @@ export interface ReferenceDetails {
   address?: Address | string
   phone?: string
   email?: string
+  state?: string
+  district?: string
 }
 
 export interface PersonalInfo {
