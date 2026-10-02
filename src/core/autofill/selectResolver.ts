@@ -96,9 +96,51 @@ export const COUNTRY_NATIONALITY_ALIAS_GROUPS: readonly (readonly string[])[] = 
   ['vietnam', 'vietnamese', 'vnm', 'vn'],
 ]
 
+/**
+ * Common Port / Border Checkpoint Alias Groups for India-Bangladesh Travel.
+ */
+export const PORT_ALIAS_GROUPS: readonly (readonly string[])[] = [
+  ['gede', 'geede', 'darshana'],
+  ['haridaspur', 'benapole', 'petrapole'],
+  ['changra bandha', 'changrabandha', 'burimari'],
+  ['phulbari', 'fulbari', 'banglabandha'],
+  ['agartala', 'akhoura', 'akhaura'],
+  ['dawki', 'tamabil'],
+  ['kolkata', 'calcutta', 'ccu'],
+  ['chennai', 'madras', 'maa'],
+  ['delhi', 'new delhi', 'del'],
+  ['mumbai', 'bombay', 'bom'],
+]
+
+/**
+ * Common Religion Alias Groups for Indian Visa Applications.
+ */
+export const RELIGION_ALIAS_GROUPS: readonly (readonly string[])[] = [
+  ['islam', 'muslim', 'mohammedan', 'islamic'],
+  ['hinduism', 'hindu', 'sanatan', 'hindoo'],
+  ['christianity', 'christian'],
+  ['buddhism', 'buddhist', 'bauddha'],
+  ['sikhism', 'sikh'],
+  ['jainism', 'jain'],
+  ['judaism', 'jewish', 'jew'],
+  ['parsi', 'zoroastrian', 'parsee'],
+  ['bahai', 'baha\'i', 'bahaii'],
+  ['others', 'other'],
+]
+
 // Build fast lookup map from alias to group
 const ALIAS_TO_GROUP_MAP = new Map<string, readonly string[]>()
 for (const group of COUNTRY_NATIONALITY_ALIAS_GROUPS) {
+  for (const item of group) {
+    ALIAS_TO_GROUP_MAP.set(cleanAlphanumeric(item), group)
+  }
+}
+for (const group of PORT_ALIAS_GROUPS) {
+  for (const item of group) {
+    ALIAS_TO_GROUP_MAP.set(cleanAlphanumeric(item), group)
+  }
+}
+for (const group of RELIGION_ALIAS_GROUPS) {
   for (const item of group) {
     ALIAS_TO_GROUP_MAP.set(cleanAlphanumeric(item), group)
   }
@@ -555,6 +597,77 @@ export function findMatchingSelectOption(
     return { option: null, ambiguous: true }
   }
 
+  // 3b. Level 3b: Compound Port / Multi-segment Matching (e.g. "BY AIR/ HARIDASPUR", "HARIDASPUR / BY AIR")
+  if (targetValue.includes('/')) {
+    const segments = targetValue.split('/').map((s) => s.trim()).filter(Boolean)
+    const specificPortCandidates = segments.filter((seg) => {
+      const cleanSeg = cleanAlphanumeric(seg)
+      return (
+        cleanSeg !== 'byair' &&
+        cleanSeg !== 'air' &&
+        cleanSeg !== 'byroad' &&
+        cleanSeg !== 'road' &&
+        cleanSeg !== 'byrail' &&
+        cleanSeg !== 'rail'
+      )
+    })
+
+    const orderedSegments = [...specificPortCandidates, ...segments]
+    for (const seg of orderedSegments) {
+      const segNorm = normalizeSelectString(seg)
+      const segClean = cleanAlphanumeric(seg)
+
+      // Exact match for segment
+      const segMatches = options.filter((opt) => {
+        const oNorm = normalizeSelectString(opt.text)
+        const oVal = normalizeSelectString(opt.value)
+        const oClean = cleanAlphanumeric(opt.text)
+        const oValClean = cleanAlphanumeric(opt.value)
+        return (
+          oNorm === segNorm ||
+          oVal === segNorm ||
+          oClean === segClean ||
+          oValClean === segClean
+        )
+      })
+      if (segMatches.length === 1) {
+        return { option: segMatches[0], ambiguous: false, matchMethod: 'clean-match' }
+      }
+
+      // Check if option contains segment or segment contains option
+      const partialMatches = options.filter((opt) => {
+        const oNorm = normalizeSelectString(opt.text)
+        const oVal = normalizeSelectString(opt.value)
+        return (
+          oNorm.includes(segNorm) ||
+          oVal.includes(segNorm) ||
+          segNorm.includes(oNorm) ||
+          segNorm.includes(oVal)
+        )
+      })
+      if (partialMatches.length === 1) {
+        return { option: partialMatches[0], ambiguous: false, matchMethod: 'clean-match' }
+      }
+      if (partialMatches.length > 1) {
+        const nonSlash = partialMatches.filter((o) => !o.value.includes('/') && !o.text.includes('/'))
+        if (nonSlash.length === 1) {
+          return { option: nonSlash[0], ambiguous: false, matchMethod: 'clean-match' }
+        }
+        const byRoad = (nonSlash.length > 0 ? nonSlash : partialMatches).filter((o) => {
+          const v = normalizeSelectString(o.value)
+          const t = normalizeSelectString(o.text)
+          return v.startsWith('by road ') || t.startsWith('by road ')
+        })
+        if (byRoad.length === 1) {
+          return { option: byRoad[0], ambiguous: false, matchMethod: 'clean-match' }
+        }
+        if (nonSlash.length > 0) {
+          return { option: nonSlash[0], ambiguous: false, matchMethod: 'clean-match' }
+        }
+      }
+    }
+  }
+
   // 4. Level 4: Generic Country / Nationality / Demonym alias dictionary match
   const aliasMatches = options.filter((opt) => {
     return (
@@ -597,20 +710,38 @@ export function findMatchingSelectOption(
     return { option: structuredMatches[0], ambiguous: false, matchMethod: 'structured-match' }
   }
   if (structuredMatches.length > 1) {
+    // Disambiguate: prefer non-compound options (without slashes) over compound dual-port options (e.g. BY AIR/ HARIDASPUR vs BY ROAD HARIDASPUR)
+    const nonCompound = structuredMatches.filter(
+      (opt) => !opt.value.includes('/') && !opt.text.includes('/')
+    )
+    if (nonCompound.length === 1) {
+      return { option: nonCompound[0], ambiguous: false, matchMethod: 'structured-match' }
+    }
+
+    // Prefer standard land border road entry ("BY ROAD <PORT>") for single port targets
+    const byRoadMatches = (nonCompound.length > 1 ? nonCompound : structuredMatches).filter((opt) => {
+      const v = normalizeSelectString(opt.value)
+      const t = normalizeSelectString(opt.text)
+      return v.startsWith('by road ') || t.startsWith('by road ')
+    })
+    if (byRoadMatches.length === 1) {
+      return { option: byRoadMatches[0], ambiguous: false, matchMethod: 'structured-match' }
+    }
+
     return { option: null, ambiguous: true }
   }
 
   // 6. Level 6: Word / Token boundary match (e.g. "DHAKA" matches "BANGLADESH - DHAKA")
+  const tokenTargetWords = normTarget.split(/[^a-z0-9]+/).filter(Boolean)
   const tokenMatches = options.filter((opt) => {
     const optTextClean = normalizeSelectString(opt.text)
     const optValClean = normalizeSelectString(opt.value)
     const wordsText = optTextClean.split(/[^a-z0-9]+/).filter(Boolean)
     const wordsVal = optValClean.split(/[^a-z0-9]+/).filter(Boolean)
-    const targetWords = normTarget.split(/[^a-z0-9]+/).filter(Boolean)
 
     // Check if target is a distinct token in the option or option is a token in target
-    const targetInOpt = targetWords.every((w) => wordsText.includes(w) || wordsVal.includes(w))
-    const optInTarget = wordsText.every((w) => targetWords.includes(w)) || wordsVal.every((w) => targetWords.includes(w))
+    const targetInOpt = tokenTargetWords.every((w) => wordsText.includes(w) || wordsVal.includes(w))
+    const optInTarget = wordsText.every((w) => tokenTargetWords.includes(w)) || wordsVal.every((w) => tokenTargetWords.includes(w))
 
     return targetInOpt || optInTarget
   })
@@ -618,6 +749,36 @@ export function findMatchingSelectOption(
     return { option: tokenMatches[0], ambiguous: false, matchMethod: 'token-match' }
   }
   if (tokenMatches.length > 1) {
+    // Disambiguate: prefer non-compound options over compound dual-port options
+    const nonCompound = tokenMatches.filter(
+      (opt) => !opt.value.includes('/') && !opt.text.includes('/')
+    )
+    if (nonCompound.length === 1) {
+      return { option: nonCompound[0], ambiguous: false, matchMethod: 'token-match' }
+    }
+
+    // If target has a specific port keyword, prefer the candidate that contains it
+    const specificMatches = (nonCompound.length > 0 ? nonCompound : tokenMatches).filter((opt) => {
+      const optClean = cleanAlphanumeric(opt.text)
+      const optValClean = cleanAlphanumeric(opt.value)
+      const specificTargetWords = tokenTargetWords.filter(
+        (w: string) => w !== 'by' && w !== 'air' && w !== 'road' && w !== 'rail'
+      )
+      return specificTargetWords.some((w: string) => optClean.includes(w) || optValClean.includes(w))
+    })
+    if (specificMatches.length === 1) {
+      return { option: specificMatches[0], ambiguous: false, matchMethod: 'token-match' }
+    }
+
+    const byRoadMatches = (specificMatches.length > 0 ? specificMatches : (nonCompound.length > 1 ? nonCompound : tokenMatches)).filter((opt) => {
+      const v = normalizeSelectString(opt.value)
+      const t = normalizeSelectString(opt.text)
+      return v.startsWith('by road ') || t.startsWith('by road ')
+    })
+    if (byRoadMatches.length === 1) {
+      return { option: byRoadMatches[0], ambiguous: false, matchMethod: 'token-match' }
+    }
+
     return { option: null, ambiguous: true }
   }
 
@@ -709,5 +870,118 @@ export function selectOptionAndDispatchEvents(
     }
   }
   setNativeInputValue(element, option.value)
+}
+
+/**
+ * Resolves a fallback option for Indian Visa entry/exit port dropdowns.
+ * Ensures that port selection never fails due to minor naming variances or compound strings (e.g. "BY AIR/ HARIDASPUR").
+ */
+export function resolvePortFallbackOption(
+  element: HTMLSelectElement,
+  targetValue: string
+): HTMLOptionElement | null {
+  const options = getSelectOptions(element)
+  if (options.length === 0) return null
+
+  const normTarget = normalizeSelectString(targetValue)
+  const cleanTarget = cleanAlphanumeric(targetValue)
+
+  // 1. Check all known land border checkposts and major port keywords
+  const portKeywords = [
+    'haridaspur', 'benapole', 'petrapole', 'gede', 'geede', 'darshana',
+    'changrabandha', 'changra bandha', 'burimari', 'phulbari', 'fulbari', 'banglabandha',
+    'agartala', 'akhaura', 'akhoura', 'dawki', 'tamabil', 'chennai', 'madras',
+    'delhi', 'kolkata', 'calcutta', 'mumbai', 'bombay', 'hili', 'jaigaon',
+    'radhikapur', 'raniganj', 'dalu', 'dhubri', 'sabroom', 'srimantpur', 'suterkandi'
+  ]
+
+  // Find if any port keyword is in targetValue
+  const foundKeyword = portKeywords.find((kw) => {
+    const cleanKw = cleanAlphanumeric(kw)
+    return cleanTarget.includes(cleanKw) || normTarget.includes(kw)
+  })
+
+  if (foundKeyword) {
+    const cleanFound = cleanAlphanumeric(foundKeyword)
+    // 1a. Look for option starting with "BY ROAD <PORT>" or containing the port
+    const byRoadMatch = options.find((opt) => {
+      const textClean = cleanAlphanumeric(opt.text)
+      const valClean = cleanAlphanumeric(opt.value)
+      return (
+        (textClean.includes(cleanFound) || valClean.includes(cleanFound)) &&
+        (normalizeSelectString(opt.text).startsWith('by road') || normalizeSelectString(opt.value).startsWith('by road'))
+      )
+    })
+    if (byRoadMatch) return byRoadMatch
+
+    // 1b. Look for any option containing the keyword
+    const portMatch = options.find((opt) => {
+      const textClean = cleanAlphanumeric(opt.text)
+      const valClean = cleanAlphanumeric(opt.value)
+      return textClean.includes(cleanFound) || valClean.includes(cleanFound)
+    })
+    if (portMatch) return portMatch
+  }
+
+  // 2. Default ICP fallback: HARIDASPUR (primary entry point between Bangladesh & India)
+  const haridaspurMatch = options.find((opt) => {
+    const clean = cleanAlphanumeric(opt.text) + ' ' + cleanAlphanumeric(opt.value)
+    return clean.includes('haridaspur') || clean.includes('petrapole')
+  })
+  if (haridaspurMatch) return haridaspurMatch
+
+  // 3. Fallback to BY AIR
+  const byAirMatch = options.find((opt) => {
+    const norm = normalizeSelectString(opt.text) + ' ' + normalizeSelectString(opt.value)
+    return norm.includes('by air')
+  })
+  if (byAirMatch) return byAirMatch
+
+  // 4. Return first non-placeholder option
+  return options[0] || null
+}
+
+/**
+ * Resolves a fallback option for Purpose of Visit dropdown.
+ */
+export function resolvePurposeFallbackOption(
+  element: HTMLSelectElement,
+  targetValue: string
+): HTMLOptionElement | null {
+  const options = getSelectOptions(element)
+  if (options.length === 0) return null
+
+  const normTarget = normalizeSelectString(targetValue)
+  const cleanTarget = cleanAlphanumeric(targetValue)
+
+  // 1. Business
+  if (cleanTarget.includes('business') || normTarget.includes('business')) {
+    const busMatch = options.find((opt) => {
+      const n = normalizeSelectString(opt.text) + ' ' + normalizeSelectString(opt.value)
+      return n.includes('business')
+    })
+    if (busMatch) return busMatch
+  }
+
+  // 2. Tourism
+  if (cleanTarget.includes('touris') || normTarget.includes('touris') || cleanTarget.includes('holiday')) {
+    const tourMatch = options.find((opt) => {
+      const n = normalizeSelectString(opt.text) + ' ' + normalizeSelectString(opt.value)
+      return n.includes('touris') || n.includes('holiday')
+    })
+    if (tourMatch) return tourMatch
+  }
+
+  // 3. Medical
+  if (cleanTarget.includes('medical') || normTarget.includes('medical')) {
+    const medMatch = options.find((opt) => {
+      const n = normalizeSelectString(opt.text) + ' ' + normalizeSelectString(opt.value)
+      return n.includes('medical')
+    })
+    if (medMatch) return medMatch
+  }
+
+  // 4. Return first non-placeholder option
+  return options[0] || null
 }
 
