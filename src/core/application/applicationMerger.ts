@@ -12,6 +12,7 @@ import {
   normalizeCountry,
   resolveApprovedProductDefault,
 } from './defaultResolution'
+import { PORTAL_INDIAN_STATES_OPTIONS } from '../../countries/india/options/registrationOptions'
 
 const HISTORICAL_FIELD_KEYS = new Set([
   'old_visa_flag',
@@ -1236,8 +1237,20 @@ export function populateApplicationFromDocuments(options: {
         !resolvedValue
       ) {
         resolvedValue = activeProfile.reference?.state || ''
+        if (!resolvedValue && activeProfile.reference?.addressLine2) {
+          const matched = PORTAL_INDIAN_STATES_OPTIONS.find((opt) =>
+            activeProfile.reference!.addressLine2!.toUpperCase().includes(opt.value.toUpperCase())
+          )
+          if (matched) resolvedValue = matched.value
+        }
+        if (!resolvedValue && activeProfile.reference?.addressLine1) {
+          const matched = PORTAL_INDIAN_STATES_OPTIONS.find((opt) =>
+            activeProfile.reference!.addressLine1!.toUpperCase().includes(opt.value.toUpperCase())
+          )
+          if (matched) resolvedValue = matched.value
+        }
         if (resolvedValue) {
-          source = activeSource
+          source = activeProfile.reference?.state ? activeSource : 'derived'
           docId = activeDocId
         }
       } else if (
@@ -1245,8 +1258,26 @@ export function populateApplicationFromDocuments(options: {
         !resolvedValue
       ) {
         resolvedValue = activeProfile.reference?.district || ''
+        if (!resolvedValue && activeProfile.reference?.addressLine2) {
+          const stateOpt = PORTAL_INDIAN_STATES_OPTIONS.find((opt) =>
+            activeProfile.reference!.addressLine2!.toUpperCase().includes(opt.value.toUpperCase())
+          )
+          if (stateOpt) {
+            const rawPart = activeProfile.reference.addressLine2.replace(new RegExp(stateOpt.value, 'i'), '').replace(/[\/,]/g, '').trim()
+            if (rawPart) resolvedValue = rawPart.toUpperCase()
+          }
+        }
+        if (!resolvedValue && activeProfile.reference?.addressLine1) {
+          const stateOpt = PORTAL_INDIAN_STATES_OPTIONS.find((opt) =>
+            activeProfile.reference!.addressLine1!.toUpperCase().includes(opt.value.toUpperCase())
+          )
+          if (stateOpt) {
+            const rawPart = activeProfile.reference.addressLine1.replace(new RegExp(stateOpt.value, 'i'), '').replace(/[\/,]/g, '').trim()
+            if (rawPart) resolvedValue = rawPart.toUpperCase()
+          }
+        }
         if (resolvedValue) {
-          source = activeSource
+          source = activeProfile.reference?.district ? activeSource : 'derived'
           docId = activeDocId
         }
       } else if (
@@ -1422,17 +1453,17 @@ export function populateApplicationFromDocuments(options: {
       fields[flagKey] = existingApp.fields[flagKey]
     } else {
       const isRefusalQ = q === 2 && (ogdProfile?.previousVisa?.hasRefusal === false || activeProfile?.previousVisa?.hasRefusal === false)
-      if (isRefusalQ) {
+      if (isRefusalQ || ogdDoc) {
         fields[flagKey] = {
           value: 'No',
           source: 'ogd',
           documentId: ogdDoc?.documentId,
           isUserEdited: false,
         }
-      } else if (!fields[flagKey]) {
+      } else if (!fields[flagKey] || fields[flagKey].value === '') {
         fields[flagKey] = {
           value: 'No',
-          source: 'missing',
+          source: 'derived',
           isUserEdited: false,
         }
       }
@@ -1511,6 +1542,19 @@ export function populateApplicationFromDocuments(options: {
     fields['entrypoint'] = {
       ...fields['exitpoint'],
       isUserEdited: false,
+    }
+  }
+
+  // Bidirectional sync for appl.email and appl.email_re so both are always populated together
+  if (fields['appl.email']?.value && (!fields['appl.email_re']?.value || fields['appl.email_re'].value === '')) {
+    fields['appl.email_re'] = {
+      ...fields['appl.email'],
+      isUserEdited: fields['appl.email'].isUserEdited,
+    }
+  } else if (fields['appl.email_re']?.value && (!fields['appl.email']?.value || fields['appl.email'].value === '')) {
+    fields['appl.email'] = {
+      ...fields['appl.email_re'],
+      isUserEdited: fields['appl.email_re'].isUserEdited,
     }
   }
 
