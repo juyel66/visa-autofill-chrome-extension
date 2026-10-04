@@ -365,7 +365,7 @@ export async function executeAutofill(request: AutofillRequest): Promise<Autofil
         if ((resolvedValue === undefined || resolvedValue === '') && (applicant as any).fields) {
           const raw =
             (applicant as any).fields[mapping.targetField] ??
-            (applicant as any).fields[mapping.sourceField] ??
+            (mapping.sourceField ? (applicant as any).fields[mapping.sourceField] : undefined) ??
             (applicant as any).fields[`appl.${mapping.targetField}`]
           if (raw !== undefined && raw !== null) {
             const rawVal = typeof raw === 'object' && raw.value !== undefined ? raw.value : raw
