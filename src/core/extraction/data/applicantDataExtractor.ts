@@ -744,18 +744,67 @@ export function extractFromOgdVisaApplication(
   const visaText = visaSectionMatch ? visaSectionMatch[1] : text
 
   const visaTypeMatch = visaText.match(/(?:type\s*of\s*visa|visa\s*type)[:\s]+([^\r\n:]+)/i)
+  if (visaTypeMatch && visaTypeMatch[1]) {
+    const rawVt = cleanExtractedPurpose(visaTypeMatch[1])?.toUpperCase().trim() || ''
+    if (rawVt) {
+      let normVt = rawVt
+      if (/tourist/i.test(rawVt)) normVt = 'TOURIST VISA'
+      else if (/medical/i.test(rawVt)) normVt = 'MEDICAL VISA'
+      else if (/business/i.test(rawVt)) normVt = 'BUSINESS VISA'
+      else if (/entry/i.test(rawVt)) normVt = 'ENTRY VISA'
+      else if (/student/i.test(rawVt)) normVt = 'STUDENT VISA'
+      else if (/employment/i.test(rawVt)) normVt = 'EMPLOYMENT VISA'
+      else if (/conference/i.test(rawVt)) normVt = 'CONFERENCE VISA'
+      else if (/journalist/i.test(rawVt)) normVt = 'JOURNALIST VISA'
+      else if (/transit/i.test(rawVt)) normVt = 'TRANSIT VISA'
+      else if (/missionary/i.test(rawVt)) normVt = 'MISSIONARY VISA'
+      result.travel!.visaType = { value: normVt, source, confidence: baseConfidence }
+    }
+  }
 
   const purposeMatch = visaText.match(/(?:purpose\s*of\s*(?:visit|journey)|visiting\s*india\s*for|visit\s*purpose|purpose\s*for\s*visit|purpose)[:\s]+([\s\S]+?)(?=(?:[\r\n]+\s*(?:places|countries|hotel|reference|duration|no\.?\s*of\s*entries|number\s*of\s*entries|expected|port|declaration|previous|profession|old|validity)|\s{2,}(?:places|countries|hotel|reference|duration|no\.?\s*of\s*entries|number\s*of\s*entries|expected|port|declaration|previous|profession|old|validity)|$))/i)
   if (purposeMatch && purposeMatch[1]) {
     const rawPurpose = cleanExtractedPurpose(purposeMatch[1])
     if (rawPurpose) {
       result.travel!.purposeOfVisit = { value: rawPurpose, source, confidence: baseConfidence }
+      if (!result.travel!.visaType) {
+        let normVt = rawPurpose.toUpperCase()
+        if (/tourist/i.test(normVt)) normVt = 'TOURIST VISA'
+        else if (/medical/i.test(normVt)) normVt = 'MEDICAL VISA'
+        else if (/business/i.test(normVt)) normVt = 'BUSINESS VISA'
+        else if (/entry/i.test(normVt)) normVt = 'ENTRY VISA'
+        else if (/student/i.test(normVt)) normVt = 'STUDENT VISA'
+        else if (/employment/i.test(normVt)) normVt = 'EMPLOYMENT VISA'
+        else if (/conference/i.test(normVt)) normVt = 'CONFERENCE VISA'
+        result.travel!.visaType = { value: normVt, source, confidence: baseConfidence }
+      }
     }
-  } else if (visaTypeMatch && visaTypeMatch[1]) {
-    const rawVT = cleanExtractedPurpose(visaTypeMatch[1])?.toUpperCase()
-    if (rawVT) {
-      result.travel!.purposeOfVisit = { value: rawVT, source, confidence: baseConfidence }
-    }
+  } else if (result.travel!.visaType?.value) {
+    result.travel!.purposeOfVisit = { value: result.travel!.visaType.value, source, confidence: baseConfidence }
+  }
+
+  // Company details if business/conference visa
+  const compNameM = visaText.match(/(?:name\s*of\s*(?:the\s*)?company(?:\s*in\s*india)?|company\s*name)[:\s]+([^\r\n:]+)/i)
+  if (compNameM && compNameM[1]) {
+    result.travel!.businessCompanyName = { value: compNameM[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+  const compAddrM = visaText.match(/(?:company\s*address|address\s*of\s*(?:the\s*)?company)[:\s]+([^\r\n]+)/i)
+  if (compAddrM && compAddrM[1]) {
+    result.travel!.businessCompanyAddress = { value: compAddrM[1].trim().toUpperCase(), source, confidence: baseConfidence }
+  }
+  const compPhoneM = visaText.match(/(?:company\s*phone|phone\s*of\s*(?:the\s*)?company)[:\s]+([^\r\n:]+)/i)
+  if (compPhoneM && compPhoneM[1]) {
+    result.travel!.businessCompanyPhone = { value: compPhoneM[1].trim(), source, confidence: baseConfidence }
+  }
+  const compEmailM = visaText.match(/(?:company\s*email|email\s*of\s*(?:the\s*)?company)[:\s]+([^\r\n:]+)/i)
+  if (compEmailM && compEmailM[1]) {
+    result.travel!.businessCompanyEmail = { value: compEmailM[1].trim().toLowerCase(), source, confidence: baseConfidence }
+  }
+
+  // Places likely to be visited
+  const placesMatch = visaText.match(/(?:places\s*likely\s*to\s*be\s*visited|places\s*to\s*visit)[:\s]+([^\r\n:]+)/i)
+  if (placesMatch && placesMatch[1]) {
+    result.travel!.placesVisited = { value: placesMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
   }
 
   const durationMatch = visaText.match(/(?:duration\s*of\s*visa(?:\s*\(in\s*months\))?|visa\s*duration)[:\s]+([0-9A-Za-z ]+?)(?=\s+(?:no\s*of\s*entries|purpose|expected)|$|\r?\n)/i)
@@ -791,12 +840,82 @@ export function extractFromOgdVisaApplication(
   // --- SECTION 7: PREVIOUS VISA & REFUSAL DETAILS ---
   const prevVisaMatch = text.match(/(?:have\s*you\s*visited\s*india\s*previously\??|visited\s*india\s*previously)[:\s]+(yes|no)/i)
   if (prevVisaMatch) {
-    result.previousVisa!.hasPreviousVisa = { value: prevVisaMatch[1].toUpperCase() === 'YES', source, confidence: baseConfidence }
+    const hasPrev = prevVisaMatch[1].toUpperCase() === 'YES'
+    result.previousVisa!.hasPreviousVisa = { value: hasPrev, source, confidence: baseConfidence }
+    if (hasPrev) {
+      const prevBlockMatch = text.match(/(?:previous\s*visa\s*details|previous\s*visit\s*details|visited\s*india\s*previously)[:\s]*([\s\S]+?)(?=(?:have\s*you\s*ever\s*been\s*refused|hotel|reference|declaration|$))/i)
+      const prevBlock = prevBlockMatch ? prevBlockMatch[1] : text
+
+      const prevAddrMatch = prevBlock.match(/(?:address\s*(?:stayed\s*(?:during\s*previous\s*visit)?)?|previous\s*visited\s*address)[:\s]+([\s\S]+?)(?=(?:cities|last\s*indian|old\s*visa|type\s*of\s*visa|place\s*of\s*issue|date\s*of\s*issue|have\s*you\s*ever|$))/i)
+      if (prevAddrMatch && prevAddrMatch[1]) {
+        const lines = prevAddrMatch[1].split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^(cities|last\s*indian|old\s*visa|type\s*of\s*visa|place\s*of\s*issue|date\s*of\s*issue)/i.test(l))
+        if (lines.length > 0) result.previousVisa!.visitedAddress1 = { value: lines[0].toUpperCase(), source, confidence: baseConfidence }
+        if (lines.length > 1) result.previousVisa!.visitedAddress2 = { value: lines[1].toUpperCase(), source, confidence: baseConfidence }
+        if (lines.length > 2) result.previousVisa!.visitedAddress3 = { value: lines.slice(2).join(' ').toUpperCase(), source, confidence: baseConfidence }
+      }
+
+      const citiesMatch = prevBlock.match(/(?:cities\s*(?:previously\s*)?visited(?:\s*in\s*india)?|cities\s*visited)[:\s]+([^\r\n:]+)/i)
+      if (citiesMatch && citiesMatch[1]) {
+        result.previousVisa!.citiesVisited = { value: citiesMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+      }
+
+      const oldVisaNoMatch = prevBlock.match(/(?:last\s*indian\s*visa\s*no\.?|currently\s*valid\s*visa\s*no\.?|old\s*visa\s*no\.?|previous\s*visa\s*no\.?|visa\s*no\.?|visa\s*number)[:\s]+([A-Za-z0-9]+)/i)
+      if (oldVisaNoMatch && oldVisaNoMatch[1]) {
+        result.previousVisa!.visaNumber = { value: oldVisaNoMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+      }
+
+      const oldVisaTypeMatch = prevBlock.match(/(?:type\s*of\s*visa|visa\s*type)[:\s]+([^\r\n:]+)/i)
+      if (oldVisaTypeMatch && oldVisaTypeMatch[1]) {
+        const rawOvt = oldVisaTypeMatch[1].trim().toUpperCase()
+        result.previousVisa!.visaType = { value: rawOvt, source, confidence: baseConfidence }
+      }
+
+      const oldIssuePlaceMatch = prevBlock.match(/(?:place\s*of\s*issue|issue\s*place)[:\s]+([^\r\n:]+)/i)
+      if (oldIssuePlaceMatch && oldIssuePlaceMatch[1]) {
+        result.previousVisa!.placeOfIssue = { value: oldIssuePlaceMatch[1].trim().toUpperCase(), source, confidence: baseConfidence }
+      }
+
+      const oldIssueDateMatch = prevBlock.match(/(?:date\s*of\s*issue|issue\s*date)[:\s]+([0-9A-Za-z -/]{8,25})/i)
+      if (oldIssueDateMatch && oldIssueDateMatch[1]) {
+        const parsedOldDate = parseStandardIsoDate(oldIssueDateMatch[1])
+        if (parsedOldDate) {
+          result.previousVisa!.dateOfIssue = { value: parsedOldDate, source, confidence: baseConfidence }
+        }
+      }
+    }
   }
 
   const refusalMatch = text.match(/(?:have\s*you\s*ever\s*been\s*refused\s*visa\s*or\s*deported\??|previously\s*refused\s*visa)[:\s]+(yes|no)/i)
   if (refusalMatch) {
-    result.previousVisa!.hasRefusal = { value: refusalMatch[1].toUpperCase() === 'YES', source, confidence: baseConfidence }
+    const hasRef = refusalMatch[1].toUpperCase() === 'YES'
+    result.previousVisa!.hasRefusal = { value: hasRef, source, confidence: baseConfidence }
+    if (hasRef) {
+      const refDetailsMatch = text.match(/(?:if\s*so[,\s]+when\s*and\s*by\s*whom|mention\s*control\s*no|refusal\s*details)[:\s]+([^\r\n]+)/i)
+      if (refDetailsMatch && refDetailsMatch[1]) {
+        result.previousVisa!.refusalDetails = { value: refDetailsMatch[1].trim(), source, confidence: baseConfidence }
+      }
+    }
+  }
+
+  // Travel history
+  const countriesMatch = text.match(/(?:countries\s*visited\s*(?:in\s*the\s*last\s*10\s*years)?|countries\s*visited)[:\s]+([^\r\n:]+)/i)
+  if (countriesMatch && countriesMatch[1]) {
+    const cv = countriesMatch[1].trim()
+    if (!/^(not\s*applicable|na|nil|none)$/i.test(cv)) {
+      result.travel!.countriesVisited = { value: cv.toUpperCase(), source, confidence: baseConfidence }
+    }
+  }
+
+  const saarcMatch = text.match(/(?:have\s*you\s*visited\s*saarc\s*countries|visited\s*saarc)[:\s]+(yes|no)/i)
+  if (saarcMatch) {
+    const hasSaarc = saarcMatch[1].toUpperCase() === 'YES'
+    result.travel!.visitedSaarc = { value: hasSaarc, source, confidence: baseConfidence }
+    if (hasSaarc) {
+      const saarcDetailsMatch = text.match(/(?:details\s*of\s*saarc|name\s*of\s*saarc\s*country)[:\s]+([\s\S]+?)(?=(?:reference|hotel|declaration|$))/i)
+      if (saarcDetailsMatch && saarcDetailsMatch[1]) {
+        result.travel!.saarcDetails = { value: saarcDetailsMatch[1].trim(), source, confidence: baseConfidence }
+      }
+    }
   }
 
   // --- SECTION 8: HOTEL / PLACE OF STAY & REFERENCES ---
@@ -825,6 +944,43 @@ export function extractFromOgdVisaApplication(
 
     if (cityStateM && cityStateM[1] && !result.sponsorIndia!.addressLine2) {
       result.sponsorIndia!.addressLine2 = { value: cityStateM[1].trim().toUpperCase(), source, confidence: baseConfidence }
+    }
+
+    // Parse State and District from cityStateM, addressLine2, or addressLine1
+    const INDIAN_STATES_LIST = [
+      'ANDAMAN AND NICOBAR', 'ANDHRA PRADESH', 'ARUNACHAL PRADESH', 'ASSAM', 'BIHAR',
+      'CHANDIGARH', 'CHHATTISGARH', 'DADRA AND NAGAR HAVELI', 'DAMAN AND DIU', 'DELHI',
+      'GOA', 'GUJARAT', 'HARYANA', 'HIMACHAL PRADESH', 'JAMMU AND KASHMIR', 'JHARKHAND',
+      'KARNATAKA', 'KERALA', 'LADAKH', 'LAKSHADWEEP', 'MADHYA PRADESH', 'MAHARASHTRA',
+      'MANIPUR', 'MEGHALAYA', 'MIZORAM', 'NAGALAND', 'ODISHA', 'PUDUCHERRY', 'PUNJAB',
+      'RAJASTHAN', 'SIKKIM', 'TAMIL NADU', 'TELANGANA', 'TRIPURA', 'UTTAR PRADESH',
+      'UTTARAKHAND', 'WEST BENGAL',
+    ]
+
+    const textToSearch = [
+      cityStateM?.[1] || '',
+      result.sponsorIndia!.addressLine2?.value || '',
+      result.sponsorIndia!.addressLine1?.value || '',
+      block,
+    ].join(' ').toUpperCase()
+
+    const matchedState = INDIAN_STATES_LIST.find((st) => textToSearch.includes(st))
+    if (matchedState) {
+      result.sponsorIndia!.state = { value: matchedState, source, confidence: baseConfidence }
+
+      // Look for District
+      if (cityStateM && cityStateM[1]) {
+        const rawDist = cityStateM[1].toUpperCase().replace(matchedState, '').replace(/[\/,]/g, '').trim()
+        if (rawDist) {
+          result.sponsorIndia!.district = { value: rawDist, source, confidence: baseConfidence }
+        }
+      }
+      if (!result.sponsorIndia!.district?.value && result.sponsorIndia!.addressLine2?.value) {
+        const rawDist = result.sponsorIndia!.addressLine2.value.toUpperCase().replace(matchedState, '').replace(/[\/,]/g, '').trim()
+        if (rawDist) {
+          result.sponsorIndia!.district = { value: rawDist, source, confidence: baseConfidence }
+        }
+      }
     }
 
     if (phoneM && phoneM[1]) {
@@ -3084,6 +3240,14 @@ export function mergeExtractedCandidateData(
     if (!merged.travel) merged.travel = {}
     merged.travel.purposeOfVisit = val
   })
+  mergeField('travel.visaType', 'Visa Type', (c) => c.travel?.visaType, (val) => {
+    if (!merged.travel) merged.travel = {}
+    merged.travel.visaType = val
+  })
+  mergeField('travel.placesVisited', 'Places Visited', (c) => c.travel?.placesVisited, (val) => {
+    if (!merged.travel) merged.travel = {}
+    merged.travel.placesVisited = val
+  })
   mergeField('travel.countriesVisited', 'Countries Visited', (c) => c.travel?.countriesVisited, (val) => {
     if (!merged.travel) merged.travel = {}
     merged.travel.countriesVisited = val
@@ -3091,6 +3255,26 @@ export function mergeExtractedCandidateData(
   mergeField('travel.visitedSaarc', 'Visited SAARC', (c) => c.travel?.visitedSaarc, (val) => {
     if (!merged.travel) merged.travel = {}
     merged.travel.visitedSaarc = val
+  })
+  mergeField('travel.saarcDetails', 'SAARC Details', (c) => c.travel?.saarcDetails, (val) => {
+    if (!merged.travel) merged.travel = {}
+    merged.travel.saarcDetails = val
+  })
+  mergeField('travel.businessCompanyName', 'Business Company Name', (c) => c.travel?.businessCompanyName, (val) => {
+    if (!merged.travel) merged.travel = {}
+    merged.travel.businessCompanyName = val
+  })
+  mergeField('travel.businessCompanyAddress', 'Business Company Address', (c) => c.travel?.businessCompanyAddress, (val) => {
+    if (!merged.travel) merged.travel = {}
+    merged.travel.businessCompanyAddress = val
+  })
+  mergeField('travel.businessCompanyPhone', 'Business Company Phone', (c) => c.travel?.businessCompanyPhone, (val) => {
+    if (!merged.travel) merged.travel = {}
+    merged.travel.businessCompanyPhone = val
+  })
+  mergeField('travel.businessCompanyEmail', 'Business Company Email', (c) => c.travel?.businessCompanyEmail, (val) => {
+    if (!merged.travel) merged.travel = {}
+    merged.travel.businessCompanyEmail = val
   })
 
   // Previous Visa Fields
@@ -3126,6 +3310,10 @@ export function mergeExtractedCandidateData(
     if (!merged.previousVisa) merged.previousVisa = {}
     merged.previousVisa.visitedAddress3 = val
   })
+  mergeField('previousVisa.citiesVisited', 'Cities Visited', (c) => c.previousVisa?.citiesVisited, (val) => {
+    if (!merged.previousVisa) merged.previousVisa = {}
+    merged.previousVisa.citiesVisited = val
+  })
   mergeField('previousVisa.hasRefusal', 'Has Visa Refusal', (c) => c.previousVisa?.hasRefusal, (val) => {
     if (!merged.previousVisa) merged.previousVisa = {}
     merged.previousVisa.hasRefusal = val
@@ -3147,6 +3335,14 @@ export function mergeExtractedCandidateData(
   mergeField('sponsorIndia.addressLine2', 'Sponsor in India Address Line 2', (c) => c.sponsorIndia?.addressLine2, (val) => {
     if (!merged.sponsorIndia) merged.sponsorIndia = {}
     merged.sponsorIndia.addressLine2 = val
+  })
+  mergeField('sponsorIndia.state', 'Sponsor in India State', (c) => c.sponsorIndia?.state, (val) => {
+    if (!merged.sponsorIndia) merged.sponsorIndia = {}
+    merged.sponsorIndia.state = val
+  })
+  mergeField('sponsorIndia.district', 'Sponsor in India District', (c) => c.sponsorIndia?.district, (val) => {
+    if (!merged.sponsorIndia) merged.sponsorIndia = {}
+    merged.sponsorIndia.district = val
   })
   mergeField('sponsorIndia.phone', 'Sponsor in India Phone', (c) => c.sponsorIndia?.phone, (val) => {
     if (!merged.sponsorIndia) merged.sponsorIndia = {}
