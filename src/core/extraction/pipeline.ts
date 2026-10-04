@@ -194,7 +194,7 @@ export async function processUploadedDocumentPayload(
 /**
  * Checks if candidate data object has at least one valid non-empty extracted field.
  */
-function hasAnyFields(cand?: ExtractedApplicantData): boolean {
+export function hasAnyFields(cand?: ExtractedApplicantData): boolean {
   if (!cand) return false
   return Boolean(
     cand.personal?.lastName?.value ||
