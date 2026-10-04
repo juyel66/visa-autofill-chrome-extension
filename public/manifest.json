@@ -32,16 +32,19 @@
     "https://indianvisaonline.gov.in/*",
     "https://generativelanguage.googleapis.com/*",
     "http://127.0.0.1:8001/*",
-    "http://localhost:8001/*"
+    "http://localhost:8001/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
   ],
   "permissions": [
     "activeTab",
     "storage",
     "unlimitedStorage",
-    "scripting"
+    "scripting",
+    "identity"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' http://127.0.0.1:8001 http://localhost:8001 https://*;"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src http://localhost:8000 http://127.0.0.1:8000 'self' http://127.0.0.1:8001 http://localhost:8001 https://*;"
   },
   "web_accessible_resources": [
     {
