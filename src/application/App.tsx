@@ -5,7 +5,6 @@ import { getLatestDocument } from '../core/document'
 import { applyExtractionToApplicant } from '../core/extraction'
 import { saveApplicant } from '../core/storage'
 import {
-  getAllSchemaFields,
   WORKSPACE_PAGES,
 } from '../core/application/fieldSchema'
 import type {
@@ -20,7 +19,19 @@ import {
 import {
   populateApplicationFromDocuments,
 } from '../core/application/applicationMerger'
+import {
+  createApplication,
+  updateApplication,
+  getApplicationById,
+  downloadApplicationPdf,
+} from '../core/application/applicationApi'
+import { getDraft, deleteDraft, getLatestDraft } from '../core/storage/draftDb'
 import { LOCAL_EXTRACTOR_URL } from '../core/extraction/local/pythonExtractorClient'
+import {
+  calculateWorkspaceProgress,
+  isFieldFilled,
+} from '../core/application/workspaceProgress'
+import { WorkspaceProgressBar } from './components/WorkspaceProgressBar'
 import { RegistrationSection } from './components/RegistrationSection'
 import { BasicDetailsSection } from './components/BasicDetailsSection'
 import { FamilyDetailsSection } from './components/FamilyDetailsSection'
@@ -42,6 +53,11 @@ export const App: React.FC = () => {
   const [testingConnection, setTestingConnection] = useState<boolean>(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [isPythonHealthy, setIsPythonHealthy] = useState<boolean | null>(null)
+  const [backendApplicationId, setBackendApplicationId] = useState<string | null>(null)
+  const [originalPdf, setOriginalPdf] = useState<Blob | File | null>(null)
+  const [originalPdfFileName, setOriginalPdfFileName] = useState<string>('passport.pdf')
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false)
 
   // Document Extraction Error & Status
   const [extractionError, setExtractionError] = useState<string | null>(() => {
@@ -92,7 +108,11 @@ export const App: React.FC = () => {
       const res = await fetch(`${LOCAL_EXTRACTOR_URL}/health`, { signal: controller.signal })
       clearTimeout(tId)
       if (res.ok) {
-        const data = await res.json()
+        const rawText = await res.text().catch(() => '')
+        let data: any = null
+        try {
+          data = rawText ? JSON.parse(rawText) : null
+        } catch {}
         if (data?.status === 'ok') {
           setIsPythonHealthy(true)
           setTestResult({
@@ -126,13 +146,84 @@ export const App: React.FC = () => {
       try {
         // Check Python extractor health
         fetch(`${LOCAL_EXTRACTOR_URL}/health`)
-          .then((r) => r.ok && r.json())
+          .then(async (r) => {
+            if (!r.ok) return null
+            const text = await r.text().catch(() => '')
+            try {
+              return text ? JSON.parse(text) : null
+            } catch {
+              return null
+            }
+          })
           .then((d) => setIsPythonHealthy(d?.status === 'ok'))
           .catch(() => setIsPythonHealthy(false))
 
         const urlParams = new URLSearchParams(window.location.search)
+        const urlApplicationId = urlParams.get('applicationId') || urlParams.get('id')
+        const urlDraftId = urlParams.get('draftId')
         const urlApplicantId = urlParams.get('applicantId')
 
+        // Case A: Load existing saved application from Node backend
+        if (urlApplicationId) {
+          try {
+            const detail = await getApplicationById(urlApplicationId)
+            if (detail && detail.applicationData) {
+              setApplication(detail.applicationData)
+              setBackendApplicationId(detail.id)
+              setApplicantId(detail.applicationData.applicantId || detail.applicantName || detail.id)
+              if (detail.originalPdfFileName) {
+                setOriginalPdfFileName(detail.originalPdfFileName)
+              }
+              setLoading(false)
+              return
+            }
+          } catch (backendErr: any) {
+            console.error('Failed to load application from backend:', backendErr)
+            showToast(backendErr.message || 'Failed to load application from server.', 'error')
+          }
+        }
+
+        // Case B: Load unpersisted draft with original PDF from IndexedDB
+        if (urlDraftId) {
+          try {
+            const draft = await getDraft(urlDraftId)
+            if (draft && draft.savedApplication) {
+              setDraftId(draft.draftId)
+              setApplication(draft.savedApplication)
+              setBackendApplicationId(draft.savedApplication.backendApplicationId || null)
+              if (draft.pdfBlob) {
+                setOriginalPdf(draft.pdfBlob)
+                setOriginalPdfFileName(draft.pdfFileName || 'passport.pdf')
+              }
+              setApplicantId(draft.savedApplication.applicantId || 'APPLICANT_001')
+              setLoading(false)
+              return
+            }
+          } catch (draftErr) {
+            console.warn('Failed to load draft from IndexedDB:', draftErr)
+          }
+        }
+
+        // Case C: Check for any recent in-memory/IndexedDB draft
+        try {
+          const recentDraft = await getLatestDraft()
+          if (recentDraft && recentDraft.savedApplication && Date.now() - recentDraft.createdAt < 30 * 60 * 1000) {
+            setDraftId(recentDraft.draftId)
+            setApplication(recentDraft.savedApplication)
+            setBackendApplicationId(recentDraft.savedApplication.backendApplicationId || null)
+            if (recentDraft.pdfBlob) {
+              setOriginalPdf(recentDraft.pdfBlob)
+              setOriginalPdfFileName(recentDraft.pdfFileName || 'passport.pdf')
+            }
+            setApplicantId(recentDraft.savedApplication.applicantId || 'APPLICANT_001')
+            setLoading(false)
+            return
+          }
+        } catch {
+          // ignore
+        }
+
+        // Case D: Fallback to local storage (legacy compatibility)
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           chrome.storage.local.get(
             ['visa_autofill_applicants', 'visa_autofill_selected_applicant_id', 'visa_autofill_documents'],
@@ -173,12 +264,6 @@ export const App: React.FC = () => {
     }, 4000)
   }
 
-  const handleApplicantChange = async (newId: string) => {
-    setApplicantId(newId)
-    setLoading(true)
-    await loadApplicationForApplicant(newId, applicants, documents)
-    setLoading(false)
-  }
 
   const handleFieldChange = (key: string, value: string | boolean) => {
     setApplication((prevApp) => {
@@ -504,67 +589,96 @@ export const App: React.FC = () => {
       const toSave: SavedApplication = {
         ...application,
         status: 'ready_for_autofill',
+        backendApplicationId: backendApplicationId || application.backendApplicationId,
         provenance: {
           ...application.provenance,
           lastSavedAt: new Date().toISOString(),
         },
       }
-      await saveApplication(toSave)
 
-      const activeProf = applicants.find((a) => a.applicantId === applicantId) || applicants[0]
-      if (activeProf) {
-        if (!activeProf.travel) activeProf.travel = {}
-        const nameVal = String(toSave.fields['comp_name']?.value || toSave.fields['appl.comp_name']?.value || '')
-        const addrVal = String(toSave.fields['comp_address']?.value || toSave.fields['appl.comp_address']?.value || '')
-        const phoneVal = String(toSave.fields['comp_phone']?.value || toSave.fields['appl.comp_phone']?.value || '')
-        const emailVal = String(toSave.fields['comp_email']?.value || toSave.fields['appl.comp_email']?.value || '')
-        if (nameVal) activeProf.travel.businessCompanyName = nameVal
-        if (addrVal) activeProf.travel.businessCompanyAddress = addrVal
-        if (phoneVal) activeProf.travel.businessCompanyPhone = phoneVal
-        if (emailVal) activeProf.travel.businessCompanyEmail = emailVal
-        await saveApplicant(activeProf).catch(() => {})
+      let targetBackendId = backendApplicationId || application.backendApplicationId
+
+      if (targetBackendId) {
+        // Update existing application on Node backend (PUT /api/applications/:id)
+        await updateApplication(targetBackendId, toSave, originalPdf, originalPdfFileName)
+        toSave.backendApplicationId = targetBackendId
+        setApplication(toSave)
+        showToast('✓ Application updated successfully on server! Ready for portal autofill.', 'success')
+      } else {
+        // Create new application on Node backend (POST /api/applications) with complete SavedApplication + original PDF
+        const res = await createApplication(toSave, originalPdf, originalPdfFileName)
+        targetBackendId = res.id
+        setBackendApplicationId(targetBackendId)
+        toSave.backendApplicationId = targetBackendId
+        setApplication(toSave)
+
+        // Clean up draft in IndexedDB
+        if (draftId) {
+          await deleteDraft(draftId).catch(() => {})
+        }
+
+        showToast('✓ Application saved successfully to server! Ready for portal autofill.', 'success')
       }
 
-      setApplication(toSave)
-      showToast('✓ Application saved successfully! All 100 fields ready for portal autofill.', 'success')
-    } catch (err) {
+      // Also persist to local storage cache for immediate autofill availability
+      try {
+        await saveApplication(toSave)
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+          chrome.storage.local.set({
+            visa_autofill_selected_application_id: targetBackendId,
+            visa_autofill_saved_applications: [toSave],
+          })
+        }
+      } catch (cacheErr) {
+        console.warn('Local cache sync warning:', cacheErr)
+      }
+    } catch (err: any) {
       console.error('Save failed:', err)
-      showToast('Failed to save application.', 'error')
+      showToast(err.message || 'Failed to save application to server.', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleRefreshFromDocuments = async () => {
-    if (!applicantId) return
-    setLoading(true)
-    const profileDocs = documents.filter((d) => d.applicantId === applicantId)
-    const passportDoc = getLatestDocument(profileDocs, 'passport')
-    const ogdDoc = getLatestDocument(profileDocs, 'ogd')
-    const activeProf = applicants.find((a) => a.applicantId === applicantId)
-
-    const refreshed = populateApplicationFromDocuments({
-      applicantId,
-      passportDoc,
-      ogdDoc,
-      existingApp: application,
-      notes: activeProf?.notes,
-    })
-
-    if (passportDoc?.extractedData && activeProf) {
-      try {
-        const updatedProf = applyExtractionToApplicant(activeProf, passportDoc.extractedData)
-        await saveApplicant(updatedProf)
-      } catch (pErr) {
-        console.warn('Profile sync warning on refresh:', pErr)
-      }
+  const handleDownloadPdf = async () => {
+    if (originalPdf) {
+      const url = URL.createObjectURL(originalPdf)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = originalPdfFileName || 'passport.pdf'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      showToast('✓ Original PDF downloaded.', 'success')
+      return
     }
 
-    await saveApplication(refreshed)
-    setApplication(refreshed)
-    setLoading(false)
-    showToast('Updated workspace fields from latest confirmed documents.', 'info')
+    const targetId = backendApplicationId || application?.backendApplicationId
+    if (targetId) {
+      setIsDownloadingPdf(true)
+      try {
+        const { blob, fileName } = await downloadApplicationPdf(targetId)
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        showToast('✓ Original PDF downloaded.', 'success')
+      } catch (err: any) {
+        showToast(err.message || 'Failed to download original PDF.', 'error')
+      } finally {
+        setIsDownloadingPdf(false)
+      }
+    } else {
+      showToast('No original PDF file available.', 'info')
+    }
   }
+
+
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -595,35 +709,32 @@ export const App: React.FC = () => {
     showToast('Removed photograph.', 'info')
   }
 
-  // Calculate statistics across all 100 canonical fields
+  // Calculate dynamic workspace completion progress across canonical schema fields
+  const progress = useMemo(() => {
+    return calculateWorkspaceProgress(application, showAllFields)
+  }, [application, showAllFields])
+
+  // Calculate statistics across canonical fields based on current applicable form fields
   const stats = useMemo(() => {
-    if (!application) return { total: 0, visible: 0, hidden: 0, filled: 0, edited: 0, missing: 0 }
-    let total = 0
-    let visible = 0
-    let hidden = 0
-    let filled = 0
     let edited = 0
-    let missing = 0
-
-    const allFields = getAllSchemaFields()
-    allFields.forEach((f) => {
-      total++
-      if (f.visibleByDefault === false) {
-        hidden++
-      } else {
-        visible++
-      }
-      const val = application.fields[f.key]
-      if (val && val.value !== '' && val.value !== undefined && val.value !== null && val.value !== false) {
-        filled++
-        if (val.isUserEdited) edited++
-      } else {
-        missing++
-      }
-    })
-
-    return { total, visible, hidden, filled, edited, missing }
-  }, [application])
+    if (application) {
+      Object.values(application.fields).forEach((val) => {
+        if (val?.isUserEdited && isFieldFilled(val)) {
+          edited++
+        }
+      })
+    }
+    return {
+      total: progress.total,
+      visible: progress.total,
+      hidden: progress.missing,
+      filled: progress.filled,
+      edited,
+      missing: progress.missing,
+      percentage: progress.percentage,
+      isComplete: progress.isComplete,
+    }
+  }, [application, progress])
 
   const profileDocs = useMemo(() => {
     return documents.filter((d) => d.applicantId === applicantId)
@@ -632,12 +743,13 @@ export const App: React.FC = () => {
   const passportDoc = getLatestDocument(profileDocs, 'passport')
   const ogdDoc = getLatestDocument(profileDocs, 'ogd')
 
-  // Smooth scroll to section card
+  // Smooth scroll to section card with dynamic header height offset
   const scrollToSection = (sectionId: string) => {
     setActiveNavId(sectionId)
     const element = document.getElementById(`sec-${sectionId}`)
     if (element) {
-      const headerOffset = 110
+      const headerEl = document.querySelector('header')
+      const headerOffset = headerEl ? headerEl.offsetHeight + 16 : 140
       const elementPosition = element.getBoundingClientRect().top
       const offsetPosition = elementPosition + window.pageYOffset - headerOffset
       window.scrollTo({
@@ -774,27 +886,38 @@ export const App: React.FC = () => {
               <span>{showAllFields ? '👁️ All 100 Fields' : '⚡ Curated View'}</span>
             </button>
 
-            {/* Profile Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
-              <span className="text-xs text-slate-400 uppercase font-semibold">Profile:</span>
-              <select
-                value={applicantId}
-                onChange={(e) => handleApplicantChange(e.target.value)}
-                className="bg-transparent text-xs sm:text-sm font-semibold text-blue-400 focus:outline-none cursor-pointer max-w-[140px] truncate"
+            {/* Applicant & Cloud Status Display */}
+            <div className="flex items-center gap-2 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
+              <span className="text-xs text-slate-400 font-semibold">Applicant:</span>
+              <span
+                className="text-xs sm:text-sm font-semibold text-blue-400 max-w-[150px] truncate"
+                title={`${application?.fields?.['appl.surname']?.value || ''} ${application?.fields?.['appl.applname']?.value || ''}`.trim() || applicantId}
               >
-                {applicants.length > 0 ? (
-                  applicants.map((a) => (
-                    <option key={a.applicantId} value={a.applicantId} className="bg-slate-800 text-slate-100">
-                      {a.applicantId}
-                    </option>
-                  ))
-                ) : (
-                  <option value={applicantId} className="bg-slate-800 text-slate-100">
-                    {applicantId || 'PROFILE 001'}
-                  </option>
-                )}
-              </select>
+                {`${application?.fields?.['appl.surname']?.value || ''} ${application?.fields?.['appl.applname']?.value || ''}`.trim() || applicantId || 'New Applicant'}
+              </span>
+              {backendApplicationId ? (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-700/60">
+                  Cloud Saved
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-950 text-amber-400 border border-amber-700/60">
+                  Draft
+                </span>
+              )}
             </div>
+
+            {/* Download Original PDF Button */}
+            {(backendApplicationId || originalPdf) && (
+              <button
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf}
+                className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                title="Download original uploaded passport PDF"
+              >
+                <span>📥</span>
+                <span>{isDownloadingPdf ? 'Downloading...' : 'PDF'}</span>
+              </button>
+            )}
 
             {/* Primary Save Button */}
             <button
@@ -806,6 +929,15 @@ export const App: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Dynamic Workspace Application Completion Progress Bar */}
+        <WorkspaceProgressBar
+          percentage={progress.percentage}
+          filled={progress.filled}
+          total={progress.total}
+          isComplete={progress.isComplete}
+          loading={loading || !application}
+        />
 
         {/* Sub-bar: Document provenance & quick statistics */}
         <div className="bg-slate-900/60 border-t border-slate-800/80 px-4 sm:px-6 py-2">
@@ -839,21 +971,14 @@ export const App: React.FC = () => {
                 Total Fields: <strong className="text-slate-200">{stats.total}</strong>
               </span>
               <span>
-                Visible: <strong className="text-blue-400">{showAllFields ? stats.total : stats.visible}</strong>
+                Filled: <strong className={stats.isComplete ? 'text-emerald-400' : 'text-emerald-300'}>{stats.filled}</strong>
               </span>
               <span>
-                Filled: <strong className="text-emerald-400">{stats.filled}</strong>
+                Completion: <strong className={stats.isComplete ? 'text-emerald-400' : 'text-blue-400'}>{stats.percentage}%</strong>
               </span>
               <span>
                 Edited: <strong className="text-amber-400">{stats.edited}</strong>
               </span>
-              <button
-                onClick={handleRefreshFromDocuments}
-                className="text-blue-400 hover:text-blue-300 underline text-xs cursor-pointer ml-1"
-                title="Re-run merger using current documents"
-              >
-                🔄 Re-sync
-              </button>
             </div>
           </div>
         </div>
@@ -927,7 +1052,7 @@ export const App: React.FC = () => {
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 flex flex-col md:flex-row gap-6">
         {/* Sticky Left Sidebar: Section Jump Navigator & Filter */}
         <aside className="w-full md:w-64 flex-shrink-0">
-          <div className="sticky top-28 space-y-3">
+          <div className="sticky top-[150px] space-y-3">
             {/* Search Filter Box */}
             <div className="bg-slate-900 rounded-xl p-3 border border-slate-800 shadow-sm">
               <input
@@ -946,12 +1071,13 @@ export const App: React.FC = () => {
               </div>
               {WORKSPACE_PAGES.map((page) => {
                 const isActive = activeNavId === page.id
-                // Count filled fields in this page
-                let filledInPage = 0
-                page.fieldKeys.forEach((k) => {
-                  const val = application?.fields[k]?.value
-                  if (val !== '' && val !== undefined && val !== null && val !== false) filledInPage++
-                })
+                const pageStat = progress.pageProgress[page.id] || {
+                  pageId: page.id,
+                  total: page.fieldKeys.length,
+                  filled: 0,
+                  percentage: 0,
+                  isComplete: false,
+                }
 
                 return (
                   <button
@@ -977,14 +1103,14 @@ export const App: React.FC = () => {
                       className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${
                         isActive
                           ? 'bg-blue-800 text-blue-100'
-                          : filledInPage >= page.fieldKeys.length
+                          : pageStat.isComplete
                           ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/60'
-                          : filledInPage > 0
+                          : pageStat.filled > 0
                           ? 'bg-amber-950/80 text-amber-300 border border-amber-700/50'
                           : 'bg-slate-800 text-slate-400'
                       }`}
                     >
-                      {filledInPage}/{page.fieldKeys.length}
+                      {pageStat.filled}/{pageStat.total}
                     </span>
                   </button>
                 )
