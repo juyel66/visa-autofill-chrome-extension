@@ -292,6 +292,7 @@ chrome.runtime.onMessage.addListener(
           if (!tempProfile.travel) {
             tempProfile.travel = {} as any
           }
+          const travel = tempProfile.travel as NonNullable<typeof tempProfile.travel>
 
           const getRawCompanyVal = (k: string) => {
             const f = (tempProfile as any).fields?.[k]
@@ -300,29 +301,29 @@ chrome.runtime.onMessage.addListener(
             return v !== undefined && v !== null && String(v).trim() !== '' ? String(v).trim() : undefined
           }
 
-          if (!tempProfile.travel.businessCompanyName) {
-            tempProfile.travel.businessCompanyName =
+          if (!travel.businessCompanyName) {
+            travel.businessCompanyName =
               getRawCompanyVal('comp_name') ||
               getRawCompanyVal('appl.comp_name') ||
               getRawCompanyVal('travel.businessCompanyName') ||
               message.applicant.travel?.businessCompanyName
           }
-          if (!tempProfile.travel.businessCompanyAddress) {
-            tempProfile.travel.businessCompanyAddress =
+          if (!travel.businessCompanyAddress) {
+            travel.businessCompanyAddress =
               getRawCompanyVal('comp_address') ||
               getRawCompanyVal('appl.comp_address') ||
               getRawCompanyVal('travel.businessCompanyAddress') ||
               message.applicant.travel?.businessCompanyAddress
           }
-          if (!tempProfile.travel.businessCompanyPhone) {
-            tempProfile.travel.businessCompanyPhone =
+          if (!travel.businessCompanyPhone) {
+            travel.businessCompanyPhone =
               getRawCompanyVal('comp_phone') ||
               getRawCompanyVal('appl.comp_phone') ||
               getRawCompanyVal('travel.businessCompanyPhone') ||
               message.applicant.travel?.businessCompanyPhone
           }
-          if (!tempProfile.travel.businessCompanyEmail) {
-            tempProfile.travel.businessCompanyEmail =
+          if (!travel.businessCompanyEmail) {
+            travel.businessCompanyEmail =
               getRawCompanyVal('comp_email') ||
               getRawCompanyVal('appl.comp_email') ||
               getRawCompanyVal('travel.businessCompanyEmail') ||
