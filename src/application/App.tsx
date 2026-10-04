@@ -404,6 +404,16 @@ export const App: React.FC = () => {
         updatedFields['appl.visa_type'] = { ...updatedField }
         updatedManualEdits['appl.visatype'] = true
         updatedManualEdits['appl.visa_type'] = true
+      } else if (key === 'appl.email') {
+        updatedFields['appl.email_re'] = { ...updatedField }
+        updatedFields['email'] = { ...updatedField }
+        updatedManualEdits['appl.email_re'] = true
+        updatedManualEdits['email'] = true
+      } else if (key === 'appl.email_re') {
+        updatedFields['appl.email'] = { ...updatedField }
+        updatedFields['email'] = { ...updatedField }
+        updatedManualEdits['appl.email'] = true
+        updatedManualEdits['email'] = true
       }
 
       const nextApp: SavedApplication = {
@@ -414,18 +424,23 @@ export const App: React.FC = () => {
       }
       saveApplication(nextApp).catch((err) => console.warn('Workspace auto-save error:', err))
 
-      // Keep active ApplicantProfile synchronized with business company fields
+      // Keep active ApplicantProfile synchronized with business company fields & email
       const activeProf = applicants.find((a) => a.applicantId === applicantId) || applicants[0]
       if (activeProf) {
         if (!activeProf.travel) activeProf.travel = {}
         const nameVal = String(updatedFields['comp_name']?.value || updatedFields['appl.comp_name']?.value || '')
         const addrVal = String(updatedFields['comp_address']?.value || updatedFields['appl.comp_address']?.value || '')
         const phoneVal = String(updatedFields['comp_phone']?.value || updatedFields['appl.comp_phone']?.value || '')
-        const emailVal = String(updatedFields['comp_email']?.value || updatedFields['appl.comp_email']?.value || '')
+        const compEmailVal = String(updatedFields['comp_email']?.value || updatedFields['appl.comp_email']?.value || '')
         if (nameVal) activeProf.travel.businessCompanyName = nameVal
         if (addrVal) activeProf.travel.businessCompanyAddress = addrVal
         if (phoneVal) activeProf.travel.businessCompanyPhone = phoneVal
-        if (emailVal) activeProf.travel.businessCompanyEmail = emailVal
+        if (compEmailVal) activeProf.travel.businessCompanyEmail = compEmailVal
+
+        if (key === 'appl.email' || key === 'appl.email_re' || key === 'email') {
+          if (!activeProf.contact) activeProf.contact = {}
+          activeProf.contact.email = String(value)
+        }
         saveApplicant(activeProf).catch(() => {})
       }
 
@@ -519,6 +534,16 @@ export const App: React.FC = () => {
       } else if (key === 'permanent_state_province' || key === 'perm_add3') {
         delete updatedManualEdits['permanent_district']
         updatedFields['permanent_district'] = { ...restoredField }
+      } else if (key === 'appl.email') {
+        delete updatedManualEdits['appl.email_re']
+        delete updatedManualEdits['email']
+        updatedFields['appl.email_re'] = { ...restoredField }
+        updatedFields['email'] = { ...restoredField }
+      } else if (key === 'appl.email_re') {
+        delete updatedManualEdits['appl.email']
+        delete updatedManualEdits['email']
+        updatedFields['appl.email'] = { ...restoredField }
+        updatedFields['email'] = { ...restoredField }
       }
 
       return {
@@ -749,7 +774,7 @@ export const App: React.FC = () => {
     const element = document.getElementById(`sec-${sectionId}`)
     if (element) {
       const headerEl = document.querySelector('header')
-      const headerOffset = headerEl ? headerEl.offsetHeight + 16 : 140
+      const headerOffset = headerEl ? headerEl.offsetHeight + 16 : 68
       const elementPosition = element.getBoundingClientRect().top
       const offsetPosition = elementPosition + window.pageYOffset - headerOffset
       window.scrollTo({
@@ -837,85 +862,108 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
-      {/* Top Sticky Header Bar */}
-      <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20 text-lg">
+      {/* Top Sticky Header Bar: Ultra-Slim, Unified & Interactive */}
+      <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800/80 shadow-md">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 flex items-center justify-between gap-2 sm:gap-3">
+          {/* Left: Brand & Compact Document Badges */}
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-sm text-sm flex-shrink-0">
               🇮🇳
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-slate-100 tracking-tight">
-                  Indian Visa Smart Application Workspace
-                </h1>
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-900/60 text-blue-300 border border-blue-700/50 hidden sm:inline-block">
-                  One Page Workspace
+            <div className="hidden lg:block min-w-0">
+              <span className="text-xs sm:text-sm font-bold text-slate-100 tracking-tight block truncate">
+                Visa Workspace
+              </span>
+            </div>
+
+            {/* Document Badges */}
+            <div className="hidden xl:flex items-center gap-1.5 text-[11px]">
+              {passportDoc ? (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 flex items-center gap-1" title={passportDoc.fileName}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 🛂 Passport
                 </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                All 10 sections on one full page &bull; Instant portal autofill source
-              </p>
+              ) : null}
+              {ogdDoc ? (
+                <span className="px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-700/60 flex items-center gap-1" title={ogdDoc.fileName}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> 📄 OGD
+                </span>
+              ) : null}
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          {/* Center: Interactive Slim Progress Bar Frame */}
+          <div className="flex-1 flex justify-center min-w-0">
+            <WorkspaceProgressBar
+              percentage={progress.percentage}
+              filled={progress.filled}
+              total={progress.total}
+              isComplete={progress.isComplete}
+              loading={loading || !application}
+              pageProgress={progress.pageProgress}
+              editedCount={stats.edited}
+              onSectionClick={scrollToSection}
+              passportDoc={passportDoc ? { fileName: passportDoc.fileName, confirmed: Boolean(passportDoc.extractedDataConfirmed) } : null}
+              ogdDoc={ogdDoc ? { fileName: ogdDoc.fileName, confirmed: Boolean(ogdDoc.extractedDataConfirmed) } : null}
+            />
+          </div>
+
+          {/* Right: Actions & Applicant Status */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Applicant Name & Status */}
+            <div className="hidden md:flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 text-xs">
+              <span
+                className="text-blue-400 font-semibold max-w-[120px] truncate"
+                title={`${application?.fields?.['appl.applname']?.value || ''} ${application?.fields?.['appl.surname']?.value || ''}`.trim() || applicantId}
+              >
+                {`${application?.fields?.['appl.applname']?.value || ''} ${application?.fields?.['appl.surname']?.value || ''}`.trim() || applicantId || 'New Applicant'}
+              </span>
+              {backendApplicationId ? (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-700/60">
+                  Saved
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-950 text-amber-400 border border-amber-700/60">
+                  Draft
+                </span>
+              )}
+            </div>
+
             {/* Python Local OCR Status Button */}
             <button
               onClick={() => {
                 setShowAiModal(true)
                 handleTestConnection()
               }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-900/80 to-teal-900/80 hover:from-emerald-800 hover:to-teal-800 text-emerald-200 border border-emerald-500/50 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shadow-emerald-500/10"
-              title="Local Python OCR Sidecar Extractor (Port 8001)"
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-500/50 flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+              title="Local Python OCR Extractor (Port 8001)"
             >
-              <span className={`w-2 h-2 rounded-full ${isPythonHealthy ? 'bg-emerald-400' : isPythonHealthy === false ? 'bg-rose-400' : 'bg-amber-400'}`} />
-              <span>⚡ Python OCR {isPythonHealthy ? 'Active' : 'Engine'}</span>
+              <span className={`w-1.5 h-1.5 rounded-full ${isPythonHealthy ? 'bg-emerald-400' : isPythonHealthy === false ? 'bg-rose-400' : 'bg-amber-400'}`} />
+              <span className="hidden sm:inline">Python</span> OCR
             </button>
 
-            {/* View Mode Toggle: Curated vs Show All 100 Fields */}
+            {/* View Mode Toggle */}
             <button
               onClick={() => setShowAllFields((prev) => !prev)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
                 showAllFields
-                  ? 'bg-indigo-950/90 border-indigo-500 text-indigo-200 hover:bg-indigo-900'
+                  ? 'bg-indigo-950/90 border-indigo-500 text-indigo-200'
                   : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
               }`}
-              title={showAllFields ? 'Switch back to curated practical view' : 'Display all 100 canonical fields'}
+              title={showAllFields ? 'Switch back to curated view' : 'Display all 100 fields'}
             >
-              <span>{showAllFields ? '👁️ All 100 Fields' : '⚡ Curated View'}</span>
+              <span>{showAllFields ? '100 Fields' : 'Curated'}</span>
             </button>
-
-            {/* Applicant & Cloud Status Display */}
-            <div className="flex items-center gap-2 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
-              <span className="text-xs text-slate-400 font-semibold">Applicant:</span>
-              <span
-                className="text-xs sm:text-sm font-semibold text-blue-400 max-w-[150px] truncate"
-                title={`${application?.fields?.['appl.applname']?.value || ''} ${application?.fields?.['appl.surname']?.value || ''}`.trim() || applicantId}
-              >
-                {`${application?.fields?.['appl.applname']?.value || ''} ${application?.fields?.['appl.surname']?.value || ''}`.trim() || applicantId || 'New Applicant'}
-              </span>
-              {backendApplicationId ? (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-700/60">
-                  Cloud Saved
-                </span>
-              ) : (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-950 text-amber-400 border border-amber-700/60">
-                  Draft
-                </span>
-              )}
-            </div>
 
             {/* Download Original PDF Button */}
             {(backendApplicationId || originalPdf) && (
               <button
                 onClick={handleDownloadPdf}
                 disabled={isDownloadingPdf}
-                className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-                title="Download original uploaded passport PDF"
+                className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 font-semibold px-2 py-1 rounded-lg text-xs transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                title="Download original uploaded PDF"
               >
                 <span>📥</span>
-                <span>{isDownloadingPdf ? 'Downloading...' : 'PDF'}</span>
+                <span className="hidden sm:inline">{isDownloadingPdf ? '...' : 'PDF'}</span>
               </button>
             )}
 
@@ -923,63 +971,10 @@ export const App: React.FC = () => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold px-4 py-1.5 rounded-lg shadow-md hover:shadow-blue-500/20 transition-all flex items-center gap-1.5 text-xs sm:text-sm cursor-pointer"
+              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded-lg shadow-sm hover:shadow-blue-500/20 transition-all flex items-center gap-1 text-xs cursor-pointer"
             >
-              {saving ? 'Saving...' : '💾 Save Application'}
+              {saving ? 'Saving...' : '💾 Save'}
             </button>
-          </div>
-        </div>
-
-        {/* Dynamic Workspace Application Completion Progress Bar */}
-        <WorkspaceProgressBar
-          percentage={progress.percentage}
-          filled={progress.filled}
-          total={progress.total}
-          isComplete={progress.isComplete}
-          loading={loading || !application}
-        />
-
-        {/* Sub-bar: Document provenance & quick statistics */}
-        <div className="bg-slate-900/60 border-t border-slate-800/80 px-4 sm:px-6 py-2">
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between text-xs gap-3">
-            <div className="flex items-center gap-4">
-              <span className="text-slate-400 font-medium">Uploaded Documents:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-slate-300">Passport:</span>
-                {passportDoc ? (
-                  <span className="text-emerald-400 font-medium flex items-center gap-1">
-                    ✓ {passportDoc.fileName} ({passportDoc.extractedDataConfirmed ? 'Confirmed' : 'Uploaded'})
-                  </span>
-                ) : (
-                  <span className="text-slate-500 italic">None</span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-slate-300">OGD:</span>
-                {ogdDoc ? (
-                  <span className="text-purple-400 font-medium flex items-center gap-1">
-                    ✓ {ogdDoc.fileName} ({ogdDoc.extractedDataConfirmed ? 'Confirmed' : 'Uploaded'})
-                  </span>
-                ) : (
-                  <span className="text-slate-500 italic">None</span>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3.5 text-slate-400">
-              <span>
-                Total Fields: <strong className="text-slate-200">{stats.total}</strong>
-              </span>
-              <span>
-                Filled: <strong className={stats.isComplete ? 'text-emerald-400' : 'text-emerald-300'}>{stats.filled}</strong>
-              </span>
-              <span>
-                Completion: <strong className={stats.isComplete ? 'text-emerald-400' : 'text-blue-400'}>{stats.percentage}%</strong>
-              </span>
-              <span>
-                Edited: <strong className="text-amber-400">{stats.edited}</strong>
-              </span>
-            </div>
           </div>
         </div>
       </header>
@@ -1052,7 +1047,7 @@ export const App: React.FC = () => {
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 flex flex-col md:flex-row gap-6">
         {/* Sticky Left Sidebar: Section Jump Navigator & Filter */}
         <aside className="w-full md:w-64 flex-shrink-0">
-          <div className="sticky top-[150px] space-y-3">
+          <div className="sticky top-[72px] space-y-3">
             {/* Search Filter Box */}
             <div className="bg-slate-900 rounded-xl p-3 border border-slate-800 shadow-sm">
               <input
