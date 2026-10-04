@@ -426,6 +426,16 @@ export function runWorkspaceProgressTests() {
     assert.strictEqual(fieldsSnapshotBefore, fieldsSnapshotAfter, 'application.fields must remain unchanged')
   })
 
+  // 21. Shared/synced fields: when email is filled, both email fields count as filled
+  test('21. Shared/synced fields: when email is filled, both email fields count as filled', () => {
+    const appWithEmail = makeApplication({
+      'appl.email': 'applicant@example.com',
+    })
+    const res = calculateWorkspaceProgress(appWithEmail)
+    assert(res.filledFields.includes('appl.email'), 'appl.email should be filled')
+    assert(res.filledFields.includes('appl.email_re'), 'appl.email_re should be filled via alias/shared value')
+  })
+
   console.log(`\nALL ${passed} WORKSPACE PROGRESS TESTS PASSED SUCCESSFULLY!`)
 }
 
