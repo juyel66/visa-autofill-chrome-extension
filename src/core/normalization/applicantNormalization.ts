@@ -93,8 +93,10 @@ function cleanReference(ref?: ReferenceDetails): ReferenceDetails | undefined {
     address: typeof ref.address === 'string' ? cleanString(ref.address) : cleanAddress(ref.address as Address),
     phone: cleanPhone(ref.phone),
     email: cleanEmail(ref.email),
+    state: cleanString(ref.state),
+    district: cleanString(ref.district),
   }
-  const hasValues = Boolean(res.name || res.addressLine1 || res.addressLine2 || res.address || res.phone || res.email)
+  const hasValues = Boolean(res.name || res.addressLine1 || res.addressLine2 || res.address || res.phone || res.email || res.state || res.district)
   return hasValues ? res : undefined
 }
 
@@ -112,6 +114,7 @@ function cleanPreviousVisa(visa?: PreviousVisaDetails): PreviousVisaDetails | un
     visitedAddress1: cleanString(visa.visitedAddress1),
     visitedAddress2: cleanString(visa.visitedAddress2),
     visitedAddress3: cleanString(visa.visitedAddress3),
+    citiesVisited: cleanString(visa.citiesVisited),
     hasRefusal: visa.hasRefusal,
     refusalDetails: cleanString(visa.refusalDetails),
     countriesVisited: cleanString(visa.countriesVisited),
@@ -119,7 +122,7 @@ function cleanPreviousVisa(visa?: PreviousVisaDetails): PreviousVisaDetails | un
   }
   const hasValues = Boolean(
     res.hasPreviousVisa !== undefined || res.visaNumber || res.visaType || res.placeOfIssue || res.dateOfIssue ||
-    res.visitedAddress1 || res.visitedAddress2 || res.visitedAddress3 ||
+    res.visitedAddress1 || res.visitedAddress2 || res.visitedAddress3 || res.citiesVisited ||
     res.hasRefusal !== undefined || res.refusalDetails || res.countriesVisited || res.hasSaarcVisit !== undefined
   )
   return hasValues ? res : undefined
@@ -132,6 +135,7 @@ function cleanTravel(travel?: TravelDetails): TravelDetails | undefined {
   if (!travel) return undefined
   const res: TravelDetails = {
     purposeOfVisit: cleanPurpose(travel.purposeOfVisit),
+    visaType: cleanString(travel.visaType),
     intendedArrivalDate: cleanString(travel.intendedArrivalDate),
     intendedDepartureDate: cleanString(travel.intendedDepartureDate),
     duration: cleanString(travel.duration),
@@ -140,14 +144,20 @@ function cleanTravel(travel?: TravelDetails): TravelDetails | undefined {
     exitPoint: cleanString(travel.exitPoint),
     countriesVisited: cleanString(travel.countriesVisited),
     visitedSaarc: travel.visitedSaarc,
+    saarcDetails: cleanString(travel.saarcDetails),
+    businessCompanyName: cleanString(travel.businessCompanyName),
+    businessCompanyAddress: cleanString(travel.businessCompanyAddress),
+    businessCompanyPhone: cleanString(travel.businessCompanyPhone),
+    businessCompanyEmail: cleanString(travel.businessCompanyEmail),
     countriesToVisit: travel.countriesToVisit?.map((c) => cleanString(c)).filter((c): c is string => Boolean(c)),
     previousVisitToCountry: travel.previousVisitToCountry,
     travelCompanions: travel.travelCompanions?.map((c) => cleanString(c)).filter((c): c is string => Boolean(c)),
   }
   const hasValues = Boolean(
-    res.purposeOfVisit || res.intendedArrivalDate || res.intendedDepartureDate ||
+    res.purposeOfVisit || res.visaType || res.intendedArrivalDate || res.intendedDepartureDate ||
     res.duration || res.visaEntryType || res.entryPoint || res.exitPoint ||
-    res.countriesVisited || res.visitedSaarc !== undefined ||
+    res.countriesVisited || res.visitedSaarc !== undefined || res.saarcDetails ||
+    res.businessCompanyName || res.businessCompanyAddress || res.businessCompanyPhone || res.businessCompanyEmail ||
     (res.countriesToVisit && res.countriesToVisit.length > 0) ||
     res.previousVisitToCountry !== undefined ||
     (res.travelCompanions && res.travelCompanions.length > 0)
