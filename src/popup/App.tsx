@@ -1,25 +1,24 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { ApplicantProfile } from '../core/applicant'
-import { getDocuments } from '../core/document'
+import { useEffect, useState } from 'react'
 import {
-  deleteApplicant,
-  getApplicants,
-  getSelectedApplicantId,
-  saveApplicant,
-  setSelectedApplicantId,
-} from '../core/storage'
-import { ApplicantFormPage, ApplicantsPage, Dashboard, DocumentsPage, SettingsPage } from './pages'
+  loginWithGoogle,
+  logout as authLogout,
+  restoreAuthSession,
+  type AuthUser,
+} from '../core/auth'
+import { GoogleLoginScreen } from './components/GoogleLoginScreen'
+import { Dashboard, SettingsPage } from './pages'
 
-export type PopupPage = 'dashboard' | 'applicants' | 'applicant-form' | 'documents' | 'settings'
+export type PopupPage = 'dashboard' | 'settings'
 
 export default function App() {
   const [activePage, setActivePage] = useState<PopupPage>('dashboard')
-  const [applicants, setApplicants] = useState<ApplicantProfile[]>([])
-  const [selectedApplicantId, setSelectedApplicantIdState] = useState<string | null>(null)
-  const [editingApplicant, setEditingApplicant] = useState<ApplicantProfile | null>(null)
-  const [documentCount, setDocumentCount] = useState<number>(0)
 
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  // Authentication State
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true)
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false)
+  const [authError, setAuthError] = useState<string | null>(null)
+
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -30,41 +29,38 @@ export default function App() {
     }, 3000)
   }
 
-  const loadData = useCallback(async () => {
-    try {
-      const [list, selectedId, docs] = await Promise.all([
-        getApplicants(),
-        getSelectedApplicantId(),
-        getDocuments(),
-      ])
-      setApplicants(list)
-      setSelectedApplicantIdState(selectedId)
-      setDocumentCount(docs.length)
-    } catch (err) {
-      console.error('Failed to load storage data:', err)
-      setErrorMessage('Unable to load saved applicants. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
+  // Check authentication on startup
   useEffect(() => {
     let isMounted = true
-    Promise.all([getApplicants(), getSelectedApplicantId(), getDocuments()])
-      .then(([list, selectedId, docs]) => {
-        if (isMounted) {
-          setApplicants(list)
-          setSelectedApplicantIdState(selectedId)
-          setDocumentCount(docs.length)
-          setIsLoading(false)
+
+    restoreAuthSession()
+      .then((res) => {
+        if (!isMounted) return
+
+        if (res.status === 'authenticated') {
+          setAuthUser(res.user)
+          setErrorMessage(null)
+          setAuthError(null)
+        } else if (res.status === 'offline') {
+          if (res.user) {
+            setAuthUser(res.user)
+            setErrorMessage('Backend server unreachable. Working in offline mode (session preserved).')
+          } else {
+            setAuthUser(null)
+            setAuthError('Backend server unreachable. Make sure backend is running on port 8000.')
+          }
+        } else {
+          // Unauthenticated (no session or refresh token expired/revoked)
+          setAuthUser(null)
         }
       })
       .catch((err) => {
-        console.error('Failed to load storage data on mount:', err)
-        if (isMounted) {
-          setErrorMessage('Unable to load saved applicants. Please try again.')
-          setIsLoading(false)
-        }
+        if (!isMounted) return
+        console.warn('[Startup Auth Exception]:', err)
+        setAuthUser(null)
+      })
+      .finally(() => {
+        if (isMounted) setIsAuthLoading(false)
       })
 
     return () => {
@@ -72,88 +68,78 @@ export default function App() {
     }
   }, [])
 
-  const handleSaveApplicant = async (applicant: ApplicantProfile) => {
+  // Clear any previous error as soon as user is authenticated
+  useEffect(() => {
+    if (authUser) {
+      setErrorMessage(null)
+      setAuthError(null)
+    }
+  }, [authUser])
+
+  const handleLogin = async () => {
+    setIsLoggingIn(true)
+    setAuthError(null)
     setErrorMessage(null)
     try {
-      await saveApplicant(applicant)
-      await loadData()
-      showToast(
-        editingApplicant
-          ? 'Applicant profile updated successfully!'
-          : 'New applicant profile saved successfully!'
-      )
-      setEditingApplicant(null)
-    } catch (err) {
-      console.error('Failed to save applicant:', err)
-      setErrorMessage('Unable to save applicant. Please try again.')
+      const user = await loginWithGoogle()
+      setAuthUser(user)
+      setErrorMessage(null)
+      setAuthError(null)
+      showToast(`Welcome, ${user.name}!`)
+    } catch (err: any) {
+      console.error('Login failed:', err)
+      const msg = err.message || 'Failed to authenticate with Google. Make sure backend is running on port 8000.'
+      setAuthError(msg)
+      setErrorMessage(msg)
+    } finally {
+      setIsLoggingIn(false)
     }
   }
 
-  const handleDuplicateApplicant = async (applicant: ApplicantProfile) => {
-    setErrorMessage(null)
+  const handleLogout = async () => {
     try {
-      const now = new Date().toISOString()
-      const duplicated: ApplicantProfile = {
-        ...JSON.parse(JSON.stringify(applicant)),
-        applicantId: `app_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        createdAt: now,
-        updatedAt: now,
-      }
-      await saveApplicant(duplicated)
-      await loadData()
-      showToast('Applicant profile duplicated successfully!')
-    } catch (err) {
-      console.error('Failed to duplicate applicant:', err)
-      setErrorMessage('Unable to duplicate applicant. Please try again.')
+      await authLogout()
+    } catch (err: any) {
+      console.error('Logout error:', err)
+    } finally {
+      setAuthUser(null)
+      setErrorMessage(null)
+      setAuthError(null)
+      showToast('Signed out successfully.')
     }
   }
 
-  const handleDeleteApplicant = async (id: string) => {
-    setErrorMessage(null)
-    try {
-      await deleteApplicant(id)
-      await loadData()
-      showToast('Applicant profile deleted.')
-    } catch (err) {
-      console.error('Failed to delete applicant:', err)
-      setErrorMessage('Unable to delete applicant. Please try again.')
-    }
+  // 1. Initial Loading State
+  if (isAuthLoading) {
+    return (
+      <div className="w-80 p-6 min-h-[460px] bg-slate-900 text-slate-100 flex flex-col items-center justify-center font-sans">
+        <div className="animate-spin text-2xl text-blue-500 mb-2">✦</div>
+        <p className="text-xs text-slate-400 font-medium">Checking authorization...</p>
+      </div>
+    )
   }
 
-  const handleSelectApplicant = async (id: string) => {
-    setErrorMessage(null)
-    try {
-      await setSelectedApplicantId(id)
-      setSelectedApplicantIdState(id)
-      showToast('Applicant selected for active application.')
-    } catch (err) {
-      console.error('Failed to select applicant:', err)
-      setErrorMessage('Unable to select applicant. Please try again.')
-    }
+  // 2. Unauthenticated State: Show Centered Google Login
+  if (!authUser) {
+    return (
+      <div className="w-80 min-h-[460px] relative">
+        {toastMessage && (
+          <div className="absolute top-2 left-4 right-4 z-50 p-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold text-center shadow-lg animate-fade-in">
+            {toastMessage}
+          </div>
+        )}
+        <GoogleLoginScreen
+          onLogin={handleLogin}
+          isLoading={isLoggingIn}
+          errorMessage={authError}
+        />
+      </div>
+    )
   }
 
-  const handleStartCreate = () => {
-    setEditingApplicant(null)
-    setActivePage('applicant-form')
-  }
-
-  const handleStartEdit = (applicant: ApplicantProfile) => {
-    setEditingApplicant(applicant)
-    setActivePage('applicant-form')
-  }
-
-  const selectedApplicant =
-    applicants.find((a) => a.applicantId === selectedApplicantId) || null
-
+  // 3. Authenticated State: Direct Application Dashboard
   return (
-    <div
-      className="w-80 p-5 font-sans min-h-[460px] transition-colors duration-300 relative"
-      style={{
-        background:
-          'linear-gradient(135deg, var(--color-bg-start), var(--color-bg-middle), var(--color-bg-end))',
-        color: 'var(--color-text)',
-      }}
-    >
+    <div className="w-80 p-0 font-sans min-h-[460px] transition-colors duration-300 relative bg-slate-900 text-slate-100 flex flex-col">
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div className="absolute top-2 left-5 right-5 z-50 p-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold text-center shadow-lg animate-fade-in">
@@ -163,92 +149,41 @@ export default function App() {
 
       {/* Error Notification Banner */}
       {errorMessage && (
-        <div className="mb-3 p-2 rounded-lg bg-red-600 text-white text-xs font-semibold text-center shadow-lg">
-          {errorMessage}
+        <div className="m-3 mb-0 p-2 rounded-lg bg-red-600 text-white text-xs font-semibold shadow-lg flex items-center justify-between">
+          <span className="flex-1 text-center">⚠️ {errorMessage}</span>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-white hover:text-red-200 text-xs font-bold px-1.5 py-0.5 ml-2 cursor-pointer rounded hover:bg-red-700/50"
+            title="Dismiss"
+          >
+            ✕
+          </button>
         </div>
       )}
 
-      {/* Loading Indicator State */}
-      {isLoading ? (
-        <div
-          className="rounded-xl p-8 shadow-lg text-center space-y-3"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            borderColor: 'var(--color-border)',
-            borderWidth: '1px',
-            borderStyle: 'solid',
+      {/* Dashboard View */}
+      {activePage === 'dashboard' && (
+        <Dashboard
+          onNavigate={(page) => {
+            if (page === 'settings' || page === 'dashboard') {
+              setActivePage(page)
+            }
           }}
-        >
-          <div className="animate-spin text-2xl inline-block">⏳</div>
-          <div className="text-xs font-semibold" style={{ color: 'var(--color-muted)' }}>
-            Loading extension...
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Dashboard View */}
-          {activePage === 'dashboard' && (
-            <Dashboard
-              selectedApplicant={selectedApplicant}
-              applicantCount={applicants.length}
-              onNavigate={setActivePage}
-              onAddApplicant={handleStartCreate}
-            />
-          )}
+          user={authUser}
+          onLogout={handleLogout}
+        />
+      )}
 
-          {/* Applicants List View */}
-          {activePage === 'applicants' && (
-            <ApplicantsPage
-              applicants={applicants}
-              selectedApplicantId={selectedApplicantId}
-              onBack={() => setActivePage('dashboard')}
-              onAddApplicant={handleStartCreate}
-              onEditApplicant={handleStartEdit}
-              onSelectApplicant={handleSelectApplicant}
-              onDuplicateApplicant={handleDuplicateApplicant}
-              onDeleteApplicant={handleDeleteApplicant}
-            />
-          )}
-
-          {/* Applicant Form View (Create / Edit) */}
-          {activePage === 'applicant-form' && (
-            <ApplicantFormPage
-              initialApplicant={editingApplicant}
-              onSave={async (applicant) => {
-                await handleSaveApplicant(applicant)
-                setActivePage('applicants')
-              }}
-              onCancel={() => {
-                setEditingApplicant(null)
-                setActivePage(applicants.length > 0 ? 'applicants' : 'dashboard')
-              }}
-            />
-          )}
-
-          {/* Documents View */}
-          {activePage === 'documents' && (
-            <DocumentsPage
-              applicants={applicants}
-              selectedApplicantId={selectedApplicantId}
-              onBack={() => setActivePage('dashboard')}
-              onAddApplicant={handleStartCreate}
-              onUpdateApplicant={handleSaveApplicant}
-            />
-          )}
-
-          {/* Settings & Privacy Center View */}
-          {activePage === 'settings' && (
-            <SettingsPage
-              onBack={() => setActivePage('dashboard')}
-              applicantCount={applicants.length}
-              documentCount={documentCount}
-              onDataWiped={async () => {
-                await loadData()
-                setActivePage('dashboard')
-              }}
-            />
-          )}
-        </>
+      {/* Settings View */}
+      {activePage === 'settings' && (
+        <SettingsPage
+          onBack={() => setActivePage('dashboard')}
+          applicantCount={0}
+          documentCount={0}
+          onDataWiped={async () => {
+            setActivePage('dashboard')
+          }}
+        />
       )}
     </div>
   )
