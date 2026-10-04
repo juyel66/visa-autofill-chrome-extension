@@ -891,9 +891,9 @@ export const App: React.FC = () => {
               <span className="text-xs text-slate-400 font-semibold">Applicant:</span>
               <span
                 className="text-xs sm:text-sm font-semibold text-blue-400 max-w-[150px] truncate"
-                title={`${application?.fields?.['appl.surname']?.value || ''} ${application?.fields?.['appl.applname']?.value || ''}`.trim() || applicantId}
+                title={`${application?.fields?.['appl.applname']?.value || ''} ${application?.fields?.['appl.surname']?.value || ''}`.trim() || applicantId}
               >
-                {`${application?.fields?.['appl.surname']?.value || ''} ${application?.fields?.['appl.applname']?.value || ''}`.trim() || applicantId || 'New Applicant'}
+                {`${application?.fields?.['appl.applname']?.value || ''} ${application?.fields?.['appl.surname']?.value || ''}`.trim() || applicantId || 'New Applicant'}
               </span>
               {backendApplicationId ? (
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-700/60">
