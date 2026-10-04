@@ -327,6 +327,7 @@ export function applyExtractionToApplicant(
     travel: hasTravel
       ? {
           purposeOfVisit: tr.purposeOfVisit?.value ? tr.purposeOfVisit.value : undefined,
+          visaType: tr.visaType?.value ? tr.visaType.value : undefined,
           intendedArrivalDate: tr.journeyDate?.value
             ? tr.journeyDate.value
             : tr.intendedArrivalDate?.value
@@ -338,6 +339,11 @@ export function applyExtractionToApplicant(
           exitPoint: tr.exitPoint?.value ? tr.exitPoint.value : undefined,
           countriesVisited: tr.countriesVisited?.value ? tr.countriesVisited.value : undefined,
           visitedSaarc: tr.visitedSaarc?.value !== undefined ? tr.visitedSaarc.value : undefined,
+          saarcDetails: tr.saarcDetails?.value ? tr.saarcDetails.value : undefined,
+          businessCompanyName: tr.businessCompanyName?.value ? tr.businessCompanyName.value : undefined,
+          businessCompanyAddress: tr.businessCompanyAddress?.value ? tr.businessCompanyAddress.value : undefined,
+          businessCompanyPhone: tr.businessCompanyPhone?.value ? tr.businessCompanyPhone.value : undefined,
+          businessCompanyEmail: tr.businessCompanyEmail?.value ? tr.businessCompanyEmail.value : undefined,
         }
       : undefined,
     previousVisa: hasPreviousVisa
@@ -350,6 +356,7 @@ export function applyExtractionToApplicant(
           visitedAddress1: pv.visitedAddress1?.value ? pv.visitedAddress1.value : undefined,
           visitedAddress2: pv.visitedAddress2?.value ? pv.visitedAddress2.value : undefined,
           visitedAddress3: pv.visitedAddress3?.value ? pv.visitedAddress3.value : undefined,
+          citiesVisited: pv.citiesVisited?.value ? pv.citiesVisited.value : undefined,
           hasRefusal: pv.hasRefusal?.value !== undefined ? pv.hasRefusal.value : undefined,
           refusalDetails: pv.refusalDetails?.value ? pv.refusalDetails.value : undefined,
         }
@@ -359,6 +366,8 @@ export function applyExtractionToApplicant(
           name: spInd.name?.value ? spInd.name.value : undefined,
           addressLine1: spInd.addressLine1?.value ? spInd.addressLine1.value : undefined,
           addressLine2: spInd.addressLine2?.value ? spInd.addressLine2.value : undefined,
+          state: spInd.state?.value ? spInd.state.value : undefined,
+          district: spInd.district?.value ? spInd.district.value : undefined,
           phone: spInd.phone?.value ? spInd.phone.value : undefined,
           email: spInd.email?.value ? spInd.email.value : undefined,
         }
