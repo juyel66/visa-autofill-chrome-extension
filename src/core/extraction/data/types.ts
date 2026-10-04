@@ -19,6 +19,7 @@ export interface ExtractedFamilyMember {
 }
 
 export interface ExtractedTravelData {
+  visaType?: ExtractedField<string>
   duration?: ExtractedField<string>
   visaEntryType?: ExtractedField<string>
   journeyDate?: ExtractedField<string> // YYYY-MM-DD
@@ -26,8 +27,14 @@ export interface ExtractedTravelData {
   entryPoint?: ExtractedField<string>
   exitPoint?: ExtractedField<string>
   purposeOfVisit?: ExtractedField<string>
+  placesVisited?: ExtractedField<string>
   countriesVisited?: ExtractedField<string>
   visitedSaarc?: ExtractedField<boolean>
+  saarcDetails?: ExtractedField<string>
+  businessCompanyName?: ExtractedField<string>
+  businessCompanyAddress?: ExtractedField<string>
+  businessCompanyPhone?: ExtractedField<string>
+  businessCompanyEmail?: ExtractedField<string>
 }
 
 export interface ExtractedPreviousVisa {
@@ -39,6 +46,7 @@ export interface ExtractedPreviousVisa {
   visitedAddress1?: ExtractedField<string>
   visitedAddress2?: ExtractedField<string>
   visitedAddress3?: ExtractedField<string>
+  citiesVisited?: ExtractedField<string>
   hasRefusal?: ExtractedField<boolean>
   refusalDetails?: ExtractedField<string>
 }
@@ -47,6 +55,8 @@ export interface ExtractedReference {
   name?: ExtractedField<string>
   addressLine1?: ExtractedField<string>
   addressLine2?: ExtractedField<string>
+  state?: ExtractedField<string>
+  district?: ExtractedField<string>
   phone?: ExtractedField<string>
   email?: ExtractedField<string>
 }
