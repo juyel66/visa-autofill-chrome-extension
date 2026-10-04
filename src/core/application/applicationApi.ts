@@ -173,6 +173,14 @@ export async function createApplication(
   // 1. Append the authoritative, complete SavedApplication JSON
   formData.append('applicationData', JSON.stringify(applicationData))
 
+  // Explicitly compute applicantName as Given Name + Surname
+  const givenName = applicationData.fields?.['appl.applname']?.value || applicationData.fields?.['appl.name']?.value || ''
+  const surname = applicationData.fields?.['appl.surname']?.value || ''
+  const applicantName = [givenName, surname].filter(Boolean).join(' ').trim()
+  if (applicantName) {
+    formData.append('applicantName', applicantName)
+  }
+
   // 2. Append original PDF File/Blob if available
   if (originalPdf) {
     const resolvedName = fileName || (originalPdf instanceof File ? originalPdf.name : 'passport.pdf')
@@ -217,9 +225,16 @@ export async function updateApplication(
 
   let response: Response
 
+  const givenName = applicationData.fields?.['appl.applname']?.value || applicationData.fields?.['appl.name']?.value || ''
+  const surname = applicationData.fields?.['appl.surname']?.value || ''
+  const applicantName = [givenName, surname].filter(Boolean).join(' ').trim()
+
   if (originalPdf) {
     const formData = new FormData()
     formData.append('applicationData', JSON.stringify(applicationData))
+    if (applicantName) {
+      formData.append('applicantName', applicantName)
+    }
     const resolvedName = fileName || (originalPdf instanceof File ? originalPdf.name : 'passport.pdf')
     formData.append('pdf', originalPdf, resolvedName)
 
@@ -233,7 +248,7 @@ export async function updateApplication(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ applicationData }),
+      body: JSON.stringify({ applicationData, ...(applicantName ? { applicantName } : {}) }),
     })
   }
 
