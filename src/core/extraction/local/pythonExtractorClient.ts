@@ -993,22 +993,27 @@ export async function extractPassportWithPython(
           signal: controller.signal,
         })
 
+        const rawText = await response.text().catch(() => '')
+        let jsonResult: any = null
+        try {
+          jsonResult = rawText ? JSON.parse(rawText) : null
+        } catch {
+          // Response is non-JSON (e.g. HTML or plain text)
+        }
+
         if (!response.ok) {
-          let errorDetail = ''
-          try {
-            const errorJson = await response.json()
-            errorDetail = errorJson.detail || JSON.stringify(errorJson)
-          } catch {
-            errorDetail = await response.text()
-          }
+          const errorDetail =
+            jsonResult?.detail ||
+            (typeof jsonResult?.message === 'string' ? jsonResult.message : '') ||
+            (rawText.length < 300 ? rawText : '') ||
+            response.statusText
           throw new PythonExtractorError(
-            `Python extraction service returned HTTP ${response.status}: ${errorDetail || response.statusText}`,
+            `Python extraction service returned HTTP ${response.status}: ${errorDetail || 'Extraction request failed'}`,
             'HTTP_ERROR',
             response.status
           )
         }
 
-        const jsonResult = await response.json()
         parsed = jsonResult as PythonPassportExtractionResult
       } catch (fetchErr: unknown) {
         if (fetchErr instanceof PythonExtractorError && fetchErr.code === 'HTTP_ERROR') {
@@ -1032,8 +1037,14 @@ export async function extractPassportWithPython(
               body: altFormData,
               signal: controller.signal,
             })
-            if (altRes.ok) {
-              parsed = (await altRes.json()) as PythonPassportExtractionResult
+            const altRawText = await altRes.text().catch(() => '')
+            let altJson: any = null
+            try {
+              altJson = altRawText ? JSON.parse(altRawText) : null
+            } catch {}
+
+            if (altRes.ok && altJson) {
+              parsed = altJson as PythonPassportExtractionResult
             } else {
               throw fetchErr
             }
