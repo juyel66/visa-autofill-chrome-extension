@@ -53,7 +53,6 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
   const hasVisitedSaarc = saarcFlagVal.toLowerCase() === 'yes'
 
   const visaType = getVal('visa_type') || 'BUSINESS VISA'
-  const isBusinessVisa = visaType.toUpperCase().includes('BUSINESS') || Boolean(getVal('comp_name'))
 
   const renderBadge = (fieldVal?: ApplicationFieldValue) => {
     if (!renderSourceBadge) return null
