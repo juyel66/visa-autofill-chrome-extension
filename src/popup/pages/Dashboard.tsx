@@ -15,7 +15,7 @@ import {
   downloadApplicationPdf,
 } from '../../core/application/applicationApi'
 import type { AuthUser } from '../../core/auth'
-import { executePassportExtractionWorkflow } from '../../core/workflow'
+import { executePassportExtractionWorkflow, executeOgdExtractionWorkflow } from '../../core/workflow'
 
 export interface DashboardProps {
   selectedApplicant?: ApplicantProfile | null
@@ -41,6 +41,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [selectedApplication, setSelectedApplication] = useState<SavedApplication | null>(null)
 
   // Extraction State
+  const [uploadTab, setUploadTab] = useState<'passport' | 'ogd'>('passport')
   const [isExtracting, setIsExtracting] = useState<boolean>(false)
   const isExtractingRef = useRef<boolean>(false)
   const [extractingStatus, setExtractingStatus] = useState<string>('Extracting...')
@@ -204,33 +205,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
     isExtractingRef.current = true
 
+    const isOgd = uploadTab === 'ogd'
     setErrorMessage(null)
     setIsExtracting(true)
-    setExtractingStatus('Reading passport PDF...')
+    setExtractingStatus(isOgd ? 'Reading OGD application PDF...' : 'Reading passport PDF...')
 
     try {
-      await executePassportExtractionWorkflow({
-        file,
-        user: user || null,
-        onProgress: (status) => setExtractingStatus(status),
-        navigateWorkspace: (draftId) => {
-          const workspaceUrl = chrome?.runtime?.getURL
-            ? chrome.runtime.getURL(`application.html?draftId=${encodeURIComponent(draftId)}`)
-            : `application.html?draftId=${encodeURIComponent(draftId)}`
+      if (isOgd) {
+        await executeOgdExtractionWorkflow({
+          file,
+          user: user || null,
+          existingApp: selectedApplication,
+          onProgress: (status) => setExtractingStatus(status),
+          navigateWorkspace: (draftId) => {
+            const workspaceUrl = chrome?.runtime?.getURL
+              ? chrome.runtime.getURL(`application.html?draftId=${encodeURIComponent(draftId)}`)
+              : `application.html?draftId=${encodeURIComponent(draftId)}`
 
-          if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
-            chrome.tabs.create({ url: workspaceUrl })
-          } else {
-            window.open(workspaceUrl, '_blank')
-          }
-        },
-      })
+            if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+              chrome.tabs.create({ url: workspaceUrl })
+            } else {
+              window.open(workspaceUrl, '_blank')
+            }
+          },
+        })
 
-      showToast('✓ Passport extracted! Opening Workspace tab...')
+        showToast('✓ OGD extracted! Opening Workspace tab...')
+      } else {
+        await executePassportExtractionWorkflow({
+          file,
+          user: user || null,
+          onProgress: (status) => setExtractingStatus(status),
+          navigateWorkspace: (draftId) => {
+            const workspaceUrl = chrome?.runtime?.getURL
+              ? chrome.runtime.getURL(`application.html?draftId=${encodeURIComponent(draftId)}`)
+              : `application.html?draftId=${encodeURIComponent(draftId)}`
+
+            if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+              chrome.tabs.create({ url: workspaceUrl })
+            } else {
+              window.open(workspaceUrl, '_blank')
+            }
+          },
+        })
+
+        showToast('✓ Passport extracted! Opening Workspace tab...')
+      }
     } catch (err: unknown) {
       console.error('File upload/extraction error:', err)
       const errObj = err as { message?: string }
-      const userMsg = errObj?.message || 'Failed to extract passport document.'
+      const userMsg = errObj?.message || (isOgd ? 'Failed to extract OGD document.' : 'Failed to extract passport document.')
       setErrorMessage(userMsg)
       showToast(`⚠️ ${userMsg}`)
     } finally {
@@ -547,36 +571,73 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
 
-        {/* Primary Action: + NEW PDF EXTRACTION */}
-        <div className="pt-0.5">
-          <button
-            onClick={handleTriggerExtraction}
-            disabled={isExtracting}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {isExtracting ? (
-              <>
-                <svg className="animate-spin h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span className="truncate">{extractingStatus}</span>
-              </>
-            ) : (
-              <>
-                <span className="text-base">📄</span>
-                <span>+ NEW PDF EXTRACTION</span>
-              </>
-            )}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,application/pdf"
-            onChange={handleFileUpload}
-            className="hidden"
-            disabled={isExtracting}
-          />
+        {/* Document Type Selector & Upload Action */}
+        <div className="bg-slate-800/80 rounded-xl border border-slate-700 p-2.5 shadow-sm space-y-2.5">
+          {/* Tab Selection: Passport (default) vs OGD */}
+          <div className="flex bg-slate-900/90 p-1 rounded-lg border border-slate-700/80">
+            <button
+              type="button"
+              onClick={() => setUploadTab('passport')}
+              disabled={isExtracting}
+              className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                uploadTab === 'passport'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+            >
+              <span>📘</span>
+              <span>Passport</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setUploadTab('ogd')}
+              disabled={isExtracting}
+              className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                uploadTab === 'ogd'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+            >
+              <span>📄</span>
+              <span>OGD File</span>
+            </button>
+          </div>
+
+          {/* Primary Action Button */}
+          <div>
+            <button
+              onClick={handleTriggerExtraction}
+              disabled={isExtracting}
+              className={`w-full disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                uploadTab === 'passport'
+                  ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20'
+                  : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/20'
+              }`}
+            >
+              {isExtracting ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="truncate">{extractingStatus}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-base">{uploadTab === 'passport' ? '📘' : '📄'}</span>
+                  <span>{uploadTab === 'passport' ? '+ NEW PASSPORT EXTRACTION' : '+ NEW OGD EXTRACTION'}</span>
+                </>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={isExtracting}
+            />
+          </div>
         </div>
 
         {/* Saved Applications Section */}
