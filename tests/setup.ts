@@ -42,6 +42,7 @@ Object.defineProperty(global, 'HTMLTextAreaElement', { value: window.HTMLTextAre
 Object.defineProperty(global, 'HTMLButtonElement', { value: window.HTMLButtonElement, configurable: true, writable: true })
 Object.defineProperty(global, 'Event', { value: window.Event, configurable: true, writable: true })
 Object.defineProperty(global, 'CustomEvent', { value: window.CustomEvent, configurable: true, writable: true })
+Object.defineProperty(global, 'localStorage', { value: window.localStorage, configurable: true, writable: true })
 
 global.CSS = {
   escape: (val: string) => val.replace(/([#;?%&,.+*~':"!^$[\]()=>|/\\@])/g, '\\$1'),
