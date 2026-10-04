@@ -188,29 +188,36 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             clearTimeout(timeoutId)
           }
 
+          let rawText = ''
+          if (response) {
+            rawText = await response.text().catch(() => '')
+          }
+          let parsedJson: any = null
+          try {
+            parsedJson = rawText ? JSON.parse(rawText) : null
+          } catch {
+            // Non-JSON response
+          }
+
           if (!response || !response.ok) {
-            let errorDetail = ''
-            if (response) {
-              try {
-                const errorJson = await response.json()
-                errorDetail = errorJson.detail || JSON.stringify(errorJson)
-              } catch {
-                errorDetail = await response.text()
-              }
-            }
+            const errorDetail =
+              parsedJson?.detail ||
+              (typeof parsedJson?.message === 'string' ? parsedJson.message : '') ||
+              (rawText.length < 300 ? rawText : '') ||
+              response?.statusText ||
+              'Connection failed'
             sendResponse({
               status: 'error',
-              error: `Python OCR service returned HTTP ${response?.status || 'network error'}: ${errorDetail || response?.statusText || 'Connection failed'}`,
+              error: `Python OCR service returned HTTP ${response?.status || 'network error'}: ${errorDetail}`,
             })
             return
           }
 
-          const parsed = await response.json()
           sendResponse({
             status: 'success',
             data: {
               type: 'PYTHON_EXTRACTION_COMPLETED',
-              result: parsed,
+              result: parsedJson,
             },
           })
         } catch (err: unknown) {
