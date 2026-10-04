@@ -5,7 +5,7 @@ import { resolveApplicantValue } from '../autofill/valueResolver'
 import { parseDateString, formatToIsoDate, validatePassportDates } from '../autofill/dateNormalizer'
 import { getAllSchemaFields } from './fieldSchema'
 import { resolveApplicantReligion } from '../extraction/data/religionExtractor'
-import type { ApplicationFieldValue, SavedApplication } from './types'
+import type { ApplicationFieldSource, ApplicationFieldValue, SavedApplication } from './types'
 import {
   isBangladeshiValue,
   normalizeNationality,
@@ -281,7 +281,7 @@ export function populateApplicationFromDocuments(options: {
     }
 
     let resolvedValue: string | undefined
-    let source: 'passport' | 'ogd' | 'derived' | 'missing' = 'missing'
+    let source: ApplicationFieldSource = 'missing'
     let docId: string | undefined
 
     // Priority 2: Passport Document (Primary authoritative source for identity, passport, address)
