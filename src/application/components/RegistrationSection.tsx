@@ -397,7 +397,10 @@ export const RegistrationSection: React.FC<RegistrationSectionProps> = ({
                   name="appl.email"
                   value={emailVal}
                   placeholder=""
-                  onChange={(e) => onFieldChange('appl.email', e.target.value)}
+                  onChange={(e) => {
+                    onFieldChange('appl.email', e.target.value)
+                    onFieldChange('appl.email_re', e.target.value)
+                  }}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-blue-600"
                 />
               </div>
@@ -418,7 +421,10 @@ export const RegistrationSection: React.FC<RegistrationSectionProps> = ({
                   name="appl.email_re"
                   value={emailReVal}
                   placeholder=""
-                  onChange={(e) => onFieldChange('appl.email_re', e.target.value)}
+                  onChange={(e) => {
+                    onFieldChange('appl.email_re', e.target.value)
+                    onFieldChange('appl.email', e.target.value)
+                  }}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-blue-600"
                 />
               </div>
