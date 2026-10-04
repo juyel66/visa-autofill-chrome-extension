@@ -27,7 +27,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
   // -------------------------------------------------------------------------
   console.log('--- PART 1: RELIGION CONVERSION & RESOLUTION ---')
   {
-    const savedApp: SavedApplication = {
+    const savedApp = {
       applicationId: 'app_rel_1',
       applicantId: 'user_123',
       createdAt: new Date().toISOString(),
@@ -42,7 +42,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
       },
     }
 
-    const profile = convertSavedApplicationToApplicantProfile(savedApp)
+    const profile = convertSavedApplicationToApplicantProfile(savedApp as unknown as SavedApplication)
     testAssert(profile.personalInfo?.religion === 'ISLAM', 'Test 1: profile.personalInfo.religion is converted from appl.religion')
 
     const resolvedVal = resolveApplicantValue(profile, 'personalInfo.religion')
@@ -53,7 +53,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
   }
 
   {
-    const savedApp: SavedApplication = {
+    const savedApp = {
       applicationId: 'app_rel_2',
       applicantId: 'user_456',
       createdAt: new Date().toISOString(),
@@ -68,7 +68,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
       },
     }
 
-    const profile = convertSavedApplicationToApplicantProfile(savedApp)
+    const profile = convertSavedApplicationToApplicantProfile(savedApp as unknown as SavedApplication)
     const resolvedVal = resolveApplicantValue(profile, 'personalInfo.religion')
     testAssert(resolvedVal === 'HINDUISM', 'Test 4: resolveApplicantValue returns HINDUISM for personalInfo.religion')
   }
@@ -121,7 +121,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
         <option value="CHRISTIANITY">CHRISTIANITY</option>
       </select>
     `
-    const savedApp: SavedApplication = {
+    const savedApp = {
       applicationId: 'app_rel_3',
       applicantId: 'user_rel_3',
       createdAt: new Date().toISOString(),
@@ -136,7 +136,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
       },
     }
 
-    const profile = convertSavedApplicationToApplicantProfile(savedApp)
+    const profile = convertSavedApplicationToApplicantProfile(savedApp as unknown as SavedApplication)
     const religionMapping = BANGLADESH_BASIC_DETAILS_MAPPINGS.filter((m) => m.id === 'bd_basic_religion')
 
     const result = await executeAutofill({
@@ -154,7 +154,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
   // -------------------------------------------------------------------------
   console.log('--- PART 4: COMPANY DETAILS WORKSPACE & RESOLUTION ---')
   {
-    const savedApp: SavedApplication = {
+    const savedApp = {
       applicationId: 'app_biz_1',
       applicantId: 'user_biz_1',
       createdAt: new Date().toISOString(),
@@ -169,7 +169,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
       },
     }
 
-    const profile = convertSavedApplicationToApplicantProfile(savedApp)
+    const profile = convertSavedApplicationToApplicantProfile(savedApp as unknown as SavedApplication)
     testAssert(profile.travel?.businessCompanyName === 'TECH CORP INDIA PVT LTD', 'Test 12: travel.businessCompanyName converted from comp_name')
     testAssert(profile.travel?.businessCompanyAddress === '123 PARK STREET, KOLKATA, WEST BENGAL', 'Test 13: travel.businessCompanyAddress converted from comp_address')
     testAssert(profile.travel?.businessCompanyPhone === '+913322110099', 'Test 14: travel.businessCompanyPhone converted from comp_phone')
@@ -203,7 +203,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
       </form>
     `
 
-    const savedApp: SavedApplication = {
+    const savedApp = {
       applicationId: 'app_biz_2',
       applicantId: 'user_biz_2',
       createdAt: new Date().toISOString(),
@@ -217,7 +217,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
       },
     }
 
-    const profile = convertSavedApplicationToApplicantProfile(savedApp)
+    const profile = convertSavedApplicationToApplicantProfile(savedApp as unknown as SavedApplication)
     const companyMappings = BANGLADESH_VISA_DETAILS_MAPPINGS.filter((m) =>
       ['bd_visa_comp_name', 'bd_visa_comp_address', 'bd_visa_comp_phone', 'bd_visa_comp_email'].includes(m.id)
     )
@@ -256,7 +256,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
       </form>
     `
 
-    const savedApp: SavedApplication = {
+    const savedApp = {
       applicationId: 'app_biz_3',
       applicantId: 'user_biz_3',
       createdAt: new Date().toISOString(),
@@ -270,7 +270,7 @@ export async function runTask123Tests(): Promise<{ passed: boolean; failures: st
       },
     }
 
-    const profile = convertSavedApplicationToApplicantProfile(savedApp)
+    const profile = convertSavedApplicationToApplicantProfile(savedApp as unknown as SavedApplication)
     const companyMappings = BANGLADESH_VISA_DETAILS_MAPPINGS.filter((m) =>
       ['bd_visa_comp_name', 'bd_visa_comp_address', 'bd_visa_comp_phone', 'bd_visa_comp_email'].includes(m.id)
     )
