@@ -24,6 +24,21 @@ const FIELD_ALIASES: Record<string, string[]> = {
   'appl.exitpoint': ['exitpoint'],
   'refuse_flag': ['appl.refuse_flag'],
   'appl.refuse_flag': ['refuse_flag'],
+  'appl.email': ['appl.email_re', 'email'],
+  'appl.email_re': ['appl.email', 'email'],
+  'comp_name': ['appl.comp_name'],
+  'appl.comp_name': ['comp_name'],
+  'comp_address': ['appl.comp_address'],
+  'appl.comp_address': ['comp_address'],
+  'comp_phone': ['appl.comp_phone'],
+  'appl.comp_phone': ['comp_phone'],
+  'comp_email': ['appl.comp_email'],
+  'appl.comp_email': ['comp_email'],
+  'religion': ['appl.religion'],
+  'appl.religion': ['religion'],
+  'visa_type': ['appl.visatype', 'appl.visa_type'],
+  'appl.visatype': ['visa_type', 'appl.visa_type'],
+  'appl.visa_type': ['visa_type', 'appl.visatype'],
 }
 
 /**
