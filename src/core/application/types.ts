@@ -16,8 +16,10 @@ export interface ApplicationFieldValue {
 }
 
 export interface SavedApplication {
+  version?: number
   applicationId: string
   applicantId: string
+  backendApplicationId?: string
   createdAt: string
   updatedAt: string
   status: SavedApplicationStatus
@@ -44,4 +46,28 @@ export interface SavedApplication {
     fileName?: string
     fileSize?: number
   }
+}
+
+export interface BackendApplicationSummary {
+  id: string
+  applicantName?: string | null
+  passportNumber?: string | null
+  status?: string | null
+  hasOriginalPdf?: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BackendApplicationDetail {
+  id: string
+  userId: string
+  applicantName?: string | null
+  passportNumber?: string | null
+  status?: string | null
+  applicationData: SavedApplication
+  originalPdfFileName?: string | null
+  originalPdfMimeType?: string | null
+  hasOriginalPdf?: boolean
+  createdAt: string
+  updatedAt: string
 }
