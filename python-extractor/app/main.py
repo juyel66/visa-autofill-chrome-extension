@@ -1,8 +1,13 @@
 import asyncio
 from contextlib import asynccontextmanager
 import time
+import traceback
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import pymupdf
+
 from .extractor import extract_passport
 from .ocr import get_ocr_instance
 from .schemas import PassportExtractionResult
@@ -31,6 +36,26 @@ app.add_middleware(
     allow_headers=["*"],
     allow_private_network=True,
 )
+
+
+@app.exception_handler(ResponseValidationError)
+async def response_validation_exception_handler(request, exc: ResponseValidationError):
+    tb = traceback.format_exc()
+    print(f"[main] !!! ResponseValidationError on {request.url}: {exc}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Response schema validation error: {str(exc)}"},
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc: Exception):
+    tb = traceback.format_exc()
+    print(f"[main] !!! Unhandled exception on {request.url}: {exc}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"},
+    )
 
 
 @app.get("/health")
@@ -69,13 +94,6 @@ async def extract_passport_endpoint(file: UploadFile = File(...)):
 
     try:
         # Finite 120-second safe timeout ensures backend never hangs indefinitely while accommodating CPU OCR.
-        # TIMEOUT SAFETY NOTE:
-        # asyncio.wait_for cancels the waiting coroutine when the timeout expires, unblocking the event loop
-        # and returning an immediate HTTP 504 response to the client.
-        # However, asyncio.to_thread runs in Python's standard ThreadPoolExecutor. In Python/C-extensions,
-        # worker threads cannot be forcibly killed or aborted asynchronously from outside without risking
-        # lock corruption or C-library segfaults. The underlying OCR thread will safely complete its current
-        # task in the background, but the HTTP request will NEVER be left hanging indefinitely.
         t_extract_start = time.time()
         result = await asyncio.wait_for(
             asyncio.to_thread(extract_passport, content),
@@ -98,10 +116,19 @@ async def extract_passport_endpoint(file: UploadFile = File(...)):
         )
     except HTTPException:
         raise
+    except pymupdf.FileDataError as e:
+        t_err = (time.time() - t_req_start) * 1000
+        print(f"[main] !!! PDF data error after {t_err:.2f} ms: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded PDF file is damaged, invalid, or encrypted. Please provide a standard passport PDF.",
+        )
     except Exception as e:
         t_err = (time.time() - t_req_start) * 1000
-        print(f"[main] !!! Extraction failed after {t_err:.2f} ms: {e}")
+        tb = traceback.format_exc()
+        print(f"[main] !!! Extraction failed after {t_err:.2f} ms: {e}\n{tb}")
         raise HTTPException(
             status_code=500,
             detail=f"Passport extraction failed: {str(e)}",
         )
+
