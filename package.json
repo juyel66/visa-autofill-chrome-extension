@@ -8,7 +8,7 @@
     "dev:web": "vite",
     "dev:python": "node scripts/dev.mjs --python-only",
     "build": "tsc -b && node build.js",
-    "test": "npx tsx -r ./tests/setup.ts src/core/application/__tests__/task119WorkspaceFields.test.ts && npx tsx -r ./tests/setup.ts src/core/application/__tests__/task120AddressHandling.test.ts && npx tsx -r ./tests/setup.ts src/core/application/__tests__/task121DateOfIssuePostalCode.test.ts && npx tsx -r ./tests/setup.ts src/core/application/__tests__/task122EntryExitPointAutofill.test.ts && npx tsx -r ./tests/setup.ts src/core/application/__tests__/task123ReligionAndCompanyFieldsAutofill.test.ts",
+    "test": "npx tsx -r ./tests/setup.ts src/core/application/__tests__/task119WorkspaceFields.test.ts && npx tsx -r ./tests/setup.ts src/core/application/__tests__/task120AddressHandling.test.ts && npx tsx -r ./tests/setup.ts src/core/application/__tests__/task121DateOfIssuePostalCode.test.ts && npx tsx -r ./tests/setup.ts src/core/application/__tests__/task122EntryExitPointAutofill.test.ts && npx tsx -r ./tests/setup.ts src/core/application/__tests__/task123ReligionAndCompanyFieldsAutofill.test.ts && npx tsx -r ./tests/setup.ts tests/applicationIntegration.test.ts && npx tsx -r ./tests/setup.ts tests/passportUploadWorkflow.test.ts && npx tsx -r ./tests/setup.ts tests/apiSafeResponse.test.ts && npx tsx -r ./tests/setup.ts tests/persistentAuthSession.test.ts && npx tsx -r ./tests/setup.ts tests/workspaceProgress.test.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
