@@ -102,22 +102,22 @@ def inspect_pdf(pdf_source: Union[str, bytes]) -> Tuple[pymupdf.Document, Proces
     return doc, processed
 
 
+import cv2
+
+
 def render_page_to_image(page: pymupdf.Page, dpi: int = 200) -> np.ndarray:
     """
     Render a PyMuPDF page to a numpy RGB/BGR array for OCR processing.
     """
-    pix = page.get_pixmap(dpi=dpi)
+    pix = page.get_pixmap(dpi=dpi, alpha=False)
     img = np.frombuffer(pix.samples, dtype=np.uint8).reshape((pix.height, pix.width, pix.n))
-    
+
     # If 4-channel RGBA, convert to 3-channel RGB
     if pix.n == 4:
-        import cv2
         return cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
     elif pix.n == 3:
-        import cv2
         return cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     elif pix.n == 1:
-        import cv2
         return cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    
+
     return img
