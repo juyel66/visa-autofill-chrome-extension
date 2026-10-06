@@ -45,6 +45,11 @@ export interface SavedApplication {
     dataUrl?: string
     fileName?: string
     fileSize?: number
+    width?: number
+    height?: number
+    uploadedAt?: string
+    backendSynced?: boolean
+    backendPhotoUrl?: string
   }
 }
 
@@ -68,6 +73,12 @@ export interface BackendApplicationDetail {
   originalPdfFileName?: string | null
   originalPdfMimeType?: string | null
   hasOriginalPdf?: boolean
+  applicantPhoto?: {
+    exists: boolean
+    url?: string | null
+    fileName?: string | null
+    mimeType?: string | null
+  }
   createdAt: string
   updatedAt: string
 }
