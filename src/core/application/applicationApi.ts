@@ -187,6 +187,19 @@ export async function createApplication(
     formData.append('pdf', originalPdf, resolvedName)
   }
 
+  // 3. Append applicant photograph if available
+  if (applicationData.photograph?.dataUrl) {
+    try {
+      const photoBlob = dataUrlToBlob(applicationData.photograph.dataUrl)
+      const photoFileName = applicationData.photograph.fileName || 'applicant_photo.jpg'
+      formData.append('applicant_photo', photoBlob, photoFileName)
+      formData.append('photo', photoBlob, photoFileName)
+      formData.append('file', photoBlob, photoFileName)
+    } catch {
+      // ignore conversion failure
+    }
+  }
+
   // NOTE: Do not set Content-Type header manually. Browser/fetch automatically sets multipart boundary!
   const response = await safeFetch(`${BACKEND_API_BASE_URL}/api/applications`, {
     method: 'POST',
@@ -229,14 +242,28 @@ export async function updateApplication(
   const surname = applicationData.fields?.['appl.surname']?.value || ''
   const applicantName = [givenName, surname].filter(Boolean).join(' ').trim()
 
-  if (originalPdf) {
+  if (originalPdf || applicationData.photograph?.dataUrl) {
     const formData = new FormData()
     formData.append('applicationData', JSON.stringify(applicationData))
     if (applicantName) {
       formData.append('applicantName', applicantName)
     }
-    const resolvedName = fileName || (originalPdf instanceof File ? originalPdf.name : 'passport.pdf')
-    formData.append('pdf', originalPdf, resolvedName)
+    if (originalPdf) {
+      const resolvedName = fileName || (originalPdf instanceof File ? originalPdf.name : 'passport.pdf')
+      formData.append('pdf', originalPdf, resolvedName)
+    }
+
+    if (applicationData.photograph?.dataUrl) {
+      try {
+        const photoBlob = dataUrlToBlob(applicationData.photograph.dataUrl)
+        const photoFileName = applicationData.photograph.fileName || 'applicant_photo.jpg'
+        formData.append('applicant_photo', photoBlob, photoFileName)
+        formData.append('photo', photoBlob, photoFileName)
+        formData.append('file', photoBlob, photoFileName)
+      } catch (photoErr) {
+        console.warn('Failed to convert photo dataUrl to Blob:', photoErr)
+      }
+    }
 
     response = await safeFetch(`${BACKEND_API_BASE_URL}/api/applications/${encodeURIComponent(id)}`, {
       method: 'PUT',
@@ -318,3 +345,134 @@ export async function downloadApplicationPdf(
   const blob = await response.blob()
   return { blob, fileName }
 }
+
+/**
+ * Converts a Base64 dataURL string to a standard binary Blob.
+ */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const arr = dataUrl.split(',')
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+  const bstr = atob(arr[1])
+  let n = bstr.length
+  const u8arr = new Uint8Array(n)
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n)
+  }
+  return new Blob([u8arr], { type: mime })
+}
+
+export interface ApplicantPhotoUploadResponse {
+  success: boolean
+  message?: string
+  photoUrl?: string
+  filename?: string
+  width?: number
+  height?: number
+  sizeBytes?: number
+  isSquare?: boolean
+  timestamp?: string
+  data?: any
+}
+
+/**
+ * POST /api/applications/:id/photo
+ * Uploads applicant photograph to backend API using application ID.
+ */
+export async function uploadApplicantPhoto(
+  photoBlobOrFile: Blob | File,
+  fileName: string = 'applicant_photo.jpg',
+  applicationId?: string
+): Promise<ApplicantPhotoUploadResponse> {
+  if (!applicationId || typeof applicationId !== 'string' || !applicationId.trim()) {
+    throw new ApplicationApiError('Application is not ready for photo upload.', 400)
+  }
+
+  if (!photoBlobOrFile || photoBlobOrFile.size === 0) {
+    throw new ApplicationApiError('Photo file is empty or invalid.', 400)
+  }
+
+  const formData = new FormData()
+  const resolvedFileName =
+    fileName || (photoBlobOrFile instanceof File ? photoBlobOrFile.name : 'applicant_photo.jpg')
+
+  formData.append('applicant_photo', photoBlobOrFile, resolvedFileName)
+  formData.append('photo', photoBlobOrFile, resolvedFileName)
+  formData.append('file', photoBlobOrFile, resolvedFileName)
+
+  const targetUrl = `${BACKEND_API_BASE_URL}/api/applications/${encodeURIComponent(applicationId.trim())}/photo`
+
+  const response = await safeFetch(targetUrl, {
+    method: 'POST',
+    body: formData,
+  })
+
+  return await consumeJsonResponse<ApplicantPhotoUploadResponse>(
+    response,
+    'Failed to upload applicant photograph.'
+  )
+}
+
+/**
+ * GET /api/applications/:id/photo
+ * Fetches the saved applicant photograph as binary blob from backend.
+ * Returns null if no photo is saved on the application (HTTP 404).
+ */
+export async function getApplicantPhoto(
+  applicationId?: string
+): Promise<{ blob: Blob; mimeType: string } | null> {
+  if (!applicationId || typeof applicationId !== 'string' || !applicationId.trim()) {
+    return null
+  }
+
+  const targetUrl = `${BACKEND_API_BASE_URL}/api/applications/${encodeURIComponent(applicationId.trim())}/photo`
+  const response = await safeFetch(targetUrl)
+
+  if (response.status === 404) {
+    await response.text().catch(() => '')
+    return null
+  }
+
+  if (!response.ok) {
+    const rawText = await response.text().catch(() => '')
+    let json: any = null
+    try {
+      json = rawText ? JSON.parse(rawText) : null
+    } catch {}
+    throw createApplicationApiError(response.status, json, 'Failed to download applicant photo.', rawText)
+  }
+
+  const mimeType = response.headers.get('content-type') || 'image/jpeg'
+  const blob = await response.blob()
+  return { blob, mimeType }
+}
+
+/**
+ * DELETE /api/applications/:id/photo
+ * Removes applicant photograph from backend application record.
+ */
+export async function deleteApplicantPhoto(
+  applicationId?: string
+): Promise<{ success: boolean; message?: string }> {
+  if (!applicationId || typeof applicationId !== 'string' || !applicationId.trim()) {
+    return { success: true }
+  }
+
+  const targetUrl = `${BACKEND_API_BASE_URL}/api/applications/${encodeURIComponent(applicationId.trim())}/photo`
+
+  try {
+    const response = await safeFetch(targetUrl, {
+      method: 'DELETE',
+    })
+
+    return await consumeJsonResponse<{ success: boolean; message?: string }>(
+      response,
+      'Failed to remove applicant photograph.'
+    )
+  } catch (err: any) {
+    if (err?.status === 404) {
+      return { success: true, message: 'Applicant photo already removed.' }
+    }
+    throw err
+  }
+}
+
