@@ -29,7 +29,7 @@ interface BenchmarkMetrics {
 async function clearPythonServerCache(): Promise<void> {
   // Clear the in-memory SHA256 cache in the running Python server to force real warm OCR inference
   try {
-    const res = await fetch(`${LOCAL_EXTRACTOR_URL}/health`)
+    const res = await fetch(`${LOCAL_EXTRACTOR_URL}/clear-cache`, { method: 'POST' })
     assert(res.ok)
   } catch (e) {
     console.error('Cannot connect to Python service:', e)
@@ -142,6 +142,7 @@ async function runTask126Benchmark() {
 
   // 2. Cold Start Run
   console.log('--- 2. COLD START MEASUREMENT ---')
+  await clearPythonServerCache()
   const coldStartResult = await runEndToEndUploadToWorkspace(scannedPath, 'app_cold')
   console.log(`  Cold Start Total (T0 -> T12): ${coldStartResult.metrics.total_ms} ms (${(coldStartResult.metrics.total_ms / 1000).toFixed(2)}s)`)
   console.log(`  Fields Populated in Workspace: ${coldStartResult.fieldCount}`)
@@ -219,6 +220,7 @@ async function runTask126Benchmark() {
   console.log('\n--- 8. 5 WARM REPETITIONS BENCHMARK (Upload -> Fully Populated Workspace) ---')
   const warmTimes: number[] = []
   for (let i = 1; i <= 5; i++) {
+    await clearPythonServerCache()
     const runResult = await runEndToEndUploadToWorkspace(scannedPath, `app_warm_${i}`)
     warmTimes.push(runResult.metrics.total_ms)
     console.log(`  Repetition #${i}: ${runResult.metrics.total_ms} ms (${(runResult.metrics.total_ms / 1000).toFixed(3)}s) | Populated Fields: ${runResult.fieldCount}`)
