@@ -4,9 +4,6 @@ import type { DocumentRecord } from '../core/document/types'
 import { getLatestDocument } from '../core/document'
 import { applyExtractionToApplicant } from '../core/extraction'
 import { saveApplicant } from '../core/storage'
-import {
-  WORKSPACE_PAGES,
-} from '../core/application/fieldSchema'
 import type {
   SavedApplication,
   ApplicationFieldValue,
@@ -24,6 +21,7 @@ import {
   updateApplication,
   getApplicationById,
   downloadApplicationPdf,
+  deleteApplicantPhoto,
 } from '../core/application/applicationApi'
 import { getDraft, deleteDraft, getLatestDraft } from '../core/storage/draftDb'
 import { LOCAL_EXTRACTOR_URL } from '../core/extraction/local/pythonExtractorClient'
@@ -37,17 +35,16 @@ import { BasicDetailsSection } from './components/BasicDetailsSection'
 import { FamilyDetailsSection } from './components/FamilyDetailsSection'
 import { VisaDetailsSection } from './components/VisaDetailsSection'
 import { AdditionalQuestionsSection } from './components/AdditionalQuestionsSection'
+import { ApplicantPhotoEditor } from './components/ApplicantPhotoEditor'
 
 export const App: React.FC = () => {
   const [applicantId, setApplicantId] = useState<string>('')
   const [applicants, setApplicants] = useState<ApplicantProfile[]>([])
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [application, setApplication] = useState<SavedApplication | null>(null)
-  const [activeNavId, setActiveNavId] = useState<string>('registration')
   const [loading, setLoading] = useState<boolean>(true)
   const [saving, setSaving] = useState<boolean>(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
-  const [searchQuery, setSearchQuery] = useState<string>('')
   const [showAllFields, setShowAllFields] = useState<boolean>(false)
   const [showAiModal, setShowAiModal] = useState<boolean>(false)
   const [testingConnection, setTestingConnection] = useState<boolean>(false)
@@ -627,14 +624,16 @@ export const App: React.FC = () => {
         // Update existing application on Node backend (PUT /api/applications/:id)
         await updateApplication(targetBackendId, toSave, originalPdf, originalPdfFileName)
         toSave.backendApplicationId = targetBackendId
+
         setApplication(toSave)
-        showToast('✓ Application updated successfully on server! Ready for portal autofill.', 'success')
+        showToast('✓ Application saved successfully to server!', 'success')
       } else {
         // Create new application on Node backend (POST /api/applications) with complete SavedApplication + original PDF
         const res = await createApplication(toSave, originalPdf, originalPdfFileName)
         targetBackendId = res.id
         setBackendApplicationId(targetBackendId)
         toSave.backendApplicationId = targetBackendId
+
         setApplication(toSave)
 
         // Clean up draft in IndexedDB
@@ -642,7 +641,7 @@ export const App: React.FC = () => {
           await deleteDraft(draftId).catch(() => {})
         }
 
-        showToast('✓ Application saved successfully to server! Ready for portal autofill.', 'success')
+        showToast('✓ Application saved successfully to server!', 'success')
       }
 
       // Also persist to local storage cache for immediate autofill availability
@@ -727,12 +726,66 @@ export const App: React.FC = () => {
 
   const handleRemovePhoto = () => {
     if (!application) return
-    setApplication({
+    const updatedApp: SavedApplication = {
       ...application,
       photograph: undefined,
-    })
-    showToast('Removed photograph.', 'info')
+    }
+    setApplication(updatedApp)
+    saveApplication(updatedApp).catch(() => {})
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({
+        visa_autofill_saved_applications: [updatedApp],
+      })
+    }
+    if (backendApplicationId) {
+      deleteApplicantPhoto(backendApplicationId).catch(() => {})
+    }
+    showToast('Removed applicant photograph.', 'info')
   }
+
+  const handlePhotoSavedFromEditor = async (photoData: {
+    dataUrl: string
+    fileName: string
+    fileSize: number
+    width: number
+    height: number
+  }) => {
+    if (!application) return
+
+    const updatedApp: SavedApplication = {
+      ...application,
+      photograph: {
+        dataUrl: photoData.dataUrl,
+        fileName: photoData.fileName,
+        fileSize: photoData.fileSize,
+        width: photoData.width,
+        height: photoData.height,
+        uploadedAt: new Date().toISOString(),
+      },
+    }
+
+    setApplication(updatedApp)
+
+    try {
+      await saveApplication(updatedApp)
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({
+          visa_autofill_saved_applications: [updatedApp],
+        })
+      }
+    } catch (saveErr) {
+      console.warn('Local draft sync warning:', saveErr)
+    }
+  }
+
+  const applicantDisplayName = useMemo(() => {
+    const given =
+      application?.fields?.['appl.applname']?.value ||
+      application?.fields?.['appl.name']?.value ||
+      ''
+    const surname = application?.fields?.['appl.surname']?.value || ''
+    return [given, surname].filter(Boolean).join(' ').trim() || applicantId || 'Applicant'
+  }, [application, applicantId])
 
   // Calculate dynamic workspace completion progress across canonical schema fields
   const progress = useMemo(() => {
@@ -770,7 +823,6 @@ export const App: React.FC = () => {
 
   // Smooth scroll to section card with dynamic header height offset
   const scrollToSection = (sectionId: string) => {
-    setActiveNavId(sectionId)
     const element = document.getElementById(`sec-${sectionId}`)
     if (element) {
       const headerEl = document.querySelector('header')
@@ -1043,98 +1095,26 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Main Single Full-Page Layout */}
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 flex flex-col md:flex-row gap-6">
-        {/* Sticky Left Sidebar: Section Jump Navigator & Filter */}
-        <aside className="w-full md:w-64 flex-shrink-0">
-          <div className="sticky top-[72px] space-y-3">
-            {/* Search Filter Box */}
-            <div className="bg-slate-900 rounded-xl p-3 border border-slate-800 shadow-sm">
-              <input
-                type="text"
-                placeholder="Search any field..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            {/* Jump-to-Section Navigation: Exactly 5 Authentic Portal Pages */}
-            <nav className="bg-slate-900/90 rounded-xl p-2 border border-slate-800 shadow-sm space-y-1.5">
-              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Application Pages
-              </div>
-              {WORKSPACE_PAGES.map((page) => {
-                const isActive = activeNavId === page.id
-                const pageStat = progress.pageProgress[page.id] || {
-                  pageId: page.id,
-                  total: page.fieldKeys.length,
-                  filled: 0,
-                  percentage: 0,
-                  isComplete: false,
-                }
-
-                return (
-                  <button
-                    key={page.id}
-                    onClick={() => scrollToSection(page.id)}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-medium transition-all flex items-center justify-between cursor-pointer border ${
-                      isActive
-                        ? 'bg-blue-600 text-white font-bold border-blue-500 shadow-md shadow-blue-500/20'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span
-                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                          isActive ? 'bg-white text-blue-700' : 'bg-slate-800 text-slate-300'
-                        }`}
-                      >
-                        {page.pageNumber}
-                      </span>
-                      <span className="truncate">{page.title.replace(/^\d+\.\s*/, '')}</span>
-                    </div>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${
-                        isActive
-                          ? 'bg-blue-800 text-blue-100'
-                          : pageStat.isComplete
-                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/60'
-                          : pageStat.filled > 0
-                          ? 'bg-amber-950/80 text-amber-300 border border-amber-700/50'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {pageStat.filled}/{pageStat.total}
-                    </span>
-                  </button>
-                )
-              })}
-            </nav>
-
-            {/* Quick View Mode Box */}
-            <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-800 text-xs text-slate-300 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-200">Workspace View</span>
-                <span className="text-[11px] text-blue-400 font-semibold">{showAllFields ? 'All 100 Fields' : 'Curated'}</span>
-              </div>
-              <p className="text-slate-400 text-[11px] leading-relaxed">
-                {showAllFields
-                  ? 'Showing all 100 canonical fields including conditional & technical items.'
-                  : 'Showing 5 authentic Indian Visa portal pages with live data synchronization.'}
-              </p>
-              <button
-                onClick={() => setShowAllFields((prev) => !prev)}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 py-1.5 px-2 rounded-lg font-medium text-xs transition-colors cursor-pointer text-center block"
-              >
-                {showAllFields ? '⚡ Curated View' : '👁️ Show All 100 Fields'}
-              </button>
-            </div>
+      {/* Main Single Full-Page Layout: Left = Applicant Photo, Right = Form Fields */}
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 flex flex-col lg:flex-row gap-6 items-start">
+        {/* Left Area: Dedicated Applicant Photo Management */}
+        <aside className="w-full lg:w-80 xl:w-88 flex-shrink-0">
+          <div className="sticky top-[72px]">
+            <ApplicantPhotoEditor
+              applicationId={backendApplicationId}
+              backendApplicationId={backendApplicationId}
+              applicantId={applicantId}
+              applicantName={applicantDisplayName}
+              application={application}
+              onPhotoSaved={handlePhotoSavedFromEditor}
+              onPhotoRemoved={handleRemovePhoto}
+              onToast={showToast}
+            />
           </div>
         </aside>
 
-        {/* Right Area: Exactly 5 Sequential Authentic Portal Pages */}
-        <main className="flex-1 min-w-0 space-y-8">
+        {/* Right Area: Sequential Authentic Portal Pages & Fields */}
+        <main className="flex-1 min-w-0 space-y-8 w-full">
           {/* PAGE 1: Registration Form */}
           <section id="sec-registration" className="scroll-mt-28">
             <RegistrationSection
