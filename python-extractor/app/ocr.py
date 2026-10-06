@@ -16,6 +16,27 @@ class OCRBox(BaseModel):
     bbox: List[Any] = Field(default_factory=list)
 
 
+# Apply ONNX Runtime and RapidOCR performance enhancements:
+# 1. Enable ONNX Runtime CPU memory arena to prevent repeated OS malloc/free across layers & crops,
+#    and allow short spinning to eliminate thread wake-up overhead.
+try:
+    from rapidocr_onnxruntime.utils.infer_engine import OrtInferSession
+    _orig_init_sess_opts = OrtInferSession._init_sess_opts
+
+    def _optimized_init_sess_opts(config):
+        sess_opt = _orig_init_sess_opts(config)
+        sess_opt.enable_cpu_mem_arena = True
+        try:
+            sess_opt.add_session_config_entry("session.intra_op.allow_spinning", "1")
+        except Exception:
+            pass
+        return sess_opt
+
+    OrtInferSession._init_sess_opts = staticmethod(_optimized_init_sess_opts)
+except Exception as e:
+    print(f"[ocr] Note: OrtInferSession patch skipped: {e}")
+
+
 def get_ocr_instance() -> RapidOCR:
     """
     Lazy initialize RapidOCR singleton instance with optimized ONNX Runtime settings.
@@ -32,15 +53,18 @@ def get_ocr_instance() -> RapidOCR:
         # Initialize RapidOCR with PP-OCRv4 ONNX models and single-item CRNN recognition batches
         # to avoid dynamic tensor padding latency on CPU.
         _ocr_instance = RapidOCR(
-            det_limit_type="max",
-            det_limit_side_len=960,
+            det_limit_type="min",
+            det_limit_side_len=800,
             rec_batch_num=1,
         )
 
-        # Warm up ONNX Runtime sessions so subsequent user requests execute immediately
+        # Warm up both detection and recognition ONNX Runtime sessions with realistic dimensions
+        # so subsequent user requests execute immediately without cold-allocation pauses
         try:
-            dummy = np.zeros((100, 100, 3), dtype=np.uint8)
-            _ocr_instance(dummy, use_cls=False)
+            dummy_det = np.zeros((1636, 1157, 3), dtype=np.uint8)
+            _ocr_instance.text_det(dummy_det)
+            dummy_rec = [np.zeros((48, 120 * i, 3), dtype=np.uint8) for i in range(1, 8)]
+            _ocr_instance.text_rec(dummy_rec)
             print("[ocr] RapidOCR PP-OCRv4 ONNX Runtime singleton initialized & warmed up.")
         except Exception as e:
             print(f"[ocr] Warmup warning: {e}")
