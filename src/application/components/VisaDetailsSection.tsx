@@ -896,18 +896,29 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 <img
                   src={application.photograph.dataUrl}
                   alt="Applicant"
-                  className="w-32 h-40 object-cover rounded border-2 border-slate-400 shadow-sm"
+                  className="w-32 h-32 object-cover rounded-lg border-2 border-blue-500 shadow-md"
                 />
                 <div className="space-y-1.5 text-xs text-slate-700">
                   <div><strong>File:</strong> {application.photograph.fileName || 'photo.jpg'}</div>
-                  <div className="text-emerald-700 font-semibold">✓ Photograph attached to Workspace</div>
-                  <button
-                    type="button"
-                    onClick={onRemovePhoto}
-                    className="text-rose-600 hover:text-rose-800 text-xs font-semibold underline cursor-pointer pt-2 block"
-                  >
-                    🗑️ Remove Photograph
-                  </button>
+                  <div className="text-emerald-700 font-semibold">✓ 1:1 Square Photograph attached to Workspace</div>
+                  <div className="flex items-center gap-3 pt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-xs font-semibold underline cursor-pointer"
+                    >
+                      🎯 Adjust in Left Photo Editor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onRemovePhoto}
+                      className="text-rose-600 hover:text-rose-800 text-xs font-semibold underline cursor-pointer"
+                    >
+                      🗑️ Remove
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
