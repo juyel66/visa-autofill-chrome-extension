@@ -36,6 +36,8 @@ import { FamilyDetailsSection } from './components/FamilyDetailsSection'
 import { VisaDetailsSection } from './components/VisaDetailsSection'
 import { AdditionalQuestionsSection } from './components/AdditionalQuestionsSection'
 import { ApplicantPhotoEditor } from './components/ApplicantPhotoEditor'
+import { ManualFieldsNavigator } from './components/ManualFieldsNavigator'
+import { checkAndClearActiveTargetIfFilled } from './manualFieldsRegistry'
 
 export const App: React.FC = () => {
   const [applicantId, setApplicantId] = useState<string>('')
@@ -253,6 +255,10 @@ export const App: React.FC = () => {
 
     loadData()
   }, [loadApplicationForApplicant])
+
+  useEffect(() => {
+    checkAndClearActiveTargetIfFilled(application)
+  }, [application])
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type })
@@ -839,31 +845,46 @@ export const App: React.FC = () => {
   const renderFieldSourceBadge = (fieldKeyOrValue?: string | ApplicationFieldValue) => {
     if (!application || !fieldKeyOrValue) return null
     let f: ApplicationFieldValue | undefined
+    let key = ''
     if (typeof fieldKeyOrValue === 'string') {
-      f = application.fields[fieldKeyOrValue]
+      key = fieldKeyOrValue
+      f = application.fields[key]
     } else {
       f = fieldKeyOrValue
     }
 
+    // 1. SMART STATUS: Needs Review (conflicts or low OCR confidence)
     if (f?.hasConflict) {
       return (
         <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-950/90 text-red-300 border border-red-700/80 cursor-help"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-950/90 text-amber-300 border border-amber-600/70 cursor-help"
           title={f.conflictDetails || 'Invalid data relationship - requires manual review'}
         >
-          <span>⚠</span> Invalid / Review
+          <span>🟡</span> Needs Review
         </span>
       )
     }
 
-    if (!f || f.value === '' || f.value === undefined || f.value === null || f.value === false) {
+    if (
+      f?.confidence === 'low' ||
+      (typeof f?.confidence === 'number' && f.confidence < 0.7)
+    ) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800/80 text-amber-400/90 border border-slate-700">
-          <span>⚠</span> Manual Entry
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-950/90 text-amber-300 border border-amber-600/70 cursor-help"
+          title="Low OCR confidence - review recommended"
+        >
+          <span>🟡</span> Needs Review
         </span>
       )
     }
 
+    // Blank or non-existent value -> do not display badge (avoid visual noise)
+    if (!f || f.value === undefined || f.value === null || (typeof f.value === 'string' && f.value.trim().length === 0)) {
+      return null
+    }
+
+    // 2. SMART STATUS: Completed badges with source provenance
     if (f.isUserEdited) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-950/80 text-amber-300 border border-amber-700/60">
@@ -896,11 +917,15 @@ export const App: React.FC = () => {
       )
     }
 
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800/80 text-amber-400/90 border border-slate-700">
-        <span>⚠</span> Manual Entry
-      </span>
-    )
+    if (f.source === 'manual') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-700/60">
+          <span>✓</span> Completed
+        </span>
+      )
+    }
+
+    return null
   }
 
   if (loading) {
@@ -1005,6 +1030,12 @@ export const App: React.FC = () => {
             >
               <span>{showAllFields ? '100 Fields' : 'Curated'}</span>
             </button>
+
+            {/* Manual Fields Navigator */}
+            <ManualFieldsNavigator
+              application={application}
+              onExpandSection={scrollToSection}
+            />
 
             {/* Download Original PDF Button */}
             {(backendApplicationId || originalPdf) && (
@@ -1115,6 +1146,67 @@ export const App: React.FC = () => {
 
         {/* Right Area: Sequential Authentic Portal Pages & Fields */}
         <main className="flex-1 min-w-0 space-y-8 w-full">
+          {/* FEATURE 1: Application Completion Progress Indicator */}
+          <div
+            id="workspace-application-completion-card"
+            data-field-id="application-completion-indicator"
+            className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm backdrop-blur-xs transition-all"
+          >
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-base" aria-hidden="true">📊</span>
+                <span className="font-bold text-sm text-slate-100 tracking-tight">
+                  Application Completion
+                </span>
+              </div>
+              <span className="text-sm font-bold text-blue-400 font-mono tracking-tight">
+                {progress.percentage}%
+              </span>
+            </div>
+
+            {/* Polished progress bar with subtle transition */}
+            <div
+              role="progressbar"
+              aria-valuenow={progress.percentage}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Application Completion: ${progress.percentage}%`}
+              className="w-full bg-slate-950/80 rounded-full h-3 overflow-hidden p-0.5 border border-slate-800"
+            >
+              <div
+                className={`h-full rounded-full transition-all duration-300 ease-out ${
+                  progress.isComplete
+                    ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400'
+                    : progress.percentage >= 70
+                    ? 'bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-500'
+                }`}
+                style={{ width: `${progress.percentage}%` }}
+              />
+            </div>
+
+            <div className="mt-2.5 text-xs text-slate-400 flex items-center justify-between">
+              <div>
+                {progress.missing > 0 ? (
+                  <span className="text-amber-400 font-medium">
+                    {progress.missing} {progress.missing === 1 ? 'field remaining' : 'fields remaining'}
+                  </span>
+                ) : (
+                  <span className="text-emerald-400 font-medium">
+                    ✓ All applicable fields completed
+                  </span>
+                )}
+              </div>
+              <div className="text-slate-400 text-[11px]">
+                <strong className={progress.isComplete ? 'text-emerald-300' : 'text-slate-200'}>
+                  {progress.filled}
+                </strong>
+                <span className="text-slate-600 mx-1">/</span>
+                <span>{progress.total} fields</span>
+              </div>
+            </div>
+          </div>
+
           {/* PAGE 1: Registration Form */}
           <section id="sec-registration" className="scroll-mt-28">
             <RegistrationSection
