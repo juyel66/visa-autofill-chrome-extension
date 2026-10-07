@@ -148,6 +148,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.surname"
+                  data-field-id="appl.surname"
                   type="text"
                   value={getVal('appl.surname')}
                   onChange={(e) => onFieldChange('appl.surname', e.target.value.toUpperCase())}
@@ -177,6 +179,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.applname"
+                  data-field-id="appl.applname"
                   type="text"
                   value={getVal('appl.applname')}
                   onChange={(e) => onFieldChange('appl.applname', e.target.value.toUpperCase())}
@@ -238,7 +242,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
                       type="text"
-                      id="prev_surname"
+                      id="appl.prev_surname"
+                      data-field-id="appl.prev_surname"
                       value={getVal('appl.prev_surname')}
                       onChange={(e) => onFieldChange('appl.prev_surname', e.target.value.toUpperCase())}
                       placeholder="PREVIOUS SURNAME"
@@ -267,7 +272,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
                       type="text"
-                      id="prev_name"
+                      id="appl.prev_name"
+                      data-field-id="appl.prev_name"
                       value={getVal('appl.prev_name')}
                       onChange={(e) => onFieldChange('appl.prev_name', e.target.value.toUpperCase())}
                       placeholder="PREVIOUS NAME"
@@ -298,6 +304,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="appl.applsex"
+                  data-field-id="appl.applsex"
                   value={getVal('appl.applsex').toUpperCase()}
                   onChange={(e) => onFieldChange('appl.applsex', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
@@ -321,6 +329,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.birthdate"
+                  data-field-id="appl.birthdate"
                   type="text"
                   value={getVal('appl.birthdate')}
                   onChange={(e) => onFieldChange('appl.birthdate', e.target.value)}
@@ -350,6 +360,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.placbrth"
+                  data-field-id="appl.placbrth"
                   type="text"
                   value={getVal('appl.placbrth')}
                   onChange={(e) => onFieldChange('appl.placbrth', e.target.value.toUpperCase())}
@@ -370,6 +382,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="appl.country_of_birth"
+                  data-field-id="appl.country_of_birth"
                   value={getVal('appl.country_of_birth')}
                   onChange={(e) => onFieldChange('appl.country_of_birth', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
@@ -393,6 +407,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.nic_no"
+                  data-field-id="appl.nic_no"
                   type="text"
                   value={getVal('appl.nic_no')}
                   onChange={(e) => onFieldChange('appl.nic_no', e.target.value)}
@@ -413,6 +429,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="appl.religion"
+                  data-field-id="appl.religion"
                   value={getVal('appl.religion')}
                   onChange={(e) => onFieldChange('appl.religion', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
@@ -436,6 +454,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.visual_mark"
+                  data-field-id="appl.visual_mark"
                   type="text"
                   value={getVal('appl.visual_mark')}
                   onChange={(e) => onFieldChange('appl.visual_mark', e.target.value.toUpperCase())}
@@ -454,6 +474,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="appl.edu_id"
+                  data-field-id="appl.edu_id"
                   value={getVal('appl.edu_id') || 'BELOW MATRICULATION'}
                   onChange={(e) => onFieldChange('appl.edu_id', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
@@ -477,6 +499,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="appl.nationality"
+                  data-field-id="appl.nationality"
                   value={normalizeToBangladesh(getVal('appl.nationality'))}
                   onChange={(e) => onFieldChange('appl.nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#7c3aed]"
@@ -500,6 +524,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="appl.nationality_by"
+                  data-field-id="appl.nationality_by"
                   value={getVal('appl.nationality_by')}
                   onChange={(e) => onFieldChange('appl.nationality_by', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
@@ -536,6 +562,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.passport_number"
+                  data-field-id="appl.passport_number"
                   type="text"
                   value={getVal('appl.passport_number')}
                   onChange={(e) => onFieldChange('appl.passport_number', e.target.value.toUpperCase())}
@@ -554,6 +582,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.passport_issue_place"
+                  data-field-id="appl.passport_issue_place"
                   type="text"
                   value={getVal('appl.passport_issue_place') || 'DHAKA'}
                   onChange={(e) => onFieldChange('appl.passport_issue_place', e.target.value.toUpperCase())}
@@ -572,6 +602,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.passport_issue_date"
+                  data-field-id="appl.passport_issue_date"
                   type="text"
                   value={getVal('appl.passport_issue_date')}
                   onChange={(e) => onFieldChange('appl.passport_issue_date', e.target.value)}
@@ -590,6 +622,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="appl.passport_expiry_date"
+                  data-field-id="appl.passport_expiry_date"
                   type="text"
                   value={getVal('appl.passport_expiry_date')}
                   onChange={(e) => onFieldChange('appl.passport_expiry_date', e.target.value)}
@@ -604,7 +638,7 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
             </div>
 
             {/* 5. Any other passport held radio */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded" data-field-id="appl.oth_ppt">
               <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2">
                 Any other valid Passport/Identity Certificate(IC) held
               </label>
@@ -655,6 +689,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <select
+                      id="appl.prev_passport_country_issue"
+                      data-field-id="appl.prev_passport_country_issue"
                       value={normalizeToBangladesh(getVal('appl.prev_passport_country_issue'))}
                       onChange={(e) => onFieldChange('appl.prev_passport_country_issue', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
@@ -687,6 +723,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
+                      id="appl.oth_pptno"
+                      data-field-id="appl.oth_pptno"
                       type="text"
                       value={getVal('appl.oth_pptno')}
                       onChange={(e) => onFieldChange('appl.oth_pptno', e.target.value.toUpperCase())}
@@ -714,6 +752,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
+                      id="appl.oth_ppt_issue_date"
+                      data-field-id="appl.oth_ppt_issue_date"
                       type="text"
                       value={getVal('appl.oth_ppt_issue_date')}
                       onChange={(e) => onFieldChange('appl.oth_ppt_issue_date', e.target.value)}
@@ -741,6 +781,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
+                      id="appl.oth_ppt_issue_place"
+                      data-field-id="appl.oth_ppt_issue_place"
                       type="text"
                       value={getVal('appl.oth_ppt_issue_place') || 'DHAKA'}
                       onChange={(e) => onFieldChange('appl.oth_ppt_issue_place', e.target.value.toUpperCase())}
@@ -768,6 +810,8 @@ export const BasicDetailsSection: React.FC<BasicDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <select
+                      id="appl.other_ppt_nationality"
+                      data-field-id="appl.other_ppt_nationality"
                       value={normalizeToBangladesh(getVal('appl.other_ppt_nationality'))}
                       onChange={(e) => onFieldChange('appl.other_ppt_nationality', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
