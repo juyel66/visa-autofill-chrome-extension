@@ -6,6 +6,7 @@ import {
   PORTAL_OCCUPATION_DETAILS_OF_OPTIONS,
   PORTAL_VISA_TYPE_OPTIONS,
   PORTAL_INDIAN_STATES_OPTIONS,
+  ALL_INDIAN_DISTRICTS_OPTIONS,
 } from '../../countries/india/options/registrationOptions'
 
 export interface ApplicationFieldDef {
@@ -2031,9 +2032,10 @@ export const BANGLADESH_APPLICATION_SCHEMA: ApplicationSectionDef[] = [
         label: 'District',
         section: 'visaDetails',
         subsection: 'Reference in India',
-        inputType: 'text',
+        inputType: 'select',
         targetMappingField: 'districtofsponsor_ind',
         sourceApplicantPath: 'reference.district',
+        options: ALL_INDIAN_DISTRICTS_OPTIONS,
         visibleByDefault: true,
       },
       {
