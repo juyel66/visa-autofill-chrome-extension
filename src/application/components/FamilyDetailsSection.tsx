@@ -156,6 +156,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="pres_addr1"
+                  data-field-id="pres_addr1"
                   value={getVal('pres_addr1')}
                   onChange={(e) => onFieldChange('pres_addr1', e.target.value.toUpperCase())}
                   placeholder="HOUSE / STREET ADDRESS"
@@ -179,6 +181,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="village_town_city"
+                  data-field-id="village_town_city"
                   value={getVal('village_town_city') || getVal('pres_addr2')}
                   onChange={(e) => {
                     onFieldChange('village_town_city', e.target.value.toUpperCase())
@@ -202,6 +206,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="present_country"
+                  data-field-id="present_country"
                   value={getVal('present_country')}
                   onChange={(e) => onFieldChange('present_country', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
@@ -229,6 +235,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="district"
+                  data-field-id="district"
                   value={getVal('district') || getVal('state_province')}
                   onChange={(e) => {
                     onFieldChange('district', e.target.value.toUpperCase())
@@ -253,6 +261,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="pincode"
+                  data-field-id="pincode"
                   value={getVal('pincode')}
                   onChange={(e) => onFieldChange('pincode', e.target.value)}
                   placeholder="POSTAL CODE"
@@ -274,6 +284,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="pres_phone"
+                  data-field-id="pres_phone"
                   value={getVal('pres_phone')}
                   onChange={(e) => onFieldChange('pres_phone', e.target.value)}
                   placeholder="PHONE NUMBER"
@@ -302,6 +314,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                 />
                 <input
                   type="text"
+                  id="mobile"
+                  data-field-id="mobile"
                   value={getVal('mobile')}
                   onChange={(e) => onFieldChange('mobile', e.target.value)}
                   placeholder="MOBILE NUMBER"
@@ -323,6 +337,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="email"
+                  id="family_email"
+                  data-field-id="appl.email"
                   value={getVal('appl.email')}
                   onChange={(e) => {
                     onFieldChange('appl.email', e.target.value)
@@ -352,6 +368,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="perm_add1"
+                  data-field-id="perm_add1"
                   value={getVal('perm_add1')}
                   onChange={(e) => onFieldChange('perm_add1', e.target.value.toUpperCase())}
                   placeholder="PERMANENT ADDRESS"
@@ -375,6 +393,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="permanent_village_town_city"
+                  data-field-id="permanent_village_town_city"
                   value={getVal('permanent_village_town_city') || getVal('perm_add2') || getVal('village_town_city') || getVal('pres_addr2')}
                   onChange={(e) => {
                     onFieldChange('permanent_village_town_city', e.target.value.toUpperCase())
@@ -399,6 +419,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="permanent_district"
+                  data-field-id="permanent_district"
                   value={getVal('permanent_district') || getVal('permanent_state_province')}
                   onChange={(e) => {
                     onFieldChange('permanent_district', e.target.value.toUpperCase())
@@ -438,6 +460,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="fthrname"
+                  data-field-id="fthrname"
                   value={getVal('fthrname')}
                   onChange={(e) => onFieldChange('fthrname', e.target.value.toUpperCase())}
                   placeholder="FATHER'S FULL NAME"
@@ -454,6 +478,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="father_nationality"
+                  data-field-id="father_nationality"
                   value={getVal('father_nationality')}
                   onChange={(e) => onFieldChange('father_nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -476,6 +502,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="father_prev_nationality"
+                  data-field-id="father_prev_nationality"
                   value={getVal('father_prev_nationality')}
                   onChange={(e) => onFieldChange('father_prev_nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -499,6 +527,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="father_place_of_birth"
+                  data-field-id="father_place_of_birth"
                   value={getVal('father_place_of_birth')}
                   onChange={(e) => onFieldChange('father_place_of_birth', e.target.value.toUpperCase())}
                   placeholder="PLACE OF BIRTH"
@@ -515,6 +545,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="father_country_of_birth"
+                  data-field-id="father_country_of_birth"
                   value={getVal('father_country_of_birth')}
                   onChange={(e) => onFieldChange('father_country_of_birth', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -543,6 +575,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="mother_name"
+                  data-field-id="mother_name"
                   value={getVal('mother_name')}
                   onChange={(e) => onFieldChange('mother_name', e.target.value.toUpperCase())}
                   placeholder="MOTHER'S FULL NAME"
@@ -559,6 +593,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="mother_nationality"
+                  data-field-id="mother_nationality"
                   value={getVal('mother_nationality')}
                   onChange={(e) => onFieldChange('mother_nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -581,6 +617,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="mother_prev_nationality"
+                  data-field-id="mother_prev_nationality"
                   value={getVal('mother_prev_nationality')}
                   onChange={(e) => onFieldChange('mother_prev_nationality', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -604,6 +642,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="mother_place_of_birth"
+                  data-field-id="mother_place_of_birth"
                   value={getVal('mother_place_of_birth')}
                   onChange={(e) => onFieldChange('mother_place_of_birth', e.target.value.toUpperCase())}
                   placeholder="PLACE OF BIRTH"
@@ -620,6 +660,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="mother_country_of_birth"
+                  data-field-id="mother_country_of_birth"
                   value={getVal('mother_country_of_birth')}
                   onChange={(e) => onFieldChange('mother_country_of_birth', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -643,6 +685,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="marital_status"
+                  data-field-id="marital_status"
                   value={getVal('marital_status')}
                   onChange={(e) => onFieldChange('marital_status', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -668,6 +712,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
                       type="text"
+                      id="spouse_name"
+                      data-field-id="spouse_name"
                       value={getVal('spouse_name')}
                       onChange={(e) => onFieldChange('spouse_name', e.target.value.toUpperCase())}
                       placeholder="SPOUSE NAME"
@@ -682,6 +728,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Nationality *</label>
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <select
+                      id="spouse_nationality"
+                      data-field-id="spouse_nationality"
                       value={getVal('spouse_nationality')}
                       onChange={(e) => onFieldChange('spouse_nationality', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -700,6 +748,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Previous Nationality</label>
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <select
+                      id="spouse_prev_nationality"
+                      data-field-id="spouse_prev_nationality"
                       value={getVal('spouse_prev_nationality')}
                       onChange={(e) => onFieldChange('spouse_prev_nationality', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -719,6 +769,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <input
                       type="text"
+                      id="spouse_place_of_birth"
+                      data-field-id="spouse_place_of_birth"
                       value={getVal('spouse_place_of_birth')}
                       onChange={(e) => onFieldChange('spouse_place_of_birth', e.target.value.toUpperCase())}
                       placeholder="PLACE OF BIRTH"
@@ -733,6 +785,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Spouse Country of Birth</label>
                   <div className="sm:col-span-5 flex items-center gap-1.5">
                     <select
+                      id="spouse_country_of_birth"
+                      data-field-id="spouse_country_of_birth"
                       value={getVal('spouse_country_of_birth')}
                       onChange={(e) => onFieldChange('spouse_country_of_birth', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -750,7 +804,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
             )}
 
             {/* Pakistan Grandparent Ancestry */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
+            <div id="grandparent_flag" data-field-id="grandparent_flag" className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
               <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2 text-[11px] leading-tight">
                 Were your Grandfather/ Grandmother (paternal/maternal) Pakistan Nationals or Belong to Pakistan held area?
               </label>
@@ -785,6 +839,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                 <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">If Yes, give details *</label>
                 <div className="sm:col-span-5">
                   <textarea
+                    id="grandparent_details"
+                    data-field-id="grandparent_details"
                     value={getVal('grandparent_details')}
                     onChange={(e) => onFieldChange('grandparent_details', e.target.value)}
                     rows={2}
@@ -813,6 +869,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="occupation"
+                  data-field-id="occupation"
                   value={getVal('occupation')}
                   onChange={(e) => onFieldChange('occupation', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
@@ -838,6 +896,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                 <div className="sm:col-span-5 flex items-center gap-1.5">
                   <select
                     id="occ_flag"
+                    data-field-id="occ_flag"
                     value={getVal('occ_flag')}
                     onChange={(e) => onFieldChange('occ_flag', e.target.value)}
                     className={`w-full bg-white border ${
@@ -882,6 +941,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="empname"
+                  data-field-id="empname"
                   type="text"
                   value={getVal('empname')}
                   onChange={(e) => onFieldChange('empname', e.target.value.toUpperCase())}
@@ -900,6 +961,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="empdesignation"
+                  data-field-id="empdesignation"
                   type="text"
                   value={getVal('empdesignation')}
                   onChange={(e) => onFieldChange('empdesignation', e.target.value.toUpperCase())}
@@ -918,6 +981,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="empaddress"
+                  data-field-id="empaddress"
                   type="text"
                   value={getVal('empaddress')}
                   onChange={(e) => onFieldChange('empaddress', e.target.value.toUpperCase())}
@@ -936,6 +1001,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="empphone"
+                  data-field-id="empphone"
                   type="text"
                   value={getVal('empphone')}
                   onChange={(e) => onFieldChange('empphone', e.target.value)}
@@ -954,6 +1021,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="previous_occupation"
+                  data-field-id="previous_occupation"
                   value={getVal('previous_occupation')}
                   onChange={(e) => onFieldChange('previous_occupation', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -969,7 +1038,7 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
             </div>
 
             {/* Military/Security Service */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded" data-field-id="prev_org">
               <label className="sm:col-span-4 text-right sm:text-right font-medium text-slate-700 pr-2 text-[11px]">
                 Are/were you in a Military/Semi-Military/Police/Security Organization?
               </label>
@@ -1006,6 +1075,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Organization *</label>
                   <div className="sm:col-span-5">
                     <input
+                      id="previous_organization"
+                      data-field-id="previous_organization"
                       type="text"
                       value={getVal('previous_organization')}
                       onChange={(e) => onFieldChange('previous_organization', e.target.value.toUpperCase())}
@@ -1019,6 +1090,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Designation *</label>
                   <div className="sm:col-span-5">
                     <input
+                      id="previous_designation"
+                      data-field-id="previous_designation"
                       type="text"
                       value={getVal('previous_designation')}
                       onChange={(e) => onFieldChange('previous_designation', e.target.value.toUpperCase())}
@@ -1032,6 +1105,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Rank *</label>
                   <div className="sm:col-span-5">
                     <input
+                      id="previous_rank"
+                      data-field-id="previous_rank"
                       type="text"
                       value={getVal('previous_rank')}
                       onChange={(e) => onFieldChange('previous_rank', e.target.value.toUpperCase())}
@@ -1045,6 +1120,8 @@ export const FamilyDetailsSection: React.FC<FamilyDetailsSectionProps> = ({
                   <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">Place of Posting *</label>
                   <div className="sm:col-span-5">
                     <input
+                      id="previous_posting"
+                      data-field-id="previous_posting"
                       type="text"
                       value={getVal('previous_posting')}
                       onChange={(e) => onFieldChange('previous_posting', e.target.value.toUpperCase())}
