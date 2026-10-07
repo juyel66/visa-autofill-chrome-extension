@@ -248,7 +248,7 @@ export function isFieldFilled(
   }
 
   if (typeof val === 'boolean') {
-    return val === true
+    return true
   }
 
   return false
