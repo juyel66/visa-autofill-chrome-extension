@@ -152,7 +152,7 @@ export const AdditionalQuestionsSection: React.FC<AdditionalQuestionsSectionProp
               const flagVal = getVal(q.flagKey).toLowerCase()
               const isYes = flagVal === 'yes'
               return (
-                <div key={q.num} className="border-b border-slate-100 pb-3 space-y-2">
+                <div key={q.num} id={q.flagKey} data-field-id={q.flagKey} className="border-b border-slate-100 pb-3 space-y-2">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span className="font-medium text-slate-800">
                       {q.num}. {q.title}
@@ -161,6 +161,7 @@ export const AdditionalQuestionsSection: React.FC<AdditionalQuestionsSectionProp
                       <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
                         <input
                           type="radio"
+                          id={`${q.flagKey}_yes`}
                           name={`q_${q.num}_radio`}
                           checked={isYes}
                           onChange={() => onFieldChange(q.flagKey, 'Yes')}
@@ -171,6 +172,7 @@ export const AdditionalQuestionsSection: React.FC<AdditionalQuestionsSectionProp
                       <label className="flex items-center gap-1 text-xs font-semibold cursor-pointer">
                         <input
                           type="radio"
+                          id={`${q.flagKey}_no`}
                           name={`q_${q.num}_radio`}
                           checked={!isYes}
                           onChange={() => onFieldChange(q.flagKey, 'No')}
@@ -185,6 +187,8 @@ export const AdditionalQuestionsSection: React.FC<AdditionalQuestionsSectionProp
                   {isYes && (
                     <div className="pl-4">
                       <textarea
+                        id={q.ansKey}
+                        data-field-id={q.ansKey}
                         value={getVal(q.ansKey)}
                         onChange={(e) => onFieldChange(q.ansKey, e.target.value)}
                         rows={2}
