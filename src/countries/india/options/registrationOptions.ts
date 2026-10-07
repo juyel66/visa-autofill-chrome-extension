@@ -577,3 +577,5 @@ export const PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS: PortalSelectOption[] = [
   { value: 'GEEDE', label: 'GEEDE' },
   { value: 'CHANGRA BANDHA', label: 'CHANGRA BANDHA' },
 ]
+
+export * from './indianDistrictsOptions'
