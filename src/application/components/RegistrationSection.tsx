@@ -29,6 +29,7 @@ interface SearchableSelectProps {
   onChange: (value: string) => void
   className?: string
   dropUp?: boolean
+  dataFieldId?: string
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -40,6 +41,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   onChange,
   className = '',
   dropUp = false,
+  dataFieldId,
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [filterText, setFilterText] = useState('')
@@ -71,6 +73,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       {/* Primary Select Trigger */}
       <div
         id={`${id}_trigger`}
+        data-field-id={dataFieldId || name || id}
         onClick={() => setIsOpen((prev) => !prev)}
         title={selectedOption ? selectedOption.label : placeholder}
         className="w-full min-h-[28px] bg-white text-slate-800 border border-[#a0aec0] hover:border-slate-500 rounded px-2.5 py-1 text-xs font-medium flex items-center justify-between cursor-pointer shadow-xs transition-colors"
@@ -87,6 +90,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       <select
         id={id}
         name={name}
+        data-field-id={dataFieldId || name || id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="sr-only"
@@ -394,6 +398,7 @@ export const RegistrationSection: React.FC<RegistrationSectionProps> = ({
                 <input
                   type="text"
                   id="email_id"
+                  data-field-id="appl.email"
                   name="appl.email"
                   value={emailVal}
                   placeholder=""
@@ -418,6 +423,7 @@ export const RegistrationSection: React.FC<RegistrationSectionProps> = ({
                 <input
                   type="text"
                   id="email_re_id"
+                  data-field-id="appl.email_re"
                   name="appl.email_re"
                   value={emailReVal}
                   placeholder=""
@@ -442,6 +448,7 @@ export const RegistrationSection: React.FC<RegistrationSectionProps> = ({
                 <input
                   type="text"
                   id="journey_id"
+                  data-field-id="appl.journeydate"
                   name="appl.journeydate"
                   value={journeyVal}
                   placeholder=""
@@ -465,6 +472,7 @@ export const RegistrationSection: React.FC<RegistrationSectionProps> = ({
               <div className="flex-1 min-w-0">
                 <SearchableSelect
                   id="purpose_id"
+                  dataFieldId="purpose"
                   name="appl.purpose"
                   value={purposeVal}
                   options={PORTAL_PURPOSE_OF_VISIT_OPTIONS}
