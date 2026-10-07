@@ -5,6 +5,9 @@ import {
   PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS,
   PORTAL_VISA_TYPE_OPTIONS,
   PORTAL_INDIAN_STATES_OPTIONS,
+  getDistrictsForIndianState,
+  getStateForIndianDistrict,
+  ALL_INDIAN_DISTRICTS_OPTIONS,
 } from '../../countries/india/options/registrationOptions'
 
 export interface VisaDetailsSectionProps {
@@ -53,6 +56,48 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
   const hasVisitedSaarc = saarcFlagVal.toLowerCase() === 'yes'
 
   const visaType = getVal('visa_type') || 'BUSINESS VISA'
+
+  const currentStateVal = getVal('stateofsponsor_ind')
+  const currentDistrictVal = getVal('districtofsponsor_ind')
+
+  const currentDistrictOptions = React.useMemo(() => {
+    if (!currentStateVal) {
+      return ALL_INDIAN_DISTRICTS_OPTIONS
+    }
+    const stateList = getDistrictsForIndianState(currentStateVal)
+    return stateList.length > 0 ? stateList : ALL_INDIAN_DISTRICTS_OPTIONS
+  }, [currentStateVal])
+
+  const hasCurrentDistrictInOptions = React.useMemo(() => {
+    if (!currentDistrictVal) return true
+    return currentDistrictOptions.some(
+      (d) => d.value.toUpperCase() === currentDistrictVal.trim().toUpperCase()
+    )
+  }, [currentDistrictOptions, currentDistrictVal])
+
+  const handleStateChange = (newState: string) => {
+    onFieldChange('stateofsponsor_ind', newState)
+    if (newState && currentDistrictVal) {
+      const newDistricts = getDistrictsForIndianState(newState)
+      if (
+        newDistricts.length > 0 &&
+        !newDistricts.some((d) => d.value.toUpperCase() === currentDistrictVal.trim().toUpperCase())
+      ) {
+        onFieldChange('districtofsponsor_ind', '')
+      }
+    }
+  }
+
+  const handleDistrictChange = (newDistrict: string) => {
+    const upper = newDistrict.toUpperCase()
+    onFieldChange('districtofsponsor_ind', upper)
+    if (!currentStateVal && upper) {
+      const detectedState = getStateForIndianDistrict(upper)
+      if (detectedState) {
+        onFieldChange('stateofsponsor_ind', detectedState)
+      }
+    }
+  }
 
   const renderBadge = (fieldVal?: ApplicationFieldValue) => {
     if (!renderSourceBadge) return null
@@ -145,6 +190,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="visa_type"
+                  data-field-id="visa_type"
                   value={visaType}
                   onChange={(e) => onFieldChange('visa_type', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#7c3aed]"
@@ -168,6 +215,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="comp_name"
+                  data-field-id="comp_name"
                   type="text"
                   value={getVal('comp_name')}
                   onChange={(e) => onFieldChange('comp_name', e.target.value.toUpperCase())}
@@ -186,6 +235,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="comp_address"
+                  data-field-id="comp_address"
                   type="text"
                   value={getVal('comp_address')}
                   onChange={(e) => onFieldChange('comp_address', e.target.value.toUpperCase())}
@@ -204,6 +255,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="comp_phone"
+                  data-field-id="comp_phone"
                   type="text"
                   value={getVal('comp_phone')}
                   onChange={(e) => onFieldChange('comp_phone', e.target.value)}
@@ -222,6 +275,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="comp_email"
+                  data-field-id="comp_email"
                   type="email"
                   value={getVal('comp_email')}
                   onChange={(e) => onFieldChange('comp_email', e.target.value)}
@@ -241,6 +296,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
                   type="text"
+                  id="duration"
+                  data-field-id="duration"
                   value={getVal('duration') !== '' ? getVal('duration') : '0'}
                   onChange={(e) => onFieldChange('duration', e.target.value)}
                   placeholder="0"
@@ -258,6 +315,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="visa_entry_id"
+                  data-field-id="visa_entry_id"
                   value={getVal('visa_entry_id') || 'SINGLE'}
                   onChange={(e) => onFieldChange('visa_entry_id', e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
@@ -279,6 +338,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="purpose"
+                  data-field-id="purpose"
                   value={
                     getVal('purpose') ||
                     'FOR ALL BUSINESS ACTIVITIES [OTHER THAN THOSE COVERED BY B-2, B-3 AND B-4 VISAS'
@@ -305,6 +366,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="journeydate"
+                  data-field-id="journeydate"
                   type="text"
                   value={getVal('journeydate') || getVal('appl.journeydate') || '20/02/2027'}
                   onChange={(e) => {
@@ -326,6 +389,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="entrypoint"
+                  data-field-id="entrypoint"
                   value={(() => {
                     const raw = getVal('entrypoint') || 'HARIDASPUR'
                     const opt = PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS.find(
@@ -364,6 +429,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
+                  id="exitpoint"
+                  data-field-id="exitpoint"
                   value={(() => {
                     const raw = getVal('exitpoint') || getVal('entrypoint') || 'HARIDASPUR'
                     const opt = PORTAL_PORT_OF_ENTRY_EXIT_OPTIONS.find(
@@ -401,7 +468,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
 
           <div className="p-4 space-y-3.5 text-xs">
             {/* Have you ever visited India before? (Default No) */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded" data-field-id="old_visa_flag">
               <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                 Have you ever visited India before? <span className="text-red-600 font-bold">*</span>
               </label>
@@ -441,6 +508,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5 space-y-1.5">
                     <input
+                      id="prv_visit_add1"
+                      data-field-id="prv_visit_add1"
                       type="text"
                       value={getVal('prv_visit_add1')}
                       onChange={(e) => onFieldChange('prv_visit_add1', e.target.value.toUpperCase())}
@@ -448,6 +517,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                     />
                     <input
+                      id="prv_visit_add2"
+                      data-field-id="prv_visit_add2"
                       type="text"
                       value={getVal('prv_visit_add2')}
                       onChange={(e) => onFieldChange('prv_visit_add2', e.target.value.toUpperCase())}
@@ -455,6 +526,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
                     />
                     <input
+                      id="prv_visit_add3"
+                      data-field-id="prv_visit_add3"
                       type="text"
                       value={getVal('prv_visit_add3')}
                       onChange={(e) => onFieldChange('prv_visit_add3', e.target.value.toUpperCase())}
@@ -475,6 +548,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   <div className="sm:col-span-5">
                     <textarea
                       rows={2}
+                      id="cities_visited"
+                      data-field-id="cities_visited"
                       value={getVal('cities_visited')}
                       onChange={(e) => onFieldChange('cities_visited', e.target.value.toUpperCase())}
                       placeholder="KOLKATA, DELHI, CHENNAI"
@@ -494,6 +569,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   <div className="sm:col-span-5">
                     <input
                       type="text"
+                      id="old_visa_no"
+                      data-field-id="old_visa_no"
                       value={getVal('old_visa_no')}
                       onChange={(e) => onFieldChange('old_visa_no', e.target.value.toUpperCase())}
                       placeholder="VISA NUMBER"
@@ -512,6 +589,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5">
                     <select
+                      id="old_visa_type_id"
+                      data-field-id="old_visa_type_id"
                       value={getVal('old_visa_type_id')}
                       onChange={(e) => onFieldChange('old_visa_type_id', e.target.value)}
                       className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs"
@@ -534,6 +613,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5">
                     <input
+                      id="oldvisaissueplace"
+                      data-field-id="oldvisaissueplace"
                       type="text"
                       value={getVal('oldvisaissueplace')}
                       onChange={(e) => onFieldChange('oldvisaissueplace', e.target.value.toUpperCase())}
@@ -551,6 +632,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   </label>
                   <div className="sm:col-span-5">
                     <input
+                      id="oldvisaissuedate"
+                      data-field-id="oldvisaissuedate"
                       type="text"
                       value={getVal('oldvisaissuedate')}
                       onChange={(e) => onFieldChange('oldvisaissuedate', e.target.value)}
@@ -564,7 +647,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
             )}
 
             {/* Has permission to visit or to extend stay in India previously been refused? (Default No) */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded" data-field-id="refuse_flag">
               <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2">
                 Has permission to visit or to extend stay in India previously been refused?
               </label>
@@ -610,6 +693,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   <div className="sm:col-span-5">
                     <textarea
                       rows={2}
+                      id="refuse_details"
+                      data-field-id="refuse_details"
                       value={getVal('refuse_details')}
                       onChange={(e) => onFieldChange('refuse_details', e.target.value.toUpperCase())}
                       placeholder="DETAILS OF REFUSAL, CONTROL NO AND DATE"
@@ -640,6 +725,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-start gap-1.5">
                 <textarea
+                  id="country_visited"
+                  data-field-id="country_visited"
                   rows={2}
                   value={getVal('country_visited') || 'NA'}
                   onChange={(e) => onFieldChange('country_visited', e.target.value.toUpperCase())}
@@ -662,7 +749,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
           </div>
 
           <div className="p-4 space-y-3.5 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-[#faf5fa] py-2 rounded" data-field-id="saarc_flag">
               <label className="sm:col-span-4 text-right font-medium text-slate-700 pr-2 text-[11px]">
                 Have you visited SAARC countries (except your own country) during last 3 years?
               </label>
@@ -703,6 +790,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                   <div className="sm:col-span-5">
                     <textarea
                       rows={2}
+                      id="saarc_details"
+                      data-field-id="saarc_details"
                       value={getVal('saarc_details')}
                       onChange={(e) => onFieldChange('saarc_details', e.target.value.toUpperCase())}
                       placeholder="NAME OF SAARC COUNTRY, YEAR, NO OF VISITS"
@@ -734,6 +823,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="nameofsponsor_ind"
+                  data-field-id="nameofsponsor_ind"
                   type="text"
                   value={getVal('nameofsponsor_ind')}
                   onChange={(e) => onFieldChange('nameofsponsor_ind', e.target.value.toUpperCase())}
@@ -752,6 +843,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="add1ofsponsor_ind"
+                  data-field-id="add1ofsponsor_ind"
                   type="text"
                   value={getVal('add1ofsponsor_ind')}
                   onChange={(e) => onFieldChange('add1ofsponsor_ind', e.target.value.toUpperCase())}
@@ -770,8 +863,10 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <select
-                  value={getVal('stateofsponsor_ind')}
-                  onChange={(e) => onFieldChange('stateofsponsor_ind', e.target.value)}
+                  id="stateofsponsor_ind"
+                  data-field-id="stateofsponsor_ind"
+                  value={currentStateVal}
+                  onChange={(e) => handleStateChange(e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
                 >
                   <option value="">Select state</option>
@@ -792,13 +887,23 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
                 District <span className="text-red-600 font-bold">*</span>
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={getVal('districtofsponsor_ind')}
-                  onChange={(e) => onFieldChange('districtofsponsor_ind', e.target.value.toUpperCase())}
-                  placeholder="Select District"
+                <select
+                  id="districtofsponsor_ind"
+                  data-field-id="districtofsponsor_ind"
+                  value={currentDistrictVal}
+                  onChange={(e) => handleDistrictChange(e.target.value)}
                   className="w-full bg-white border border-[#a0aec0] rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#7c3aed]"
-                />
+                >
+                  <option value="">Select District</option>
+                  {currentDistrictVal && !hasCurrentDistrictInOptions && (
+                    <option value={currentDistrictVal}>{currentDistrictVal}</option>
+                  )}
+                  {currentDistrictOptions.map((d) => (
+                    <option key={d.value} value={d.value}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
                 {renderBadge(fields['districtofsponsor_ind'])}
               </div>
               <div className="sm:col-span-3 text-[11px] text-slate-500 pl-1">Select District</div>
@@ -811,6 +916,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="phoneofsponsor_ind"
+                  data-field-id="phoneofsponsor_ind"
                   type="text"
                   value={getVal('phoneofsponsor_ind')}
                   onChange={(e) => onFieldChange('phoneofsponsor_ind', e.target.value)}
@@ -829,6 +936,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="nameofsponsor_msn"
+                  data-field-id="nameofsponsor_msn"
                   type="text"
                   value={getVal('nameofsponsor_msn')}
                   onChange={(e) => onFieldChange('nameofsponsor_msn', e.target.value.toUpperCase())}
@@ -847,6 +956,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="add1ofsponsor_msn"
+                  data-field-id="add1ofsponsor_msn"
                   type="text"
                   value={getVal('add1ofsponsor_msn')}
                   onChange={(e) => onFieldChange('add1ofsponsor_msn', e.target.value.toUpperCase())}
@@ -865,6 +976,8 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
               </label>
               <div className="sm:col-span-5 flex items-center gap-1.5">
                 <input
+                  id="phoneofsponsor_msn"
+                  data-field-id="phoneofsponsor_msn"
                   type="text"
                   value={getVal('phoneofsponsor_msn')}
                   onChange={(e) => onFieldChange('phoneofsponsor_msn', e.target.value)}
@@ -881,7 +994,7 @@ export const VisaDetailsSection: React.FC<VisaDetailsSectionProps> = ({
         {/* ========================================================================= */}
         {/* SECTION 6: Photograph Upload & Preview */}
         {/* ========================================================================= */}
-        <div id="sec-photoUpload" className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs scroll-mt-28">
+        <div id="sec-photoUpload" data-field-id="applicant-photo" className="border border-[#c5a0c5] rounded-md overflow-hidden bg-white shadow-xs scroll-mt-28">
           <div className="bg-[#c5a0c5] text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wide">
             Applicant Photograph Management
           </div>
