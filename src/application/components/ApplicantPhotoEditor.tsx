@@ -407,7 +407,7 @@ export const ApplicantPhotoEditor: React.FC<ApplicantPhotoEditorProps> = ({
     'Applicant'
 
   return (
-    <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden transition-all">
+    <div id="applicant-photo-editor" data-field-id="applicant-photo" className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden transition-all">
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
