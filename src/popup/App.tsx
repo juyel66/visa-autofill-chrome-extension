@@ -4,6 +4,7 @@ import {
   logout as authLogout,
   restoreAuthSession,
   type AuthUser,
+  AUTH_CONFIG,
 } from '../core/auth'
 import { GoogleLoginScreen } from './components/GoogleLoginScreen'
 import { Dashboard, SettingsPage } from './pages'
@@ -47,7 +48,7 @@ export default function App() {
             setErrorMessage('Backend server unreachable. Working in offline mode (session preserved).')
           } else {
             setAuthUser(null)
-            setAuthError('Backend server unreachable. Make sure backend is running on port 8000.')
+            setAuthError(`Backend server unreachable. Make sure backend is running on ${AUTH_CONFIG.BACKEND_URL}.`)
           }
         } else {
           // Unauthenticated (no session or refresh token expired/revoked)
@@ -88,7 +89,7 @@ export default function App() {
       showToast(`Welcome, ${user.name}!`)
     } catch (err: any) {
       console.error('Login failed:', err)
-      const msg = err.message || 'Failed to authenticate with Google. Make sure backend is running on port 8000.'
+      const msg = err.message || `Failed to authenticate with Google. Make sure backend is running on ${AUTH_CONFIG.BACKEND_URL}.`
       setAuthError(msg)
       setErrorMessage(msg)
     } finally {
