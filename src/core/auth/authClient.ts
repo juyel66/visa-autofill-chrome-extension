@@ -1,15 +1,12 @@
 import { getStoredAuth, setStoredAuth, clearStoredAuth } from './authStorage'
 import type { AuthUser } from './types'
 
-export const BACKEND_AUTH_BASE_URL = 'http://localhost:8000'
-
-export const GOOGLE_CLIENT_ID =
-  (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_GOOGLE_CLIENT_ID || import.meta.env?.GOOGLE_CLIENT_ID)) ||
-  '478244875026-tpnqtk9ke8e1tpldgrsu40gft4r65ifu.apps.googleusercontent.com'
-
-export const REDIRECT_URI =
-  (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_GOOGLE_REDIRECT_URI || import.meta.env?.GOOGLE_REDIRECT_URI)) ||
-  'https://idjemajdjnoefigfbnnfmcpnnfgme.chromiumapp.org/'
+import {
+  BACKEND_AUTH_BASE_URL,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_REDIRECT_URI as REDIRECT_URI,
+} from '../config/env'
+export { BACKEND_AUTH_BASE_URL, GOOGLE_CLIENT_ID, REDIRECT_URI }
 
 export const AUTH_CONFIG = {
   GOOGLE_CLIENT_ID,
@@ -156,7 +153,7 @@ export async function loginWithGoogle(): Promise<AuthUser> {
       }),
     })
   } catch (err) {
-    throw new Error('Unable to connect to backend server. Make sure http://localhost:8000 is running.')
+    throw new Error(`Unable to connect to backend server. Make sure ${AUTH_CONFIG.BACKEND_URL} is running.`)
   }
 
   const rawText = await response.text().catch(() => '')
@@ -292,7 +289,7 @@ export async function refreshAccessToken(): Promise<string> {
         })
       } catch (err: any) {
         // Backend unavailable: do NOT delete valid persistent session!
-        throw new Error('Unable to connect to backend server. Make sure http://localhost:8000 is running.')
+        throw new Error(`Unable to connect to backend server. Make sure ${AUTH_CONFIG.BACKEND_URL} is running.`)
       }
 
       const rawText = await response.text().catch(() => '')
