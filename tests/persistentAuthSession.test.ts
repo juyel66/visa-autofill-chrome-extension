@@ -254,9 +254,9 @@ async function runPersistentAuthSessionTests() {
 
       // Launch 3 simultaneous requests that all receive 401 initially
       const [resA, resB, resC] = await Promise.all([
-        fetchWithAuth('http://localhost:8000/api/test-endpoint-A'),
-        fetchWithAuth('http://localhost:8000/api/test-endpoint-B'),
-        fetchWithAuth('http://localhost:8000/api/test-endpoint-C'),
+        fetchWithAuth(`${AUTH_CONFIG.BACKEND_URL}/api/test-endpoint-A`),
+        fetchWithAuth(`${AUTH_CONFIG.BACKEND_URL}/api/test-endpoint-B`),
+        fetchWithAuth(`${AUTH_CONFIG.BACKEND_URL}/api/test-endpoint-C`),
       ])
 
       assert(resA.status === 200, 'Request A retried and succeeded')
@@ -387,7 +387,7 @@ async function runPersistentAuthSessionTests() {
         return new Response('Not Found', { status: 404 })
       }
 
-      const response = await fetchWithAuth('http://localhost:8000/api/applications/forbidden-id')
+      const response = await fetchWithAuth(`${AUTH_CONFIG.BACKEND_URL}/api/applications/forbidden-id`)
       assert(response.status === 403, '403 response received')
 
       const stored = await getStoredAuth()
