@@ -6,7 +6,8 @@ import { parseDateString, formatToIsoDate } from '../../autofill/dateNormalizer'
 /**
  * Default local URL for the Python extractor service created in Task 114.
  */
-export const LOCAL_EXTRACTOR_URL = 'http://127.0.0.1:8001'
+import { LOCAL_EXTRACTOR_URL } from '../../config/env'
+export { LOCAL_EXTRACTOR_URL }
 
 /**
  * Timeout in milliseconds for local extraction requests.
