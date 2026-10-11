@@ -7,6 +7,7 @@ import {
   downloadApplicationPdf,
   ApplicationApiError,
   createApplicationApiError,
+  BACKEND_API_BASE_URL,
 } from '../src/core/application/applicationApi'
 import {
   fetchWithAuth,
@@ -48,9 +49,9 @@ async function runApiSafeResponseTests() {
 
   try {
     // -------------------------------------------------------------------------
-    // TEST 1: Backend running (localhost:8000)
+    // TEST 1: Backend running (BACKEND_API_BASE_URL)
     // -------------------------------------------------------------------------
-    console.log('--- TEST 1: BACKEND RUNNING (Port 8000) ---')
+    console.log(`--- TEST 1: BACKEND RUNNING (${BACKEND_API_BASE_URL}) ---`)
     {
       globalThis.fetch = async (url: any) => {
         const u = String(url)
@@ -76,7 +77,7 @@ async function runApiSafeResponseTests() {
       }
 
       const list = await getApplications()
-      assert(list.length === 1, 'Extension can call localhost:8000 when backend is running')
+      assert(list.length === 1, `Extension can call ${BACKEND_API_BASE_URL} when backend is running`)
       assert(list[0].applicantName === 'JUYEL RANA', 'Backend data parsed cleanly')
       assert(!list.some((a) => (a as any).message?.includes('Unable to connect')), 'No false-positive "Unable to connect" error')
     }
@@ -270,7 +271,7 @@ async function runApiSafeResponseTests() {
     {
       globalThis.fetch = async (url: any) => {
         const u = String(url)
-        if (u.includes('8000')) {
+        if (u.includes(BACKEND_API_BASE_URL) || u.includes('/api/applications')) {
           throw new TypeError('Failed to fetch')
         }
         return new Response('Not Found', { status: 404 })
@@ -286,8 +287,8 @@ async function runApiSafeResponseTests() {
       assert(backendErr !== null, 'Operation requiring backend throws on connection failure')
       assert(backendErr instanceof ApplicationApiError, 'Error is ApplicationApiError')
       assert(
-        backendErr.message === 'Unable to connect to backend server. Make sure http://localhost:8000 is running.',
-        'Correct exact connection message: "Unable to connect to backend server. Make sure http://localhost:8000 is running."'
+        backendErr.message === `Unable to connect to backend server. Make sure ${BACKEND_API_BASE_URL} is running.`,
+        `Correct exact connection message: "Unable to connect to backend server. Make sure ${BACKEND_API_BASE_URL} is running."`
       )
       assert(
         !backendErr.message.includes('body stream already read'),
