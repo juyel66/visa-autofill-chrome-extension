@@ -16,11 +16,10 @@ try {
       const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/)
       if (match) {
         const key = match[1]
-        let value = match[2] || ''
+        let value = (match[2] || '').trim()
         if (value.endsWith('\r')) value = value.slice(0, -1)
-        if (!process.env[key]) {
-          process.env[key] = value
-        }
+        value = value.replace(/^["'](.*)["']$/, '$1')
+        process.env[key] = value
       }
     }
   }
