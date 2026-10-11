@@ -13,6 +13,7 @@ import {
   getApplicationById,
   deleteApplication,
   downloadApplicationPdf,
+  BACKEND_API_BASE_URL,
 } from '../../core/application/applicationApi'
 import type { AuthUser } from '../../core/auth'
 import { executePassportExtractionWorkflow, executeOgdExtractionWorkflow } from '../../core/workflow'
@@ -130,7 +131,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
     } catch (err: any) {
       console.error('Failed to load applications from backend:', err)
-      setErrorMessage(err.message || 'Unable to connect to backend server. Make sure http://localhost:8000 is running.')
+      setErrorMessage(err.message || `Unable to connect to backend server. Make sure ${BACKEND_API_BASE_URL} is running.`)
     } finally {
       setIsApplicationsLoading(false)
     }
