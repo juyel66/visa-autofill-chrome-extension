@@ -378,6 +378,24 @@ async function run() {
     logError('dev', `Extension build error: ${buildErr.message}`)
   }
 
+  // Watch .env for changes and rebuild dist/ automatically
+  const envFilePath = path.join(projectRoot, '.env')
+  if (fs.existsSync(envFilePath)) {
+    let rebuildTimer = null
+    fs.watch(envFilePath, () => {
+      clearTimeout(rebuildTimer)
+      rebuildTimer = setTimeout(() => {
+        logDev('.env file changed! Rebuilding extension bundle to dist/...')
+        try {
+          execSync('node build.js', { cwd: projectRoot, stdio: 'inherit' })
+          logDev('Extension successfully rebuilt to dist/ with new .env values!')
+        } catch (rebuildErr) {
+          logError('dev', `Rebuild failed: ${rebuildErr.message}`)
+        }
+      }, 300)
+    })
+  }
+
   // Step C: Start Vite
   logVite('Starting Vite development server...')
 
