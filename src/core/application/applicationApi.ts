@@ -5,12 +5,8 @@ import type {
   BackendApplicationDetail,
 } from './types'
 
-export const BACKEND_API_BASE_URL =
-  (typeof import.meta !== 'undefined' &&
-    (import.meta.env?.VITE_API_BASE_URL ||
-      import.meta.env?.BACKEND_URL ||
-      import.meta.env?.VITE_BACKEND_URL)) ||
-  'http://localhost:8000'
+import { BACKEND_API_BASE_URL } from '../config/env'
+export { BACKEND_API_BASE_URL }
 
 export class ApplicationApiError extends Error {
   status: number
@@ -121,7 +117,7 @@ async function safeFetch(url: string, options: RequestInit = {}): Promise<Respon
     }
     const message = err instanceof Error ? err.message : String(err)
     if (/failed to fetch|networkerror|econnrefused|failed to connect/i.test(message)) {
-      throw new ApplicationApiError('Unable to connect to backend server. Make sure http://localhost:8000 is running.', 0)
+      throw new ApplicationApiError(`Unable to connect to backend server. Make sure ${BACKEND_API_BASE_URL} is running.`, 0)
     }
     throw err
   }
