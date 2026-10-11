@@ -38,6 +38,13 @@ import { AdditionalQuestionsSection } from './components/AdditionalQuestionsSect
 import { ApplicantPhotoEditor } from './components/ApplicantPhotoEditor'
 import { ManualFieldsNavigator } from './components/ManualFieldsNavigator'
 import { checkAndClearActiveTargetIfFilled } from './manualFieldsRegistry'
+import {
+  createWorkspaceBaseline,
+  hasWorkspaceUnsavedChanges,
+  getWorkspaceUnsavedChangesCount,
+  type WorkspaceBaseline,
+} from '../core/application/workspaceUnsavedChanges'
+import { UnsavedChangesDialog } from './components/UnsavedChangesDialog'
 
 export const App: React.FC = () => {
   const [applicantId, setApplicantId] = useState<string>('')
@@ -57,6 +64,13 @@ export const App: React.FC = () => {
   const [originalPdfFileName, setOriginalPdfFileName] = useState<string>('passport.pdf')
   const [draftId, setDraftId] = useState<string | null>(null)
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false)
+
+  // Unsaved Changes Tracking & Navigation Guard State
+  const [savedBaseline, setSavedBaseline] = useState<WorkspaceBaseline | null>(null)
+  const [showUnsavedModal, setShowUnsavedModal] = useState<boolean>(false)
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null)
+  const isNavigationApprovedRef = React.useRef<boolean>(false)
+  const isInitialBaselineSetRef = React.useRef<boolean>(false)
 
   // Document Extraction Error & Status
   const [extractionError, setExtractionError] = useState<string | null>(() => {
@@ -94,6 +108,8 @@ export const App: React.FC = () => {
 
       await saveApplication(mergedApp)
       setApplication(mergedApp)
+      setSavedBaseline(createWorkspaceBaseline(mergedApp))
+      isInitialBaselineSetRef.current = true
     },
     []
   )
@@ -168,6 +184,8 @@ export const App: React.FC = () => {
             const detail = await getApplicationById(urlApplicationId)
             if (detail && detail.applicationData) {
               setApplication(detail.applicationData)
+              setSavedBaseline(createWorkspaceBaseline(detail.applicationData))
+              isInitialBaselineSetRef.current = true
               setBackendApplicationId(detail.id)
               setApplicantId(detail.applicationData.applicantId || detail.applicantName || detail.id)
               if (detail.originalPdfFileName) {
@@ -189,6 +207,8 @@ export const App: React.FC = () => {
             if (draft && draft.savedApplication) {
               setDraftId(draft.draftId)
               setApplication(draft.savedApplication)
+              setSavedBaseline(createWorkspaceBaseline(draft.savedApplication))
+              isInitialBaselineSetRef.current = true
               setBackendApplicationId(draft.savedApplication.backendApplicationId || null)
               if (draft.pdfBlob) {
                 setOriginalPdf(draft.pdfBlob)
@@ -209,6 +229,8 @@ export const App: React.FC = () => {
           if (recentDraft && recentDraft.savedApplication && Date.now() - recentDraft.createdAt < 30 * 60 * 1000) {
             setDraftId(recentDraft.draftId)
             setApplication(recentDraft.savedApplication)
+            setSavedBaseline(createWorkspaceBaseline(recentDraft.savedApplication))
+            isInitialBaselineSetRef.current = true
             setBackendApplicationId(recentDraft.savedApplication.backendApplicationId || null)
             if (recentDraft.pdfBlob) {
               setOriginalPdf(recentDraft.pdfBlob)
@@ -255,6 +277,123 @@ export const App: React.FC = () => {
 
     loadData()
   }, [loadApplicationForApplicant])
+
+  // Ensure baseline is synchronized when application first loads
+  useEffect(() => {
+    if (application && !loading && !isInitialBaselineSetRef.current) {
+      isInitialBaselineSetRef.current = true
+      setSavedBaseline(createWorkspaceBaseline(application))
+    }
+  }, [application, loading])
+
+  // Unsaved changes calculations against saved baseline
+  const hasUnsavedChanges = useMemo(() => {
+    return hasWorkspaceUnsavedChanges(application, savedBaseline)
+  }, [application, savedBaseline])
+
+  const unsavedChangesCount = useMemo(() => {
+    return getWorkspaceUnsavedChangesCount(application, savedBaseline)
+  }, [application, savedBaseline])
+
+  // Accidental browser/tab close or refresh protection
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+      return ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [hasUnsavedChanges])
+
+  // Navigation confirmation handler
+  const confirmNavigation = useCallback(
+    (onProceed: () => void) => {
+      if (hasUnsavedChanges) {
+        setPendingNavigation(() => onProceed)
+        setShowUnsavedModal(true)
+      } else {
+        onProceed()
+      }
+    },
+    [hasUnsavedChanges]
+  )
+
+  const handleStay = useCallback(() => {
+    setShowUnsavedModal(false)
+    setPendingNavigation(null)
+  }, [])
+
+  const handleLeave = useCallback(() => {
+    setShowUnsavedModal(false)
+    isNavigationApprovedRef.current = true
+    if (pendingNavigation) {
+      const nav = pendingNavigation
+      setPendingNavigation(null)
+      nav()
+    }
+  }, [pendingNavigation])
+
+  // Intercept anchor clicks within page when unsaved changes exist
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (!hasUnsavedChanges) return
+      const target = e.target as HTMLElement | null
+      const anchor = target?.closest('a')
+      if (!anchor) return
+
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return
+      if (anchor.target === '_blank') return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      confirmNavigation(() => {
+        window.location.href = anchor.href
+      })
+    }
+
+    document.addEventListener('click', handleDocumentClick, true)
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true)
+    }
+  }, [hasUnsavedChanges, confirmNavigation])
+
+  // Intercept browser back/forward history navigation
+  useEffect(() => {
+    const stateMarker = { visaWorkspace: true }
+    try {
+      window.history.replaceState(stateMarker, '')
+    } catch {}
+
+    const handlePopState = () => {
+      if (!hasUnsavedChanges) return
+      if (isNavigationApprovedRef.current) {
+        isNavigationApprovedRef.current = false
+        return
+      }
+
+      try {
+        window.history.pushState(stateMarker, '', window.location.href)
+      } catch {}
+
+      confirmNavigation(() => {
+        isNavigationApprovedRef.current = true
+        window.history.back()
+      })
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [hasUnsavedChanges, confirmNavigation])
 
   useEffect(() => {
     checkAndClearActiveTargetIfFilled(application)
@@ -632,6 +771,7 @@ export const App: React.FC = () => {
         toSave.backendApplicationId = targetBackendId
 
         setApplication(toSave)
+        setSavedBaseline(createWorkspaceBaseline(toSave))
         showToast('✓ Application saved successfully to server!', 'success')
       } else {
         // Create new application on Node backend (POST /api/applications) with complete SavedApplication + original PDF
@@ -641,6 +781,7 @@ export const App: React.FC = () => {
         toSave.backendApplicationId = targetBackendId
 
         setApplication(toSave)
+        setSavedBaseline(createWorkspaceBaseline(toSave))
 
         // Clean up draft in IndexedDB
         if (draftId) {
@@ -944,6 +1085,26 @@ export const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 flex items-center justify-between gap-2 sm:gap-3">
           {/* Left: Brand & Compact Document Badges */}
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            {/* Back to Applications Navigation Button */}
+            <button
+              type="button"
+              id="workspace-back-to-apps-btn"
+              onClick={() => {
+                confirmNavigation(() => {
+                  if (window.history.length > 1) {
+                    window.history.back()
+                  } else {
+                    window.location.href = 'index.html'
+                  }
+                })
+              }}
+              className="px-2 py-1 rounded-md text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+              title="Back to Applications"
+            >
+              <span>←</span>
+              <span className="hidden sm:inline">Applications</span>
+            </button>
+
             <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-sm text-sm flex-shrink-0">
               🇮🇳
             </div>
@@ -1050,11 +1211,40 @@ export const App: React.FC = () => {
               </button>
             )}
 
+            {/* Unsaved Changes Status Indicator near Save button */}
+            {hasUnsavedChanges ? (
+              <span
+                id="workspace-unsaved-badge"
+                data-status="unsaved"
+                className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-950/90 text-amber-300 border border-amber-600/70 shadow-xs"
+                title="You have unsaved changes in this application"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span>⚠ Unsaved changes</span>
+              </span>
+            ) : savedBaseline !== null ? (
+              <span
+                id="workspace-saved-badge"
+                data-status="saved"
+                className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-600/60 shadow-xs"
+                title="All changes saved"
+              >
+                <span className="text-emerald-400 text-xs">✓</span>
+                <span>Saved</span>
+              </span>
+            ) : null}
+
             {/* Primary Save Button */}
             <button
+              id="workspace-header-save-btn"
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded-lg shadow-sm hover:shadow-blue-500/20 transition-all flex items-center gap-1 text-xs cursor-pointer"
+              className={`font-semibold px-3 py-1 rounded-lg shadow-sm transition-all flex items-center gap-1 text-xs cursor-pointer ${
+                hasUnsavedChanges
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white ring-1 ring-blue-400/50 hover:shadow-blue-500/20'
+                  : 'bg-blue-600/90 hover:bg-blue-500 text-slate-100'
+              } disabled:opacity-50`}
+              title={hasUnsavedChanges ? 'Save changes to server' : 'All changes saved (click to re-save)'}
             >
               {saving ? 'Saving...' : '💾 Save'}
             </button>
@@ -1300,6 +1490,26 @@ export const App: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-3">
+              {hasUnsavedChanges ? (
+                <span
+                  id="workspace-unsaved-badge-bottom"
+                  data-status="unsaved"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-950/90 text-amber-300 border border-amber-600/70"
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  <span>⚠ Unsaved changes</span>
+                </span>
+              ) : savedBaseline !== null ? (
+                <span
+                  id="workspace-saved-badge-bottom"
+                  data-status="saved"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-600/60"
+                >
+                  <span className="text-emerald-400">✓</span>
+                  <span>All changes saved</span>
+                </span>
+              ) : null}
+
               <button
                 onClick={() => setShowAllFields((prev) => !prev)}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium px-3.5 py-2 rounded-lg text-xs transition-colors cursor-pointer"
@@ -1307,9 +1517,15 @@ export const App: React.FC = () => {
                 {showAllFields ? '⚡ Switch to Curated View' : '👁️ Show All 100 Fields'}
               </button>
               <button
+                id="workspace-bottom-save-btn"
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold px-6 py-2 rounded-lg text-sm shadow-md transition-all cursor-pointer flex items-center gap-2"
+                className={`font-semibold px-6 py-2 rounded-lg text-sm shadow-md transition-all cursor-pointer flex items-center gap-2 ${
+                  hasUnsavedChanges
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-blue-400/50'
+                    : 'bg-blue-600/90 hover:bg-blue-500 text-slate-100'
+                } disabled:opacity-50`}
+                title={hasUnsavedChanges ? 'Save changes to server' : 'All changes saved (click to re-save)'}
               >
                 {saving ? 'Saving...' : '💾 Save Application'}
               </button>
@@ -1392,6 +1608,13 @@ export const App: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Unsaved Changes Confirmation Dialog */}
+      <UnsavedChangesDialog
+        isOpen={showUnsavedModal}
+        onStay={handleStay}
+        onLeave={handleLeave}
+        changedCount={unsavedChangesCount}
+      />
     </div>
   )
 }
