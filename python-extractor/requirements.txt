@@ -36,7 +36,7 @@ modelscope-hub==0.4.5
 multidict==6.9.1
 networkx==3.6.1
 numpy==2.3.5
-opencv-contrib-python==4.10.0.84
+onnxruntime==1.30.0
 opencv-python-headless==5.0.0.93
 opt-einsum==3.3.0
 packaging==26.3
@@ -64,6 +64,7 @@ python-bidi==0.6.11
 python-dateutil==2.9.0.post0
 python-multipart==0.0.32
 pyyaml==6.0.2
+rapidocr-onnxruntime==1.4.4
 requests==2.34.2
 ruamel-yaml==0.19.1
 safetensors==0.8.0
@@ -76,7 +77,6 @@ truststore==0.10.4
 typing-extensions==4.16.0
 typing-inspection==0.4.4
 tzdata==2026.4
-ujson==6.0.0
 urllib3==2.8.0
 uvicorn==0.54.0
 wcwidth==0.9.1
