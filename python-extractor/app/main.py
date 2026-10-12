@@ -38,10 +38,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS safely for local extension development
+# Enable CORS safely for chrome extension and web clients
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(chrome-extension://.*|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)$",
+    allow_origin_regex=r".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
