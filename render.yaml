@@ -8,3 +8,11 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.10
+      - key: OMP_NUM_THREADS
+        value: "2"
+      - key: OPENBLAS_NUM_THREADS
+        value: "2"
+      - key: MKL_NUM_THREADS
+        value: "2"
+      - key: ORT_INTRA_OP_NUM_THREADS
+        value: "2"
