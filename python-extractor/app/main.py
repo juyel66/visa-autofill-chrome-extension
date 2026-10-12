@@ -1,3 +1,11 @@
+import sys
+# Prevent AppLocker ImportError on Windows when ujson C-extension DLL is blocked
+if "ujson" not in sys.modules:
+    try:
+        import ujson  # noqa: F401
+    except Exception:
+        sys.modules["ujson"] = None
+
 import asyncio
 from contextlib import asynccontextmanager
 import time
@@ -67,8 +75,8 @@ def health_check():
     return {"status": "ok"}
 
 
-@app.post("/clear-cache")
-@app.get("/clear-cache")
+@app.post("/clear-cache", operation_id="clear_cache_post")
+@app.get("/clear-cache", operation_id="clear_cache_get")
 def clear_cache_endpoint():
     """Clear in-memory PDF extraction SHA-256 cache."""
     from .extractor import _EXTRACTION_CACHE
@@ -145,9 +153,9 @@ async def extract_passport_endpoint(file: UploadFile = File(...)):
         )
 
 
-@app.post("/applicant_photo")
-@app.post("/applicant-photo")
-@app.post("/api/applicant_photo")
+@app.post("/applicant_photo", operation_id="upload_applicant_photo")
+@app.post("/applicant-photo", operation_id="upload_applicant_photo_hyphenated")
+@app.post("/api/applicant_photo", operation_id="upload_applicant_photo_api")
 async def upload_applicant_photo_endpoint(
     applicant_photo: Optional[UploadFile] = File(None),
     photo: Optional[UploadFile] = File(None),
