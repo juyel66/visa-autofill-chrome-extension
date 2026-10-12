@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: indian-visa-autofill-backend
+    runtime: python
+    rootDir: python-extractor
+    buildCommand: pip install -r requirements.txt && (pip uninstall -y opencv-python opencv-contrib-python 2>/dev/null || true) && pip install opencv-python-headless==5.0.0.93
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.10
