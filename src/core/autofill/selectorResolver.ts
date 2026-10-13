@@ -7,6 +7,12 @@ function safeCssEscape(val: string): string {
   return val.replace(/([#;?%&,.+*~':"!^$[\]()=>|/\\@])/g, '\\$1')
 }
 
+function isHtmlElement(el: unknown): el is HTMLElement {
+  if (!el || typeof el !== 'object') return false
+  if (typeof HTMLElement !== 'undefined' && el instanceof HTMLElement) return true
+  return (el as any).nodeType === 1
+}
+
 /**
  * Single selector strategy resolution helper.
  */
@@ -22,15 +28,15 @@ function resolveSingleSelector(selector: FieldSelector): HTMLElement[] {
     switch (strategy) {
       case 'id': {
         const els = Array.from(document.querySelectorAll(`[id="${safeCssEscape(value)}"]`))
-        return els.filter((el): el is HTMLElement => el instanceof HTMLElement)
+        return els.filter(isHtmlElement)
       }
       case 'name': {
         const els = Array.from(document.querySelectorAll(`[name="${safeCssEscape(value)}"]`))
-        return els.filter((el): el is HTMLElement => el instanceof HTMLElement)
+        return els.filter(isHtmlElement)
       }
       case 'css': {
         const els = Array.from(document.querySelectorAll(value))
-        return els.filter((el): el is HTMLElement => el instanceof HTMLElement)
+        return els.filter(isHtmlElement)
       }
       case 'label': {
         // Strategy 1: Find <label for="value">
@@ -39,7 +45,7 @@ function resolveSingleSelector(selector: FieldSelector): HTMLElement[] {
           const forId = labelFor.getAttribute('for')
           if (forId) {
             const target = document.getElementById(forId)
-            if (target instanceof HTMLElement) {
+            if (isHtmlElement(target)) {
               elements.push(target)
             }
           }
@@ -49,7 +55,7 @@ function resolveSingleSelector(selector: FieldSelector): HTMLElement[] {
         for (const l of labels) {
           if (l.textContent && l.textContent.toLowerCase().includes(value.toLowerCase())) {
             const input = l.querySelector('input, select, textarea')
-            if (input instanceof HTMLElement) {
+            if (isHtmlElement(input)) {
               elements.push(input)
             }
           }
@@ -67,7 +73,7 @@ function resolveSingleSelector(selector: FieldSelector): HTMLElement[] {
         )
         let node = iterator.iterateNext()
         while (node) {
-          if (node instanceof HTMLElement) {
+          if (isHtmlElement(node)) {
             elements.push(node)
           }
           node = iterator.iterateNext()
