@@ -3,6 +3,8 @@ import {
   loginWithGoogle,
   logout as authLogout,
   restoreAuthSession,
+  getCanonicalAuthState,
+  subscribeAuthState,
   type AuthUser,
   AUTH_CONFIG,
 } from '../core/auth'
@@ -14,11 +16,14 @@ export type PopupPage = 'dashboard' | 'settings'
 export default function App() {
   const [activePage, setActivePage] = useState<PopupPage>('dashboard')
 
-  // Authentication State
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true)
+  // Authentication State: Initialize synchronously from canonical state for instant rendering
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => getCanonicalAuthState().user)
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(() => {
+    const canonical = getCanonicalAuthState()
+    return canonical.isLoading && !canonical.user
+  })
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false)
-  const [authError, setAuthError] = useState<string | null>(null)
+  const [authError, setAuthError] = useState<string | null>(() => getCanonicalAuthState().error)
 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -30,9 +35,20 @@ export default function App() {
     }, 3000)
   }
 
-  // Check authentication on startup
+  // Subscribe to canonical auth state & restore session immediately
   useEffect(() => {
     let isMounted = true
+
+    const unsubscribe = subscribeAuthState((state) => {
+      if (!isMounted) return
+      setAuthUser(state.user)
+      if (!state.isLoading) {
+        setIsAuthLoading(false)
+      }
+      if (state.error) {
+        setErrorMessage(state.error)
+      }
+    })
 
     restoreAuthSession()
       .then((res) => {
@@ -66,6 +82,7 @@ export default function App() {
 
     return () => {
       isMounted = false
+      unsubscribe()
     }
   }, [])
 
@@ -110,8 +127,8 @@ export default function App() {
     }
   }
 
-  // 1. Initial Loading State
-  if (isAuthLoading) {
+  // 1. Initial Loading State: Only shown if actively initializing without any cached user
+  if (isAuthLoading && !authUser) {
     return (
       <div className="w-80 p-6 min-h-[460px] bg-slate-900 text-slate-100 flex flex-col items-center justify-center font-sans">
         <div className="animate-spin text-2xl text-blue-500 mb-2">✦</div>
