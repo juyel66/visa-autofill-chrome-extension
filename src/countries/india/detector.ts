@@ -124,7 +124,9 @@ export function detectIndiaVisaPage(locationInfo?: LocationInfo): CountryPageDet
 
   // DOM structural fallbacks
   if (typeof document !== 'undefined' && page === 'UNKNOWN') {
-    if (document.querySelector('input[type="password"]')) {
+    if (document.querySelector('#countryname_id, select[name="appl.countryname"], #missioncode_id, select[name="appl.missioncode"]')) {
+      page = 'REGISTRATION'
+    } else if (document.querySelector('input[type="password"]')) {
       page = 'LOGIN'
     } else if (document.querySelector('input[name*="otp" i], input[id*="otp" i]')) {
       page = 'OTP'
