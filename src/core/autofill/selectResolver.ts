@@ -128,6 +128,17 @@ export const RELIGION_ALIAS_GROUPS: readonly (readonly string[])[] = [
   ['others', 'other'],
 ]
 
+/**
+ * Common Mission Office Alias Groups for Bangladesh Indian Visa Portals.
+ */
+export const MISSION_ALIAS_GROUPS: readonly (readonly string[])[] = [
+  ['bgdd', 'dhaka', 'bangladesh dhaka', 'bangladesh-dhaka'],
+  ['bgdc', 'chittagong', 'chattogram', 'bangladesh chittagong', 'bangladesh-chittagong'],
+  ['bgdk', 'khulna', 'bangladesh khulna', 'bangladesh-khulna'],
+  ['bgdr', 'rajshahi', 'bangladesh rajshahi', 'bangladesh-rajshahi'],
+  ['bgds', 'sylhet', 'bangladesh sylhet', 'bangladesh-sylhet'],
+]
+
 // Build fast lookup map from alias to group
 const ALIAS_TO_GROUP_MAP = new Map<string, readonly string[]>()
 for (const group of COUNTRY_NATIONALITY_ALIAS_GROUPS) {
@@ -141,6 +152,11 @@ for (const group of PORT_ALIAS_GROUPS) {
   }
 }
 for (const group of RELIGION_ALIAS_GROUPS) {
+  for (const item of group) {
+    ALIAS_TO_GROUP_MAP.set(cleanAlphanumeric(item), group)
+  }
+}
+for (const group of MISSION_ALIAS_GROUPS) {
   for (const item of group) {
     ALIAS_TO_GROUP_MAP.set(cleanAlphanumeric(item), group)
   }
@@ -779,7 +795,10 @@ export function findMatchingSelectOption(
       return { option: byRoadMatches[0], ambiguous: false, matchMethod: 'token-match' }
     }
 
-    return { option: null, ambiguous: true }
+    // If target has purpose semantic category, let Level 7 resolve with scoring instead of failing as ambiguous
+    if (!resolvePurposeSemanticCategory(targetValue)) {
+      return { option: null, ambiguous: true }
+    }
   }
 
   // 7. Level 7: Purpose of Visit Semantic Category & Keyword Relevance Ranking
@@ -797,7 +816,13 @@ export function findMatchingSelectOption(
 
       // Match on same semantic category
       if (optCategory && optCategory.category === targetCategory.category) {
-        score += 10
+        score += 15
+      }
+
+      // Primary category title prefix boost (e.g. "TOURIST VISA (T1) - ..." starts with "tourist visa")
+      const catNorm = targetCategory.category.toLowerCase()
+      if (optText.startsWith(catNorm) || optText.startsWith(normTarget)) {
+        score += 25
       }
 
       // Keyword density matches (how many keywords of this category are in option)
@@ -855,7 +880,8 @@ export function findMatchingSelectOption(
 }
 
 /**
- * Selects an option on an HTMLSelectElement and dispatches the standard DOM events.
+ * Selects an option on an HTMLSelectElement, synchronizes jQuery Chosen if present,
+ * and dispatches standard DOM events and portal lifecycle functions.
  */
 export function selectOptionAndDispatchEvents(
   element: HTMLSelectElement,
@@ -870,6 +896,108 @@ export function selectOptionAndDispatchEvents(
     }
   }
   setNativeInputValue(element, option.value)
+
+  // 1. Sync jQuery Chosen container if present
+  try {
+    const doc = element.ownerDocument || document
+    const containerId = `${element.id}_chosen`
+    const chosenContainer =
+      (element.id ? doc.getElementById(containerId) : null) ||
+      element.parentElement?.querySelector('.chosen-container') ||
+      (element.nextElementSibling?.classList?.contains('chosen-container')
+        ? (element.nextElementSibling as HTMLElement)
+        : null)
+
+    if (chosenContainer) {
+      const singleSpan = chosenContainer.querySelector('.chosen-single span')
+      if (singleSpan) {
+        singleSpan.textContent = option.text
+      }
+      chosenContainer.classList.remove('chosen-default')
+      const singleAnchor = chosenContainer.querySelector('.chosen-single')
+      if (singleAnchor) {
+        singleAnchor.classList.remove('chosen-default')
+      }
+
+      const resultLis = chosenContainer.querySelectorAll('.chosen-results li')
+      const optIdx = element.selectedIndex
+      resultLis.forEach((li, i) => {
+        const dataIdx = li.getAttribute('data-option-array-index')
+        if (dataIdx !== null && dataIdx !== undefined ? Number(dataIdx) === optIdx : i === optIdx) {
+          li.classList.add('result-selected')
+        } else {
+          li.classList.remove('result-selected')
+        }
+      })
+    }
+
+    // 2. Unhide purpose description & visa service rows on registration portal
+    if (
+      element.id === 'visaPurposeDropdown' ||
+      element.name === 'appl.purpose' ||
+      element.classList.contains('purpose_drp')
+    ) {
+      const purposeDiv = doc.getElementById('purpose_div_id')
+      if (purposeDiv) {
+        purposeDiv.style.display = 'block'
+      }
+      const descRow = doc.getElementById('purpose_desc_row_id')
+      if (descRow) {
+        descRow.style.display = 'block'
+      }
+      const descEl = doc.getElementById('purpose_desc_id')
+      if (descEl) {
+        descEl.textContent = option.text
+      }
+      const serviceRow = doc.getElementById('visit_service_div_id')
+      if (serviceRow) {
+        serviceRow.style.display = 'block'
+      }
+      const serviceEl = doc.getElementById('visaServiceID')
+      if (serviceEl) {
+        const catMatch = option.text.match(/^([A-Z\s]+(?:\([A-Z0-9-]+\))?)/i)
+        serviceEl.textContent = catMatch ? catMatch[1].trim() : option.text.split('-')[0].trim()
+      }
+    }
+
+    // 3. Main world script execution for portal cascading AJAX handlers and jQuery Chosen
+    const script = doc.createElement('script')
+    const elId = element.id
+    const val = option.value
+    script.textContent = `
+      (function() {
+        try {
+          var el = document.getElementById(${JSON.stringify(elId)});
+          if (el) {
+            if (window.jQuery) {
+              window.jQuery(el).trigger('chosen:updated').trigger('change');
+            }
+            if (typeof el.onchange === 'function') {
+              el.onchange();
+            }
+            if (el.id === 'countryname_id' && typeof window.change_pia === 'function') {
+              window.change_pia(${JSON.stringify(val)}, "missioncode_id");
+            }
+            if (el.id === 'missioncode_id' && typeof window.get_nationality === 'function') {
+              window.get_nationality(${JSON.stringify(val)});
+            }
+            if (el.id === 'nationality_id' && typeof window.fetchVisaServiceNew === 'function') {
+              var mEl = document.getElementById('missioncode_id');
+              var mVal = mEl ? mEl.value : '';
+              window.fetchVisaServiceNew(mVal, 1, ${JSON.stringify(val)});
+            }
+            if (el.id === 'visaPurposeDropdown' && typeof window.visit_purpose === 'function') {
+              window.visit_purpose(${JSON.stringify(val)});
+            }
+          }
+        } catch (e) {}
+      })();
+    `
+    ;(doc.head || doc.documentElement).appendChild(script)
+    script.remove()
+  } catch {
+    // sandbox / testing fallback
+  }
 }
 
 /**
@@ -954,34 +1082,116 @@ export function resolvePurposeFallbackOption(
   const normTarget = normalizeSelectString(targetValue)
   const cleanTarget = cleanAlphanumeric(targetValue)
 
-  // 1. Business
-  if (cleanTarget.includes('business') || normTarget.includes('business')) {
-    const busMatch = options.find((opt) => {
-      const n = normalizeSelectString(opt.text) + ' ' + normalizeSelectString(opt.value)
-      return n.includes('business')
+  // 0. Direct numeric or alphanumeric code match (e.g. 544, 545, 537, T1, M1, B1)
+  const codeMatch = options.find((opt) => {
+    const optVal = cleanAlphanumeric(opt.value)
+    if (optVal === cleanTarget) return true
+    if (cleanTarget.length >= 2 && cleanAlphanumeric(opt.text).includes(`(${cleanTarget})`)) return true
+    return false
+  })
+  if (codeMatch) return codeMatch
+
+  // 1. Medical Attendant (specific before Medical)
+  if (cleanTarget.includes('attendant') || cleanTarget.includes('m2')) {
+    const attendantMatch = options.find((opt) => {
+      const t = normalizeSelectString(opt.text)
+      return t.includes('medical visa (m2)') || t.includes('attendant')
     })
-    if (busMatch) return busMatch
+    if (attendantMatch) return attendantMatch
   }
 
-  // 2. Tourism
-  if (cleanTarget.includes('touris') || normTarget.includes('touris') || cleanTarget.includes('holiday')) {
-    const tourMatch = options.find((opt) => {
-      const n = normalizeSelectString(opt.text) + ' ' + normalizeSelectString(opt.value)
-      return n.includes('touris') || n.includes('holiday')
-    })
-    if (tourMatch) return tourMatch
-  }
-
-  // 3. Medical
-  if (cleanTarget.includes('medical') || normTarget.includes('medical')) {
+  // 2. Medical (Self / Treatment)
+  if (cleanTarget.includes('medical') || cleanTarget.includes('medself') || cleanTarget.includes('m1')) {
     const medMatch = options.find((opt) => {
-      const n = normalizeSelectString(opt.text) + ' ' + normalizeSelectString(opt.value)
-      return n.includes('medical')
+      const t = normalizeSelectString(opt.text)
+      return (t.startsWith('medical visa (m1)') || t.startsWith('medical visa')) && !t.includes('attendant')
     })
     if (medMatch) return medMatch
   }
 
-  // 4. Return first non-placeholder option
+  // 3. Tourism / Recreation
+  if (
+    cleanTarget.includes('touris') ||
+    normTarget.includes('holiday') ||
+    cleanTarget.includes('sightseeing') ||
+    cleanTarget.includes('t1')
+  ) {
+    const tourMatch = options.find((opt) => {
+      const t = normalizeSelectString(opt.text)
+      return (
+        t.startsWith('tourist visa (t1)') ||
+        t.startsWith('tourist visa') ||
+        t.includes('individual tourist') ||
+        t.includes('tourism')
+      ) && !t.includes('journalist')
+    })
+    if (tourMatch) return tourMatch
+  }
+
+  // 4. Business
+  if (cleanTarget.includes('business') || cleanTarget.includes('b1')) {
+    const busMatch = options.find((opt) => {
+      const t = normalizeSelectString(opt.text)
+      return t.startsWith('business visa (b1)') || t.startsWith('business visa') || t.includes('business activities')
+    })
+    if (busMatch) return busMatch
+  }
+
+  // 5. Conference
+  if (cleanTarget.includes('conference') || cleanTarget.includes('seminar') || cleanTarget.includes('b5')) {
+    const confMatch = options.find((opt) => {
+      const t = normalizeSelectString(opt.text)
+      return t.includes('conference')
+    })
+    if (confMatch) return confMatch
+  }
+
+  // 6. Student / Education
+  if (cleanTarget.includes('student') || cleanTarget.includes('study') || cleanTarget.includes('s1')) {
+    const studMatch = options.find((opt) => {
+      const t = normalizeSelectString(opt.text)
+      return t.startsWith('student visa (s1)') || t.startsWith('student visa') || t.includes('higher education')
+    })
+    if (studMatch) return studMatch
+  }
+
+  // 7. Transit
+  if (cleanTarget.includes('transit') || cleanTarget.includes('tr')) {
+    const transitMatch = options.find((opt) => {
+      const t = normalizeSelectString(opt.text)
+      return t.startsWith('transit visa') || t.includes('(tr)')
+    })
+    if (transitMatch) return transitMatch
+  }
+
+  // 8. Journalist
+  if (cleanTarget.includes('journalist') || cleanTarget.includes('j1')) {
+    const jourMatch = options.find((opt) => {
+      const t = normalizeSelectString(opt.text)
+      return t.startsWith('journalist visa') || t.includes('(j1)')
+    })
+    if (jourMatch) return jourMatch
+  }
+
+  // 9. Work / Employment
+  if (cleanTarget.includes('work') || cleanTarget.includes('employment') || cleanTarget.includes('e1')) {
+    const workMatch = options.find((opt) => {
+      const t = normalizeSelectString(opt.text)
+      return t.startsWith('work visa') || t.includes('employment')
+    })
+    if (workMatch) return workMatch
+  }
+
+  // 10. Visitor
+  if (cleanTarget.includes('visitor') || cleanTarget.includes('visit')) {
+    const visMatch = options.find((opt) => {
+      const t = normalizeSelectString(opt.text)
+      return t.includes('visitor visa') || t.includes('visit visa')
+    })
+    if (visMatch) return visMatch
+  }
+
+  // 11. Return first non-placeholder option
   return options[0] || null
 }
 
