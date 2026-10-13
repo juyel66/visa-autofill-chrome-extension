@@ -3,12 +3,17 @@
  */
 function isoDateToDdMmYyyy(val: string): string {
   if (!val) return val
-  const parts = val.split('-')
-  if (parts.length === 3 && parts[0].length === 4) {
-    const [year, month, day] = parts
+  const trimmed = val.trim()
+  // YYYY-MM-DD or YYYY/MM/DD
+  if (/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split(/[-/]/)
     return `${day}/${month}/${year}`
   }
-  return val
+  // DD-MM-YYYY
+  if (/^\d{2}-\d{2}-\d{4}$/.test(trimmed)) {
+    return trimmed.replace(/-/g, '/')
+  }
+  return trimmed
 }
 
 /**
