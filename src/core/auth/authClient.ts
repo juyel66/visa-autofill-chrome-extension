@@ -1,5 +1,12 @@
-import { getStoredAuth, setStoredAuth, clearStoredAuth } from './authStorage'
-import type { AuthUser } from './types'
+import {
+  getStoredAuth,
+  setStoredAuth,
+  clearStoredAuth,
+  TOKEN_ACCESS_KEY,
+  TOKEN_REFRESH_KEY,
+  USER_KEY,
+} from './authStorage'
+import type { AuthUser, AuthState } from './types'
 
 import {
   BACKEND_AUTH_BASE_URL,
@@ -12,6 +19,73 @@ export const AUTH_CONFIG = {
   GOOGLE_CLIENT_ID,
   BACKEND_URL: BACKEND_AUTH_BASE_URL,
   REDIRECT_URI,
+}
+
+// Canonical In-Memory Auth State for Instant Synchronous UI Restoration
+let canonicalAuthState: AuthState = {
+  isAuthenticated: false,
+  user: null,
+  isLoading: true,
+  error: null,
+}
+
+type AuthListener = (state: AuthState) => void
+const authListeners = new Set<AuthListener>()
+
+export function getCanonicalAuthState(): AuthState {
+  return { ...canonicalAuthState }
+}
+
+export function subscribeAuthState(listener: AuthListener): () => void {
+  authListeners.add(listener)
+  try {
+    listener({ ...canonicalAuthState })
+  } catch (err) {
+    console.error('Error invoking auth listener:', err)
+  }
+  return () => {
+    authListeners.delete(listener)
+  }
+}
+
+export function updateCanonicalAuthState(partial: Partial<AuthState>): void {
+  canonicalAuthState = { ...canonicalAuthState, ...partial }
+  authListeners.forEach((fn) => {
+    try {
+      fn({ ...canonicalAuthState })
+    } catch (err) {
+      console.error('Error notifying auth listener:', err)
+    }
+  })
+}
+
+// Cross-context storage synchronization for Manifest V3 (service worker restarts / multi-tab)
+if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+  try {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === 'local') {
+        if (changes[TOKEN_ACCESS_KEY] || changes[TOKEN_REFRESH_KEY] || changes[USER_KEY]) {
+          getStoredAuth().then((stored) => {
+            if (stored.user && stored.accessToken) {
+              updateCanonicalAuthState({
+                isAuthenticated: true,
+                user: stored.user,
+                isLoading: false,
+                error: null,
+              })
+            } else if (!stored.accessToken && !stored.refreshToken) {
+              updateCanonicalAuthState({
+                isAuthenticated: false,
+                user: null,
+                isLoading: false,
+                error: null,
+              })
+            }
+          })
+        }
+      }
+    })
+  } catch {}
 }
 
 /**
@@ -197,6 +271,13 @@ export async function loginWithGoogle(): Promise<AuthUser> {
     user
   )
 
+  updateCanonicalAuthState({
+    isAuthenticated: true,
+    user,
+    isLoading: false,
+    error: null,
+  })
+
   return user
 }
 
@@ -302,6 +383,12 @@ export async function refreshAccessToken(): Promise<string> {
         if (response.status === 401 || response.status === 403) {
           // Refresh token expired, revoked, or invalid -> clear invalid session
           await clearStoredAuth()
+          updateCanonicalAuthState({
+            isAuthenticated: false,
+            user: null,
+            isLoading: false,
+            error: null,
+          })
           throw new Error('Session expired. Please sign in again.')
         }
         // Server errors (500, 502, etc.) -> preserve session and throw
@@ -328,6 +415,12 @@ export async function refreshAccessToken(): Promise<string> {
 
       if (!newAccessToken) {
         await clearStoredAuth()
+        updateCanonicalAuthState({
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: null,
+        })
         throw new Error('Invalid token response from backend.')
       }
 
@@ -340,6 +433,16 @@ export async function refreshAccessToken(): Promise<string> {
         accessToken: newAccessToken,
         ...(newRefreshToken ? { refreshToken: newRefreshToken } : {}),
       })
+
+      const currentStored = await getStoredAuth()
+      if (currentStored.user) {
+        updateCanonicalAuthState({
+          isAuthenticated: true,
+          user: currentStored.user,
+          isLoading: false,
+          error: null,
+        })
+      }
 
       return newAccessToken
     } finally {
@@ -446,69 +549,177 @@ export interface RestoreSessionResult {
   error?: string
 }
 
+// In-flight initialization promise mutex: deduplicates multiple calls to restoreAuthSession
+let activeInitPromise: Promise<RestoreSessionResult> | null = null
+
+export function resetAuthClientStateForTesting(): void {
+  activeRefreshPromise = null
+  activeInitPromise = null
+  canonicalAuthState = {
+    isAuthenticated: false,
+    user: null,
+    isLoading: true,
+    error: null,
+  }
+}
+
 /**
  * Restores the persistent authentication session on Extension startup.
- * 1. Checks stored tokens.
- * 2. If access token is expired or near expiry, silently refreshes before opening.
- * 3. Verifies current user with backend without showing login screen.
- * 4. Only returns 'unauthenticated' if no session exists or refresh token is revoked/expired.
- * 5. If backend is unavailable, preserves the session and returns 'offline'.
+ * 1. Reads existing session from chrome.storage.local immediately.
+ * 2. If locally cached user session and unexpired access token exist, restores the
+ *    authenticated UI immediately with ZERO network requests (no unnecessary /api/auth/me).
+ * 3. If access token is expired, silently refreshes in background or coordinates single refresh.
+ * 4. Deduplicates concurrent / remount initialization calls via shared activeInitPromise.
+ * 5. Returns 'unauthenticated' if no session exists or refresh token is revoked/expired.
+ * 6. If backend is unavailable, preserves the session and returns 'offline'.
  */
-export async function restoreAuthSession(): Promise<RestoreSessionResult> {
-  const stored = await getStoredAuth()
-  const { accessToken, refreshToken, user: cachedUser } = stored
-
-  // 1. No stored session at all
-  if (!accessToken && !refreshToken) {
-    return { status: 'unauthenticated', user: null }
+export async function restoreAuthSession(options?: { forceVerify?: boolean }): Promise<RestoreSessionResult> {
+  if (activeInitPromise) {
+    return activeInitPromise
   }
 
-  // 2. If access token is expired or near expiry (or missing), silently refresh
-  if (refreshToken && (!accessToken || isTokenExpiredOrNearExpiry(accessToken))) {
+  activeInitPromise = (async () => {
     try {
-      await refreshAccessToken()
-    } catch (refreshErr: any) {
-      if (isNetworkError(refreshErr)) {
-        // Backend unavailable: do NOT delete valid persistent session!
-        return {
-          status: 'offline',
+      const stored = await getStoredAuth()
+      const { accessToken, refreshToken, user: cachedUser, expiresAt } = stored
+
+      // 1. No stored session at all
+      if (!accessToken && !refreshToken) {
+        updateCanonicalAuthState({
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: null,
+        })
+        return { status: 'unauthenticated', user: null }
+      }
+
+      // 2. Check access token expiration (buffer 60 seconds)
+      const isExpired = expiresAt != null
+        ? Date.now() >= expiresAt - 60000
+        : !accessToken || isTokenExpiredOrNearExpiry(accessToken, 60)
+
+      // 3. FAST PATH: Unexpired token + cached user -> INSTANT restoration without /me
+      if (!isExpired && cachedUser && !options?.forceVerify) {
+        updateCanonicalAuthState({
+          isAuthenticated: true,
           user: cachedUser,
-          error: 'Backend is temporarily unavailable. Session preserved.',
+          isLoading: false,
+          error: null,
+        })
+        return { status: 'authenticated', user: cachedUser }
+      }
+
+      // 4. If access token is expired or near expiry, silently refresh
+      if (refreshToken && (isExpired || !accessToken)) {
+        try {
+          await refreshAccessToken()
+          // If we had a cached user and no forceVerify requested, return immediately without /me
+          if (cachedUser && !options?.forceVerify) {
+            updateCanonicalAuthState({
+              isAuthenticated: true,
+              user: cachedUser,
+              isLoading: false,
+              error: null,
+            })
+            return { status: 'authenticated', user: cachedUser }
+          }
+        } catch (refreshErr: any) {
+          if (isNetworkError(refreshErr)) {
+            // Backend unavailable: do NOT delete valid persistent session!
+            updateCanonicalAuthState({
+              isAuthenticated: Boolean(cachedUser),
+              user: cachedUser,
+              isLoading: false,
+              error: 'Backend is temporarily unavailable. Working in offline mode.',
+            })
+            return {
+              status: 'offline',
+              user: cachedUser,
+              error: 'Backend is temporarily unavailable. Session preserved.',
+            }
+          }
+          // Refresh token is expired / revoked / invalid -> show login
+          updateCanonicalAuthState({
+            isAuthenticated: false,
+            user: null,
+            isLoading: false,
+            error: null,
+          })
+          return { status: 'unauthenticated', user: null }
         }
       }
-      // Refresh token is expired / revoked / invalid -> show login
-      return { status: 'unauthenticated', user: null }
-    }
-  }
 
-  // 3. Load / verify current user from backend
-  try {
-    const verifiedUser = await getCurrentUser()
-    if (verifiedUser) {
-      return { status: 'authenticated', user: verifiedUser }
-    }
+      // 5. Load / verify current user from backend only when cached user is missing or forceVerify requested
+      try {
+        const verifiedUser = await getCurrentUser()
+        if (verifiedUser) {
+          updateCanonicalAuthState({
+            isAuthenticated: true,
+            user: verifiedUser,
+            isLoading: false,
+            error: null,
+          })
+          return { status: 'authenticated', user: verifiedUser }
+        }
 
-    // Check if session was invalidated during verification
-    const after = await getStoredAuth()
-    if (!after.refreshToken && !after.accessToken) {
-      return { status: 'unauthenticated', user: null }
-    }
+        // Check if session was invalidated during verification
+        const after = await getStoredAuth()
+        if (!after.refreshToken && !after.accessToken) {
+          updateCanonicalAuthState({
+            isAuthenticated: false,
+            user: null,
+            isLoading: false,
+            error: null,
+          })
+          return { status: 'unauthenticated', user: null }
+        }
 
-    if (cachedUser) {
-      return { status: 'offline', user: cachedUser, error: 'Could not reach server to verify profile.' }
-    }
+        if (cachedUser) {
+          updateCanonicalAuthState({
+            isAuthenticated: true,
+            user: cachedUser,
+            isLoading: false,
+            error: 'Could not reach server to verify profile.',
+          })
+          return { status: 'offline', user: cachedUser, error: 'Could not reach server to verify profile.' }
+        }
 
-    return { status: 'unauthenticated', user: null }
-  } catch (err: any) {
-    if (isNetworkError(err)) {
-      return {
-        status: 'offline',
-        user: cachedUser,
-        error: 'Unable to connect to backend server. Session preserved.',
+        updateCanonicalAuthState({
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: null,
+        })
+        return { status: 'unauthenticated', user: null }
+      } catch (err: any) {
+        if (isNetworkError(err)) {
+          updateCanonicalAuthState({
+            isAuthenticated: Boolean(cachedUser),
+            user: cachedUser,
+            isLoading: false,
+            error: 'Unable to connect to backend server. Session preserved.',
+          })
+          return {
+            status: 'offline',
+            user: cachedUser,
+            error: 'Unable to connect to backend server. Session preserved.',
+          }
+        }
+        updateCanonicalAuthState({
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: null,
+        })
+        return { status: 'unauthenticated', user: null }
       }
+    } finally {
+      activeInitPromise = null
     }
-    return { status: 'unauthenticated', user: null }
-  }
+  })()
+
+  return activeInitPromise
 }
 
 /**
@@ -542,4 +753,10 @@ export async function logout(): Promise<void> {
   }
 
   await clearStoredAuth()
+  updateCanonicalAuthState({
+    isAuthenticated: false,
+    user: null,
+    isLoading: false,
+    error: null,
+  })
 }
