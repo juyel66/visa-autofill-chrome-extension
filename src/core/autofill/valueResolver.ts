@@ -62,6 +62,10 @@ export function resolveApplicantValue(
     if (applicant.registration?.indianMission && applicant.registration.indianMission.trim() !== '') {
       return applicant.registration.indianMission.trim()
     }
+    const rawVal = (applicant as any).fields?.['appl.missioncode']?.value || (applicant as any).fields?.['missioncode']?.value
+    if (rawVal && String(rawVal).trim() !== '') {
+      return String(rawVal).trim()
+    }
     if (applicant.notes) {
       const match = applicant.notes.match(/(?:indian\s+)?mission\s*:\s*([^\r\n]+)/i)
       if (match && match[1] && match[1].trim() !== '') {
@@ -84,6 +88,10 @@ export function resolveApplicantValue(
     if (applicant.travel?.intendedArrivalDate && applicant.travel.intendedArrivalDate.trim() !== '') {
       return applicant.travel.intendedArrivalDate.trim()
     }
+    const rawVal = (applicant as any).fields?.['appl.journeydate']?.value || (applicant as any).fields?.['journeydate']?.value
+    if (rawVal && String(rawVal).trim() !== '') {
+      return String(rawVal).trim()
+    }
     return undefined
   }
 
@@ -98,7 +106,54 @@ export function resolveApplicantValue(
     if (applicant.travel?.purposeOfVisit && applicant.travel.purposeOfVisit.trim() !== '') {
       return applicant.travel.purposeOfVisit.trim()
     }
+    const rawVal = (applicant as any).fields?.['purpose']?.value || (applicant as any).fields?.['appl.purpose']?.value
+    if (rawVal && String(rawVal).trim() !== '') {
+      return String(rawVal).trim()
+    }
+    return 'TOURISM'
+  }
+
+  // Registration Email (primary and confirmation)
+  if (path === 'contact.email' || path === 'appl.email' || path === 'email' || path === 'appl.email_re' || path === 'email_re') {
+    if (applicant.contact?.email && applicant.contact.email.trim() !== '') {
+      return applicant.contact.email.trim()
+    }
+    const rawVal = (applicant as any).fields?.['appl.email']?.value || (applicant as any).fields?.['contact.email']?.value || (applicant as any).fields?.['appl.email_re']?.value
+    if (rawVal && String(rawVal).trim() !== '') {
+      return String(rawVal).trim()
+    }
+    if (!options?.disableTemporaryEmail) {
+      return resolveRegistrationEmail(applicant, options).email
+    }
     return undefined
+  }
+
+  // Date of Birth
+  if (path === 'personalInfo.dateOfBirth' || path === 'appl.birthdate' || path === 'dob' || path === 'birthdate') {
+    if (applicant.personalInfo?.dateOfBirth && applicant.personalInfo.dateOfBirth.trim() !== '') {
+      return applicant.personalInfo.dateOfBirth.trim()
+    }
+    const rawVal = (applicant as any).fields?.['appl.birthdate']?.value || (applicant as any).fields?.['dob']?.value
+    if (rawVal && String(rawVal).trim() !== '') {
+      return String(rawVal).trim()
+    }
+    return undefined
+  }
+
+  // Nationality
+  if (path === 'personalInfo.nationality' || path === 'appl.nationality' || path === 'nationality') {
+    if (applicant.personalInfo?.nationality && applicant.personalInfo.nationality.trim() !== '') {
+      return applicant.personalInfo.nationality.trim()
+    }
+    const rawVal = (applicant as any).fields?.['appl.nationality']?.value
+    if (rawVal && String(rawVal).trim() !== '') {
+      return String(rawVal).trim()
+    }
+    const passNat = (applicant.passport as any)?.nationality || applicant.passport?.issuingCountry
+    if (passNat && passNat.trim() !== '') {
+      return passNat.trim()
+    }
+    return 'BANGLADESH'
   }
 
   // Country
