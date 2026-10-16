@@ -106,7 +106,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       ;(async () => {
         try {
           const ctrl = new AbortController()
-          const timer = setTimeout(() => ctrl.abort(), 2000)
+          const timer = setTimeout(() => ctrl.abort(), 3500)
           const res = await fetch(`${baseUrl}/health`, { signal: ctrl.signal })
           clearTimeout(timer)
           if (res.ok) {
@@ -158,34 +158,56 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             blob = new Blob([bytes], { type: mime })
           }
 
-          const formData = new FormData()
-          formData.append('file', blob, fileName || 'passport.pdf')
-
           const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 45000)
+          const timeoutId = setTimeout(() => controller.abort(), 55000)
+
+          const candidates: string[] = []
+          const addCand = (u?: string) => {
+            if (!u) return
+            const c = u.replace(/\/$/, '')
+            if (!candidates.includes(c)) candidates.push(c)
+          }
+          addCand(baseUrl)
+          addCand(altBaseUrl)
+          if (baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost')) {
+            addCand('http://127.0.0.1:8001')
+            addCand('http://localhost:8001')
+            addCand('https://visa-autofill-chrome-extension.onrender.com')
+          } else {
+            addCand('http://127.0.0.1:8001')
+            addCand('http://localhost:8001')
+            addCand('https://visa-autofill-chrome-extension.onrender.com')
+          }
 
           let response: Response | null = null
+          let lastErr: unknown = null
+
           try {
-            response = await fetch(`${baseUrl}/extract-passport`, {
-              method: 'POST',
-              body: formData,
-              signal: controller.signal,
-            })
-          } catch (firstErr) {
-            // Fallback attempt to altBaseUrl (localhost vs 127.0.0.1)
-            try {
-              const fallbackFormData = new FormData()
-              fallbackFormData.append('file', blob, fileName || 'passport.pdf')
-              response = await fetch(`${altBaseUrl}/extract-passport`, {
-                method: 'POST',
-                body: fallbackFormData,
-                signal: controller.signal,
-              })
-            } catch {
-              throw firstErr
+            for (const candUrl of candidates) {
+              try {
+                const attemptFormData = new FormData()
+                attemptFormData.append('file', blob, fileName || 'passport.pdf')
+                const res = await fetch(`${candUrl}/extract-passport`, {
+                  method: 'POST',
+                  body: attemptFormData,
+                  signal: controller.signal,
+                })
+                if (res) {
+                  response = res
+                  if (res.ok) {
+                    break
+                  }
+                }
+              } catch (err) {
+                lastErr = err
+              }
             }
           } finally {
             clearTimeout(timeoutId)
+          }
+
+          if (!response && lastErr) {
+            throw lastErr
           }
 
           let rawText = ''

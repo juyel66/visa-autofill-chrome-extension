@@ -794,7 +794,11 @@ export function getInFlightExtractionsCount(): number {
   return inFlightExtractions.size
 }
 
-async function checkHealthViaBackground(baseUrl: string): Promise<boolean> {
+const DEFAULT_LOCAL_PYTHON_URL = 'http://127.0.0.1:8001'
+const DEFAULT_ALT_LOCAL_PYTHON_URL = 'http://localhost:8001'
+const DEFAULT_CLOUD_PYTHON_URL = 'https://visa-autofill-chrome-extension.onrender.com'
+
+async function checkHealthViaBackground(baseUrl: string, timeoutMs: number = 3000): Promise<boolean> {
   if (typeof chrome === 'undefined' || typeof chrome.runtime?.sendMessage !== 'function') return false
   return new Promise((resolve) => {
     let settled = false
@@ -803,7 +807,7 @@ async function checkHealthViaBackground(baseUrl: string): Promise<boolean> {
         settled = true
         resolve(false)
       }
-    }, 1500)
+    }, timeoutMs + 1500)
 
     try {
       chrome.runtime.sendMessage(
@@ -830,6 +834,71 @@ async function checkHealthViaBackground(baseUrl: string): Promise<boolean> {
       }
     }
   })
+}
+
+export async function checkEndpointHealth(url: string, timeoutMs: number = 2000): Promise<boolean> {
+  const cleanUrl = url.replace(/\/$/, '')
+  try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+    const res = await fetch(`${cleanUrl}/health`, { signal: ctrl.signal }).catch(() => null)
+    clearTimeout(timer)
+    if (res && res.ok) {
+      const data = await res.json().catch(() => null)
+      if (data?.status === 'ok') {
+        return true
+      }
+    }
+  } catch {
+    // direct fetch failed
+  }
+
+  // In Chrome extension context, retry via background worker to bypass PNA / CORS restrictions
+  if (typeof chrome !== 'undefined' && typeof chrome.runtime?.sendMessage === 'function') {
+    const bgHealthy = await checkHealthViaBackground(cleanUrl, timeoutMs)
+    if (bgHealthy) return true
+  }
+
+  return false
+}
+
+export async function resolveActiveExtractorUrl(preferredUrl: string = LOCAL_EXTRACTOR_URL): Promise<string | null> {
+  const candidates: string[] = []
+  const addCandidate = (url?: string) => {
+    if (!url) return
+    const trimmed = url.trim().replace(/\/$/, '')
+    if (trimmed && !candidates.includes(trimmed)) {
+      candidates.push(trimmed)
+    }
+  }
+
+  const cleanPreferred = (preferredUrl || LOCAL_EXTRACTOR_URL).replace(/\/$/, '')
+  const isLocalPreferred = cleanPreferred.includes('127.0.0.1') || cleanPreferred.includes('localhost')
+
+  if (isLocalPreferred) {
+    addCandidate(cleanPreferred)
+    addCandidate(cleanPreferred.includes('127.0.0.1') ? cleanPreferred.replace('127.0.0.1', 'localhost') : cleanPreferred.replace('localhost', '127.0.0.1'))
+    addCandidate(DEFAULT_LOCAL_PYTHON_URL)
+    addCandidate(DEFAULT_ALT_LOCAL_PYTHON_URL)
+    addCandidate(DEFAULT_CLOUD_PYTHON_URL)
+  } else {
+    // Remote configured: check local first in case dev server is running on port 8001
+    addCandidate(DEFAULT_LOCAL_PYTHON_URL)
+    addCandidate(DEFAULT_ALT_LOCAL_PYTHON_URL)
+    addCandidate(cleanPreferred)
+    addCandidate(DEFAULT_CLOUD_PYTHON_URL)
+  }
+
+  for (const candidate of candidates) {
+    const isLocal = candidate.includes('127.0.0.1') || candidate.includes('localhost')
+    const timeout = isLocal ? 1500 : 3500
+    const healthy = await checkEndpointHealth(candidate, timeout)
+    if (healthy) {
+      return candidate
+    }
+  }
+
+  return null
 }
 
 async function delegateExtractionToBackground(
@@ -890,10 +959,7 @@ export async function extractPassportWithPython(
   fileName: string = 'passport.pdf',
   options?: PythonExtractorOptions
 ): Promise<PythonPassportExtractionResult> {
-  const baseUrl = (options?.baseUrl || LOCAL_EXTRACTOR_URL).replace(/\/$/, '')
-  const altBaseUrl = baseUrl.includes('127.0.0.1')
-    ? baseUrl.replace('127.0.0.1', 'localhost')
-    : baseUrl.replace('localhost', '127.0.0.1')
+  let activeUrl = (options?.baseUrl || LOCAL_EXTRACTOR_URL).replace(/\/$/, '')
   const timeoutMs = options?.timeoutMs ?? DEFAULT_EXTRACTION_TIMEOUT_MS
   const onProgress = options?.onProgress
 
@@ -919,50 +985,38 @@ export async function extractPassportWithPython(
     throw new PythonExtractorError('Uploaded document payload is empty.', 'INVALID_FILE')
   }
 
-  // 1. Fast pre-flight health check (max 1.5s) to detect offline server immediately in Chrome extension
+  // 1. Fast pre-flight health check to detect active server immediately in Chrome extension
   if (typeof chrome !== 'undefined' && chrome.runtime?.id && !options?.skipHealthCheck) {
-    let serverReachable = false
-    try {
-      const healthCtrl = new AbortController()
-      const healthTimer = setTimeout(() => healthCtrl.abort(), 1500)
-      const healthRes = await fetch(`${baseUrl}/health`, { signal: healthCtrl.signal }).catch(() => null)
-      clearTimeout(healthTimer)
-      if (healthRes && healthRes.ok) {
-        serverReachable = true
-      }
-    } catch {
-      serverReachable = false
-    }
-
-    if (!serverReachable) {
-      // Check alternative host (localhost vs 127.0.0.1)
-      try {
-        const altCtrl = new AbortController()
-        const altTimer = setTimeout(() => altCtrl.abort(), 1200)
-        const altRes = await fetch(`${altBaseUrl}/health`, { signal: altCtrl.signal }).catch(() => null)
-        clearTimeout(altTimer)
-        if (altRes && altRes.ok) {
-          serverReachable = true
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    if (!serverReachable) {
-      // Check if background service worker can reach it (PNA / CORS bypass)
-      serverReachable = await checkHealthViaBackground(baseUrl)
-    }
-
-    if (!serverReachable) {
+    const resolvedUrl = await resolveActiveExtractorUrl(activeUrl)
+    if (!resolvedUrl) {
       throw new PythonExtractorError(
         'Local Python OCR server is not running on port 8001. Please run "npm run dev" in terminal.',
         'UNAVAILABLE'
       )
     }
+    activeUrl = resolvedUrl
   }
 
+  const baseUrl = activeUrl
+  const altBaseUrl = baseUrl.includes('127.0.0.1')
+    ? baseUrl.replace('127.0.0.1', 'localhost')
+    : baseUrl.replace('localhost', '127.0.0.1')
+
   const arrayBuffer = await blob.arrayBuffer()
+  if (!originalDataUrl) {
+    try {
+      const mime = blob.type || 'application/pdf'
+      let binary = ''
+      const bytes = new Uint8Array(arrayBuffer)
+      const len = bytes.byteLength
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i])
+      }
+      originalDataUrl = `data:${mime};base64,${btoa(binary)}`
+    } catch {
+      // ignore
+    }
+  }
   const contentHash = await computeSha256(arrayBuffer)
   const dedupeKey = `${baseUrl}_sha256_${contentHash}`
 

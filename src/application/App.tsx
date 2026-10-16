@@ -24,7 +24,7 @@ import {
   deleteApplicantPhoto,
 } from '../core/application/applicationApi'
 import { getDraft, deleteDraft, getLatestDraft } from '../core/storage/draftDb'
-import { LOCAL_EXTRACTOR_URL } from '../core/extraction/local/pythonExtractorClient'
+import { LOCAL_EXTRACTOR_URL, resolveActiveExtractorUrl } from '../core/extraction/local/pythonExtractorClient'
 import {
   calculateWorkspaceProgress,
   isFieldFilled,
@@ -118,36 +118,26 @@ export const App: React.FC = () => {
     setTestingConnection(true)
     setTestResult(null)
     try {
-      const controller = new AbortController()
-      const tId = setTimeout(() => controller.abort(), 3000)
-      const res = await fetch(`${LOCAL_EXTRACTOR_URL}/health`, { signal: controller.signal })
-      clearTimeout(tId)
-      if (res.ok) {
-        const rawText = await res.text().catch(() => '')
-        let data: any = null
-        try {
-          data = rawText ? JSON.parse(rawText) : null
-        } catch {}
-        if (data?.status === 'ok') {
-          setIsPythonHealthy(true)
-          setTestResult({
-            success: true,
-            message: `✓ Connected to Python Local OCR Extractor at ${LOCAL_EXTRACTOR_URL}! Ready for passport extraction.`,
-          })
-          return
-        }
+      const activeUrl = await resolveActiveExtractorUrl(LOCAL_EXTRACTOR_URL)
+      if (activeUrl) {
+        setIsPythonHealthy(true)
+        setTestResult({
+          success: true,
+          message: `✓ Connected to Python OCR Extractor at ${activeUrl}! Ready for passport extraction.`,
+        })
+        return
       }
       setIsPythonHealthy(false)
       setTestResult({
         success: false,
-        message: `Extractor responded with status ${res.status}. Expected 'ok'.`,
+        message: `Connection failed: Local Python OCR server is not running on port 8001. Please run "npm run dev" in terminal.`,
       })
     } catch (err: unknown) {
       setIsPythonHealthy(false)
       const msg = err instanceof Error ? err.message : String(err)
       setTestResult({
         success: false,
-        message: `Connection failed: ${msg}. Start Python extractor with 'npm run dev' or 'python -m uvicorn app.main:app --port 8001'.`,
+        message: `Connection failed: ${msg}. Start Python extractor with 'npm run dev'.`,
       })
     } finally {
       setTestingConnection(false)
@@ -160,17 +150,8 @@ export const App: React.FC = () => {
       setLoading(true)
       try {
         // Check Python extractor health
-        fetch(`${LOCAL_EXTRACTOR_URL}/health`)
-          .then(async (r) => {
-            if (!r.ok) return null
-            const text = await r.text().catch(() => '')
-            try {
-              return text ? JSON.parse(text) : null
-            } catch {
-              return null
-            }
-          })
-          .then((d) => setIsPythonHealthy(d?.status === 'ok'))
+        resolveActiveExtractorUrl(LOCAL_EXTRACTOR_URL)
+          .then((url) => setIsPythonHealthy(Boolean(url)))
           .catch(() => setIsPythonHealthy(false))
 
         const urlParams = new URLSearchParams(window.location.search)

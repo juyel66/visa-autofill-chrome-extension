@@ -79,20 +79,21 @@ python-extractor/
 ## 3. Setup and Installation
 
 ### Prerequisites
-- Python 3.11 (Recommended: managed via `uv` or standard Python)
+- Python 3.12 (Recommended: stable, fully supported by RapidOCR, PaddleOCR, PyMuPDF, and ONNX Runtime)
 - Windows / macOS / Linux
+- On Windows: Microsoft Visual C++ 2015-2022 Redistributable (x64)
 
 ### 1. Create Virtual Environment
-Using `uv` (recommended):
+Using standard Python (Python 3.12):
 ```bash
 cd python-extractor
-uv venv .venv --python 3.11
+py -3.12 -m venv .venv
 ```
 
-Or using standard Python:
+Or using `uv` (if installed):
 ```bash
 cd python-extractor
-python -m venv .venv
+uv venv .venv --python 3.12
 ```
 
 ### 2. Install Dependencies

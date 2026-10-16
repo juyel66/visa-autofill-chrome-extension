@@ -14,7 +14,7 @@
  * - On Ctrl+C (SIGINT/SIGTERM): Vite is stopped, and Python is stopped ONLY IF started by this runner.
  */
 
-import { spawn, execSync } from 'node:child_process'
+import { spawn, execSync, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
@@ -28,10 +28,25 @@ const pythonExtractorDir = path.join(projectRoot, 'python-extractor')
 const isWin = process.platform === 'win32'
 
 /**
+ * Tests whether a Python executable can be run.
+ */
+function testExecutable(exePath) {
+  if (!exePath || !fs.existsSync(exePath)) return false
+  try {
+    execFileSync(exePath, ['-c', 'import sys; sys.exit(0)'], {
+      stdio: 'ignore',
+      timeout: 3000,
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Resolves an executable Python interpreter.
- * On Windows systems where AppLocker / Application Control blocks unsigned stub
- * executables in Desktop .venv\Scripts\python.exe, this detects the base Python
- * from pyvenv.cfg or uv cache and mounts the virtualenv's site-packages via PYTHONPATH.
+ * Verifies that the interpreter can actually run without crashing or being blocked.
+ * Supports fallback to base Python if virtual environment stub is blocked.
  */
 function resolvePythonEnvironment() {
   const venvDir = path.join(pythonExtractorDir, '.venv')
@@ -39,9 +54,16 @@ function resolvePythonEnvironment() {
     ? path.join(venvDir, 'Scripts', 'python.exe')
     : path.join(venvDir, 'bin', 'python')
 
-  const sitePackages = isWin
-    ? path.join(venvDir, 'Lib', 'site-packages')
-    : path.join(venvDir, 'lib', 'python3.11', 'site-packages')
+  let sitePackages = path.join(venvDir, 'Lib', 'site-packages')
+  if (!isWin) {
+    const libDir = path.join(venvDir, 'lib')
+    if (fs.existsSync(libDir)) {
+      const pyVerDirs = fs.readdirSync(libDir).filter((d) => d.startsWith('python3'))
+      if (pyVerDirs.length > 0) {
+        sitePackages = path.join(libDir, pyVerDirs[0], 'site-packages')
+      }
+    }
+  }
 
   // Check if pyvenv.cfg points to a base/home python
   let basePythonExe = null
@@ -53,7 +75,7 @@ function resolvePythonEnvironment() {
       if (match) {
         const homeDir = match[1].trim()
         const candidate = isWin ? path.join(homeDir, 'python.exe') : path.join(homeDir, 'python')
-        if (fs.existsSync(candidate)) {
+        if (testExecutable(candidate)) {
           basePythonExe = candidate
         }
       }
@@ -62,40 +84,33 @@ function resolvePythonEnvironment() {
     }
   }
 
-  // Check uv global cache if basePythonExe wasn't found yet on Windows
-  if (isWin && !basePythonExe) {
-    const uvPy311 = path.join(
-      process.env.APPDATA || '',
-      'uv',
-      'python',
-      'cpython-3.11-windows-x86_64-none',
-      'python.exe'
-    )
-    if (fs.existsSync(uvPy311)) {
-      basePythonExe = uvPy311
-    }
-  }
-
-  // Test whether defaultExe can be spawned without AppLocker / Application Control block
-  let canRunDefault = false
-  if (fs.existsSync(defaultExe)) {
-    try {
-      execSync(`"${defaultExe}" -c "exit(0)"`, { stdio: 'ignore', timeout: 3000 })
-      canRunDefault = true
-    } catch {
-      canRunDefault = false
-    }
-  }
-
   let finalExe = defaultExe
   let isFallback = false
+  const canRunDefault = testExecutable(defaultExe)
 
   if (!canRunDefault) {
-    if (basePythonExe) {
+    if (basePythonExe && testExecutable(basePythonExe)) {
       finalExe = basePythonExe
       isFallback = true
+    } else if (isWin) {
+      // Check system Python 3.12 via launcher or standard install path
+      try {
+        const pyOutput = execFileSync('py', ['-3.12', '-c', 'import sys; sys.stdout.write(sys.executable)'], {
+          encoding: 'utf-8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          timeout: 3000,
+        }).trim()
+        if (testExecutable(pyOutput)) {
+          finalExe = pyOutput
+          isFallback = true
+        }
+      } catch {
+        // ignore
+      }
     }
   }
+
+  const isValid = testExecutable(finalExe)
 
   const env = {
     ...process.env,
@@ -103,7 +118,7 @@ function resolvePythonEnvironment() {
     VIRTUAL_ENV: venvDir,
   }
 
-  // Prepend venv Scripts/bin to PATH
+  // Prepend venv Scripts/bin to PATH so executables and runtime DLLs are found
   const venvBinDir = isWin ? path.join(venvDir, 'Scripts') : path.join(venvDir, 'bin')
   const pathKey = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH'
   env[pathKey] = `${venvBinDir}${path.delimiter}${env[pathKey] || ''}`
@@ -116,6 +131,7 @@ function resolvePythonEnvironment() {
     pythonExe: finalExe,
     env,
     exists: fs.existsSync(finalExe),
+    isValid,
     isFallback,
   }
 }
@@ -281,36 +297,42 @@ async function run() {
         process.exit(1)
       }
     } else {
-      const { pythonExe, env, exists, isFallback } = resolvePythonEnvironment()
+      const { pythonExe, env, isValid, isFallback } = resolvePythonEnvironment()
 
-      if (!exists) {
+      if (!isValid) {
         logError('python', 'OCR server failed to start.')
-        logError('python', `Expected interpreter not found: ${path.relative(projectRoot, pythonExe)}`)
+        logError('python', `Valid or runnable Python interpreter not found: ${pythonExe}`)
         logError(
           'python',
-          'Please set up the virtual environment in python-extractor first:\n' +
+          'Please ensure a compatible Python version (3.12 recommended) is installed and the virtual environment is set up:\n' +
           '  cd python-extractor\n' +
-          '  python -m venv .venv\n' +
+          '  py -3.12 -m venv .venv\n' +
           '  .\\.venv\\Scripts\\pip install -r requirements.txt\n'
         )
         process.exit(1)
       }
 
       if (isFallback) {
-        logPython(`AppLocker/Policy bypass active: using verified base interpreter with venv site-packages: ${pythonExe}`)
+        logPython(`Fallback interpreter active: using verified base interpreter with venv site-packages: ${pythonExe}`)
       }
 
       logPython(`Starting OCR server on http://${HOST}:${PORT}...`)
 
+      const startupLogs = []
+      const captureLog = (line) => {
+        startupLogs.push(line)
+        if (startupLogs.length > 30) startupLogs.shift()
+      }
+
       try {
         pythonProcess = spawn(
-          isWin ? `"${pythonExe}"` : pythonExe,
+          pythonExe,
           ['-m', 'uvicorn', 'app.main:app', '--host', HOST, '--port', String(PORT)],
           {
             cwd: pythonExtractorDir,
             stdio: ['ignore', 'pipe', 'pipe'],
             env,
-            shell: isWin,
+            shell: false,
             windowsHide: true,
           }
         )
@@ -322,23 +344,33 @@ async function run() {
 
       startedPythonByUs = true
 
-      pipeStreamWithPrefix(pythonProcess.stdout, logPython)
-      pipeStreamWithPrefix(pythonProcess.stderr, logPython)
+      pipeStreamWithPrefix(pythonProcess.stdout, (msg) => {
+        logPython(msg)
+        captureLog(msg)
+      })
+      pipeStreamWithPrefix(pythonProcess.stderr, (msg) => {
+        logPython(msg)
+        captureLog(msg)
+      })
 
       pythonProcess.on('error', (err) => {
         logError('python', `Failed to start Python process: ${err.message}`)
         shutdown(1)
       })
 
+      let isReady = false
+
       pythonProcess.on('exit', (code, signal) => {
         if (!isShuttingDown) {
           logError('python', `OCR server stopped unexpectedly with code ${code ?? signal}`)
+          if (!isReady && startupLogs.length > 0) {
+            logError('python', `Recent OCR server logs:\n  ${startupLogs.join('\n  ')}`)
+          }
           shutdown(code || 1)
         }
       })
 
       // Poll until /health responds
-      let isReady = false
       const pollStart = Date.now()
       const MAX_WAIT_MS = 30000
 
@@ -356,6 +388,9 @@ async function run() {
 
       if (!isReady) {
         logError('python', `OCR server did not become ready at ${HEALTH_URL} within 30 seconds.`)
+        if (startupLogs.length > 0) {
+          logError('python', `Recent OCR server logs:\n  ${startupLogs.join('\n  ')}`)
+        }
         shutdown(1)
         return
       }
